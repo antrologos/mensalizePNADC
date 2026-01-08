@@ -318,7 +318,7 @@ For Q1 2023: date_min = Jan 7, date_max = Mar 4 + 21 = Mar 25.
 
 **Goal**: Narrow the possible interview date window using each person's birthday and reported age.
 
-**Key insight**: The reported age combined with birth year tells us whether the interview happened before or after the person's birthday this year.
+**Key insight**: The reported age combined with birth year tells us whether the interview happened before or after the person's birthday this year. 
 
 **The calculation**:
 
