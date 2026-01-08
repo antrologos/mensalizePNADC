@@ -19,21 +19,134 @@ knitr::opts_chunk$set(
 
 The `mensalizePNADC` package converts Brazil's quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data into monthly time series. It provides two main capabilities:
 
-1. **Reference month identification**: Determines which month within each quarter each survey observation refers to (typically ~96% determination rate for 2013-2019 data)
-2. **Monthly weight computation**: Adjusts survey weights for monthly (instead of quarterly) estimates using rake weighting
+1. **Reference month identification**: Determines which month within each quarter each survey observation refers to
+2. **Monthly weight computation**: Adjusts survey weights for monthly (instead of quarterly) estimates
+
+### Performance Summary
+
+Tested on 55 quarters (2012Q1 - 2025Q3) with 28,395,273 observations:
+
+| Metric | Result |
+|--------|--------|
+| Overall determination rate | **95.83%** |
+| Processing time (basic mode) | 6.3 minutes |
+| Processing time (with weights) | 8.1 minutes |
+| Best period (2013-2019) | 96-99% determination |
 
 ## Installation
 
 ```{r installation}
-# Install from GitHub (when available)
-# devtools::install_github("PLACEHOLDER/mensalizePNADC")
-
-# Or install locally
-devtools::install("path/to/mensalizePNADC")
-
-# Or using R CMD INSTALL from the command line
-# R CMD INSTALL mensalizePNADC
+# Install from GitHub
+devtools::install_github("antrologos/mensalizePNADC")
 ```
+
+## Important: Use Stacked Data
+
+The algorithm achieves **95.83% determination rate** when processing **stacked multi-quarter data**. If you process quarters individually, you'll only get ~65-75% determination.
+
+| Processing Mode | Determination Rate |
+|-----------------|-------------------|
+| Per-quarter (single quarter) | 65-75% |
+| Stacked (multi-quarter) | **95.83%** |
+
+**Recommended**: Stack at least 2 years of quarterly data before calling `mensalizePNADC()`.
+
+---
+
+## Algorithm Overview: Visual Diagram
+
+The reference month identification follows a 6-step pipeline. Here's the complete flow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    REFERENCE MONTH IDENTIFICATION PIPELINE                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+INPUTS (per observation):
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  Year (Ano)  │  │  Quarter     │  │  Birthday    │  │  Age         │
+│              │  │  (Trimestre) │  │  (V2008/1/2) │  │  (V2009)     │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+        │                │                  │                 │
+        ▼                ▼                  ▼                 ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Calculate Valid Interview Saturdays                                 │
+│         (IBGE "Parada Técnica" Rules)                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  For each month, find first Saturday with ≥4 days in that month.            │
+│  This defines when interviews for that month's reference week can occur.    │
+│                                                                             │
+│  OUTPUT: date_min = First Saturday of Month 1                               │
+│          date_max = First Saturday of Month 3 + 21 days                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: Apply Birthday Constraints                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Compare (Survey_Year - Birth_Year) with Reported_Age to determine if      │
+│  interview was BEFORE or AFTER the person's birthday this year.            │
+│                                                                             │
+│  If AFTER birthday  → date_min = max(date_min, Sat_after_birthday)          │
+│  If BEFORE birthday → date_max = min(date_max, Sat_before_birthday)         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Convert Date Ranges to Month Positions (1, 2, or 3)                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  month_min_pos = which month does date_min fall in?                         │
+│  month_max_pos = which month does date_max fall in?                         │
+│                                                                             │
+│  Special handling: days 1-3 of a month belong to previous month's week      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: Aggregate to UPA-Panel Level                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  All people in same (UPA, V1014) are interviewed in the SAME MONTH.         │
+│  Take intersection of all individual constraints:                           │
+│                                                                             │
+│    upa_month_min = max(all individual month_min_pos)                        │
+│    upa_month_max = min(all individual month_max_pos)                        │
+│                                                                             │
+│  If upa_month_min = upa_month_max → DETERMINED!                             │
+│  If upa_month_min < upa_month_max → Still ambiguous, try Step 5             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: Cross-Quarter Aggregation (KEY INNOVATION)                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PNADC uses ROTATING PANEL: same (UPA, V1014) interviewed in SAME MONTH     │
+│  POSITION across all quarterly visits (up to 5 consecutive quarters).       │
+│                                                                             │
+│  Combine constraints from ALL quarters → dramatically improves accuracy:    │
+│                                                                             │
+│    Per-quarter only:  ~65-75% determination                                 │
+│    Cross-quarter:     ~95.83% determination                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 6: Handle Exception Quarters                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  For quarters with non-standard timing (2016t3, 2016t4, 2017t2, 2022t3,     │
+│  2023t2), apply relaxed rule: ≥3 days instead of ≥4 days.                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ OUTPUT                                                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ref_month_in_quarter: 1, 2, 3, or NA (indeterminate)                       │
+│  ref_month:            Full date (e.g., 2023-02-01)                         │
+│  ref_month_yyyymm:     Integer format (e.g., 202302)                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Basic Usage: Identifying Reference Months
 
@@ -49,12 +162,12 @@ You need stacked quarterly PNADC data with at least these columns:
 | `Trimestre` | Quarter (1-4) |
 | `UPA` | Primary Sampling Unit |
 | `V1014` | Panel identifier |
+| `V1008` | Household identifier |
+| `V2003` | Person identifier |
 | `V2008` | Birth day (1-31, or 99 for unknown) |
 | `V20081` | Birth month (1-12, or 99 for unknown) |
 | `V20082` | Birth year (or 9999 for unknown) |
 | `V2009` | Age |
-
-Plus join keys: `V1008` (household) and `V2003` (person)
 
 ```{r load-data}
 library(mensalizePNADC)
@@ -74,13 +187,15 @@ cat("Quarters:", uniqueN(pnadc[, .(Ano, Trimestre)]), "\n")
 
 ```{r get-crosswalk}
 crosswalk <- mensalizePNADC(pnadc)
+# Step 1/1: Identifying reference months...
+#   Determination rate: 95.8%
 
 print(crosswalk)
 # PNADC Reference Month Crosswalk
 # -------------------------------
-# Observations: 15,836,117
-# Determination rate: 96.3%
-# Date range: 201301 - 201912
+# Observations: 28,395,273
+# Determination rate: 95.8%
+# Date range: 201201 - 202509
 #
 # Join keys: Ano, Trimestre, UPA, V1008, V1014, V2003
 # Output columns: ref_month, ref_month_in_quarter, ref_month_yyyymm
@@ -124,74 +239,434 @@ monthly_data[, .(
 ), by = Ano]
 ```
 
+---
+
+## How the Algorithm Works: Detailed Explanation
+
+The reference month identification algorithm determines which of the three months in a quarter each survey observation belongs to. This section explains each step in detail with concrete examples.
+
+### Background: PNADC Survey Structure
+
+PNADC interviews households in **reference weeks** throughout each quarter. Each reference week:
+
+- Ends on a **Saturday**
+- Belongs to a specific **reference month** (the month containing most of the week)
+- Follows IBGE's "Parada Técnica" (technical break) scheduling rules
+
+The challenge: PNADC microdata only records the **quarter** (Trimestre), not the specific month. This package recovers the month using birthday constraints and panel structure.
+
+---
+
+### Step 1: Calculate Valid Interview Saturdays
+
+**Goal**: Determine which Saturdays can serve as the end of a reference week for each month.
+
+**IBGE Rule**: A reference week belongs to a month only if that Saturday has **at least 4 days** within the month. This ensures the majority of the 7-day reference week falls within that month.
+
+**How we calculate the first valid Saturday**:
+
+```
+first_saturday_day = day of the first Saturday of the month
+if first_saturday_day >= 4:
+    use this Saturday (it has enough days in the month)
+else:
+    use the second Saturday (first_saturday_day + 7)
+```
+
+**Detailed Example for Q1 2023**:
+
+```
+JANUARY 2023:
+  Sun  Mon  Tue  Wed  Thu  Fri  SAT
+   1    2    3    4    5    6   [7]  ← First Saturday is day 7
+                                     7 ≥ 4? YES → Valid! (7 days in January)
+
+FEBRUARY 2023:
+  Wed  Thu  Fri  SAT  ...
+   1    2    3   [4]              ← First Saturday is day 4
+                                  4 ≥ 4? YES → Valid! (4 days in February)
+
+MARCH 2023:
+  Wed  Thu  Fri  SAT  ...
+   1    2    3   [4]              ← First Saturday is day 4
+                                  4 ≥ 4? YES → Valid! (4 days in March)
+```
+
+**Counter-example showing when we skip to second Saturday**:
+
+```
+APRIL 2023:
+  SAT  Sun  Mon  Tue  ...
+  [1]   2    3    4              ← First Saturday is day 1
+                                  1 ≥ 4? NO → Skip!
+
+  Fri  SAT  Sun  ...
+   7   [8]   9                   ← Second Saturday is day 8
+                                  Use this one instead
+```
+
+**Why this matters**: The valid Saturday calculation defines the **possible interview date range** for the quarter:
+
+- `date_min` = First valid Saturday of Month 1
+- `date_max` = First valid Saturday of Month 3 + 21 days (allowing for 4 reference weeks)
+
+For Q1 2023: date_min = Jan 7, date_max = Mar 4 + 21 = Mar 25.
+
+---
+
+### Step 2: Apply Birthday Constraints
+
+**Goal**: Narrow the possible interview date window using each person's birthday and reported age.
+
+**Key insight**: The reported age combined with birth year tells us whether the interview happened before or after the person's birthday this year.
+
+**The calculation**:
+
+```
+visit_before_birthday = (Survey_Year - Birth_Year) - Reported_Age
+
+If = 0: Interview was AFTER birthday (person already celebrated this year)
+If = 1: Interview was BEFORE birthday (birthday hasn't happened yet)
+```
+
+**Detailed Example 1: Interview AFTER birthday**
+
+```
+Person: Born March 15, 1990
+Survey Year: 2023
+Reported Age: 33
+
+Check: 2023 - 1990 = 33
+       33 - 33 = 0  → Interview was AFTER March 15, 2023
+
+Constraint: date_min = max(date_min, first_Saturday_on_or_after(March 15))
+            date_min = max(Jan 7, March 18) = March 18
+
+This person can only have been interviewed in MARCH (month 3).
+The first two months are ruled out!
+```
+
+**Detailed Example 2: Interview BEFORE birthday**
+
+```
+Person: Born March 15, 1990
+Survey Year: 2023
+Reported Age: 32
+
+Check: 2023 - 1990 = 33
+       33 - 32 = 1  → Interview was BEFORE March 15, 2023
+
+Constraint: date_max = min(date_max, Saturday_before(March 15))
+            date_max = min(March 25, March 11) = March 11
+
+This person can only have been interviewed in JANUARY or FEBRUARY.
+March is ruled out!
+```
+
+**Why Saturdays?** Since reference weeks end on Saturdays, we constrain to the first Saturday after (or before) the birthday, not the birthday itself. This aligns with IBGE's scheduling.
+
+**Unknown birthdays**: When V2008=99, V20081=99, or V20082=9999 (unknown), that person's birthday cannot constrain the date. However, they may still be determined through household aggregation (Step 4) or cross-quarter aggregation (Step 5).
+
+---
+
+### Step 3: Convert Date Ranges to Month Positions
+
+**Goal**: Transform the date window [date_min, date_max] into month-in-quarter positions (1, 2, or 3).
+
+**Basic conversion**:
+
+```
+month_min_pos = which month of the quarter does date_min fall in?
+month_max_pos = which month of the quarter does date_max fall in?
+```
+
+**Boundary handling (days 1-3 of a month)**:
+
+Interviews on days 1-3 of a month typically belong to a reference week that **started in the previous month**. The algorithm handles this:
+
+```
+For date_min: if day ≤ 3 AND not in first month of quarter:
+              subtract 1 from month position
+
+For date_max: if day ≤ 3:
+              use the month of (date - 3 days) instead
+```
+
+**Example**:
+
+```
+date_min = March 2, 2023 (Q1)
+  Day 2 ≤ 3 and March is not month 1 of Q1
+  → month_min_pos = 3 - 1 = 2 (February)
+
+date_max = March 25, 2023 (Q1)
+  Day 25 > 3
+  → month_max_pos = 3 (March)
+
+Result: month_min_pos=2, month_max_pos=3 → still ambiguous (Feb or Mar)
+```
+
+**Determination check**:
+
+```
+If month_min_pos = month_max_pos → Reference month DETERMINED
+If month_min_pos < month_max_pos → Still ambiguous, need more constraints
+If month_min_pos > month_max_pos → Inconsistent (contradictory birthday data)
+```
+
+---
+
+### Step 4: Aggregate to UPA-Panel Level
+
+**Goal**: Combine constraints from all household members interviewed together.
+
+**Key insight**: All people in the same **UPA + V1014 (panel)** are interviewed together in the **same reference month**. Their individual constraints with respect to the month must all be satisfied simultaneously.
+
+**The aggregation**:
+
+```
+upa_month_min = MAX of all individual month_min_pos
+upa_month_max = MIN of all individual month_max_pos
+```
+
+**Why this works**: Taking the maximum of minimums and minimum of maximums gives us the **intersection** of all individual constraint windows.
+
+**Detailed Example**:
+
+```
+Household (UPA=123456, V1014=1) has 3 members:
+
+Person A: month_min=1, month_max=2 (could be Jan or Feb)
+Person B: month_min=1, month_max=3 (could be Jan, Feb, or Mar)
+Person C: month_min=2, month_max=3 (could be Feb or Mar)
+
+Aggregation:
+  upa_month_min = max(1, 1, 2) = 2
+  upa_month_max = min(2, 3, 3) = 2
+
+Result: min=2, max=2 → Reference month is FEBRUARY!
+
+Visual representation:
+              Jan    Feb    Mar
+Person A:     [======]
+Person B:     [=============]
+Person C:            [========]
+Intersection:        [==]      ← Only February satisfies all constraints
+```
+
+**What if constraints are inconsistent?**
+
+```
+Person A: month_min=1, month_max=1 (must be Jan)
+Person B: month_min=3, month_max=3 (must be Mar)
+
+upa_month_min = max(1, 3) = 3
+upa_month_max = min(1, 3) = 1
+
+Result: min=3 > max=1 → INCONSISTENT!
+
+This is rare and usually indicates data quality issues.
+These observations remain indeterminate (ref_month_in_quarter = NA).
+```
+
+---
+
+### Step 5: Cross-Quarter Aggregation (The Key Innovation)
+
+**Goal**: Leverage PNADC's rotating panel design to combine constraints across quarters.
+
+**PNADC Panel Structure**:
+
+PNADC uses a rotating panel where each household (UPA + V1014) is interviewed for **5 consecutive quarters**. Crucially, the same household is always interviewed in the **same relative month position within the quarter** across all visits (always month 1, always month 2, or always month 3).
+
+```
+UPA=123456, V1014=1 interview schedule:
+  2023-Q1: Month 1 of the quarter → January
+  2023-Q2: Month 1 of the quarter → April
+  2023-Q3: Month 1 of the quarter → July
+  2023-Q4: Month 1 of the quarter → October
+  2024-Q1: Month 1 of the quarter → January
+           [Then rotates out]
+```
+
+**The aggregation logic**:
+
+Since the relative month position is constant across quarters, constraints from **any** quarter apply to **all** quarters for that UPA-V1014:
+
+```
+For each (UPA, V1014) group across ALL quarters:
+  upa_month_min = MAX of all month_min_pos from all quarters
+  upa_month_max = MIN of all month_max_pos from all quarters
+```
+
+**Detailed Example**:
+
+```
+UPA=123456, V1014=1 appears in 5 quarters:
+
+  2023-Q1: month_min=1, month_max=2 (ambiguous: Jan or Feb)
+  2023-Q2: month_min=1, month_max=3 (ambiguous: Apr, May, or Jun)
+  2023-Q3: month_min=2, month_max=2 (DETERMINED: Aug, i.e., month 2)
+  2023-Q4: month_min=1, month_max=2 (ambiguous: Oct or Nov)
+  2024-Q1: month_min=2, month_max=3 (ambiguous: Feb or Mar)
+
+Cross-quarter aggregation:
+  upa_month_min = max(1, 1, 2, 1, 2) = 2
+  upa_month_max = min(2, 3, 2, 2, 3) = 2
+
+Result: ALL 5 quarters get ref_month_in_quarter = 2
+
+This means:
+  2023-Q1 → February
+  2023-Q2 → May
+  2023-Q3 → August
+  2023-Q4 → November
+  2024-Q1 → February
+```
+
+**Why this is so powerful**:
+
+A household that is ambiguous in Q1 (could be month 1 or 2) might have a birthday in Q3 that conclusively determines month 2. That determination propagates back to Q1!
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ IMPACT ON DETERMINATION RATE:                                      │
+│                                                                     │
+│   Per-quarter processing (each quarter alone):    ~65-75%          │
+│   Stacked multi-quarter (cross-quarter):          ~95.83%          │
+│                                                                     │
+│   Improvement: +25-30 percentage points!                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**This is why you should always stack multiple quarters before calling `mensalizePNADC()`!**
+
+---
+
+### Step 6: Handle Exception Quarters
+
+**Goal**: Apply relaxed rules for quarters where IBGE used non-standard scheduling.
+
+**Background**: In some quarters, IBGE's technical breaks crossed month boundaries in unusual ways. The standard rule (≥4 days) may produce impossible results for these quarters.
+
+**Exception quarters**:
+
+```{r exceptions}
+get_exception_quarters()
+# [1] "2016t3" "2016t4" "2017t2" "2022t3" "2023t2"
+```
+
+**Relaxed rule**: For observations still indeterminate after Step 5 in exception quarters, the algorithm:
+
+1. Recalculates first valid Saturdays with **min_days = 3** (instead of 4)
+2. Recalculates date ranges and applies birthday constraints
+3. Recalculates month positions with adjusted boundary handling (day ≤ 2 instead of ≤ 3)
+4. Re-aggregates to UPA-Panel level
+5. If now determined, uses this result; otherwise remains NA
+
+**Example**: In 2016t3, a Saturday that falls on day 3 of a month would be skipped under the standard rule (3 < 4) but accepted under the exception rule (3 ≥ 3).
+
+---
+
+### Summary: What Makes Observations Indeterminate?
+
+After all 6 steps, approximately **4.2% of observations** remain indeterminate (ref_month_in_quarter = NA). Common reasons:
+
+| Reason | Description |
+|--------|-------------|
+| All members have unknown birthdays | No birthday constraints available for the household |
+| Single-quarter UPA-V1014 | Panel appears in only one quarter with insufficient constraints |
+| Contradictory constraints | Birthday data is inconsistent (rare, indicates data quality issues) |
+| Insufficient cross-quarter overlap | Not enough informative birthdays across the panel's visits |
+
+**Handling indeterminate observations**:
+
+- **Exclude**: Remove from monthly analysis
+- **Quarterly fallback**: Use original quarterly weights for these observations
+- **Proportional distribution**: Distribute 1/3 to each of the three months
+
+---
+
 ## Computing Monthly Weights
 
 For monthly aggregate estimates (e.g., monthly employment counts), you need monthly-appropriate survey weights.
 
-### Required additional variables
+### Required Additional Variables
 
 | Variable | Description |
 |----------|-------------|
 | `V1028` | Original quarterly survey weight |
-| `V1008` | Household identifier (join key) |
-| `V2003` | Person identifier (join key) |
 | `UF` | State code |
 | `posest` | Post-stratification cell |
 | `posest_sxi` | Post-stratification group |
 
+### How Weight Calibration Works
+
+When `compute_weights = TRUE`, the package:
+
+1. **Fetches monthly population from SIDRA API** (table 6022)
+   - SIDRA provides moving-quarter estimates
+   - Package transforms to exact monthly values
+   - Boundary months extrapolated via quadratic regression
+
+2. **Applies hierarchical rake weighting** across nested cells:
+   - `celula1`: Age groups (0-13, 14-29, 30-59, 60+)
+   - `celula2`: Post-stratum group + age
+   - `celula3`: State (UF) + celula2
+   - `celula4`: Post-stratum (posest) + celula2
+
+3. **Calibrates to monthly population totals**
+
 ```{r monthly-weights}
 # Load full data with all required variables
-pnadc_full <- read_dta("PNADCtrimestralempilhada.dta")
-
-# Load monthly population totals
-monthly_pop <- read_dta("monthly_population_totals.dta")
+pnadc_full <- fread("pnadc_stacked_full.csv")
 
 # Run mensalization with weight computation
+# (automatically fetches population from SIDRA API)
 result <- mensalizePNADC(pnadc_full,
   compute_weights = TRUE,
-  monthly_totals = monthly_pop,
   verbose = TRUE)
+# Step 1/4: Identifying reference months...
+#   Determination rate: 95.8%
+# Step 2/4: Fetching monthly population from SIDRA...
+# Step 3/4: Calibrating monthly weights (rake weighting)...
+# Step 4/4: Smoothing monthly aggregates...
 
 # Use weight_monthly for monthly estimates
-monthly_estimates <- result[, .(
+monthly_pop <- result[, .(
   population = sum(weight_monthly, na.rm = TRUE)
 ), by = ref_month_yyyymm]
 ```
 
-The `weight_monthly` output is the **final weight** for general-purpose monthly analysis.
+The `weight_monthly` output is calibrated to match IBGE's official monthly population estimates (~206 million average).
 
-## Optional: Theme-Specific SIDRA Calibration
+---
 
-If you need your estimates to exactly match IBGE's official SIDRA published series, use `calibrate_to_sidra()` **after** running `mensalizePNADC()`:
+## Topic-Specific Calibration (Coming Soon)
 
-```{r sidra-calibration}
-# First, get base weights
-result <- mensalizePNADC(pnadc_full,
-  compute_weights = TRUE,
-  monthly_totals = monthly_pop)
+A future version will include `calibrate_to_sidra()` for **theme-specific Bayesian calibration** to exactly match IBGE's published SIDRA series for specific indicators.
 
-# Then, calibrate specifically for unemployment analysis
-unemployment_data <- calibrate_to_sidra(result,
-  theme = "unemployment",
-  sidra_series = sidra_targets)
+### How It Will Work
 
-# Calculate unemployment rate (will match IBGE SIDRA exactly)
-unemployment_data[, .(
-  rate = sum(weight_sidra * (VD4002 == 2)) /
-         sum(weight_sidra * (VD4001 == 1)) * 100
-), by = ref_month_yyyymm]
-```
+The base `weight_monthly` provides general-purpose monthly weights calibrated to population totals. However, different labor market indicators (unemployment rate, employment level, income) may require slightly different weight adjustments to exactly match IBGE's official published series.
 
-### Why separate SIDRA calibration?
+The `calibrate_to_sidra()` function will:
 
-Different themes (unemployment, employment, income) require different Bayesian calibrations. The base `weight_monthly` from `mensalizePNADC()` is appropriate for most analyses, but if you need exact alignment with specific IBGE published series, choose the theme that matches your analysis:
+1. **Fetch target series** from SIDRA (e.g., unemployment rate, employment levels)
+2. **Apply Bayesian adjustment** to weights so aggregated estimates match official series
+3. **Return theme-specific weights** (e.g., `weight_sidra_unemployment`)
 
-| Theme | Use when analyzing |
+**Planned themes:**
+
+| Theme | What's Calibrated |
 |-------|-------------------|
-| `"unemployment"` | Unemployment rate |
-| `"employment"` | Employment levels by category |
-| `"labor_force"` | Labor force participation |
-| `"income"` | Income and earnings |
+| `unemployment` | Unemployment rate matches IBGE exactly |
+| `employment` | Employment levels match IBGE exactly |
+| `labor_force` | Labor force participation matches IBGE |
+| `income` | Income aggregates match IBGE |
+| `custom` | User supplies their own target series |
+
+---
 
 ## Understanding the Output
 
@@ -202,60 +677,19 @@ Different themes (unemployment, employment, income) require different Bayesian c
 | `ref_month` | Date | First day of reference month (e.g., "2023-01-01") |
 | `ref_month_in_quarter` | Integer | Position: 1, 2, 3, or NA if indeterminate |
 | `ref_month_yyyymm` | Integer | YYYYMM format (e.g., 202301) |
+| `weight_monthly` | Numeric | Monthly weight (if `compute_weights = TRUE`) |
 
-### Determination Rate
+### Determination Rates by Period
 
-Not all observations can be assigned a definite reference month. The **determination rate** tells you what percentage could be identified:
+| Period | Quarters | Determination Rate | Notes |
+|--------|----------|-------------------|-------|
+| 2012 | Q1-Q4 | 91.8% - 98.9% | First year, panel rotation effects |
+| 2013-2019 | 28 quarters | 96.1% - 99.0% | Best results, stable sampling |
+| 2020-2021 | 8 quarters | 93.0% - 97.5% | Pandemic sample changes |
+| 2022-2024 | 12 quarters | 91.3% - 95.6% | Post-pandemic normalization |
+| 2025 | Q1-Q3 | 88.9% - 95.9% | Most recent data |
 
-- **2013-2019**: Typically 96-99% determination rate
-- **2012**: Lower rates (~85%) due to panel rotation (UPAs in final visits)
-- **2020+**: Variable rates due to pandemic-related sample changes
-- `ref_month_in_quarter = NA` for indeterminate observations
-
-### Exception Quarters
-
-Some quarters have non-standard IBGE timing rules (3 days minimum in month instead of 4):
-
-```{r exceptions}
-get_exception_quarters()
-# [1] "2016t3" "2016t4" "2017t2" "2022t3" "2023t2"
-```
-
-## How the Algorithm Works
-
-The reference month identification algorithm uses three key pieces of information:
-
-### 1. IBGE's "Parada Tecnica" Rules
-
-Interview weeks end on Saturdays. The first valid reference week of a month must have at least 4 days (3 for exception quarters) within that month.
-
-```{r timing-example}
-# Example: January 2023 starts on Sunday
-# - First Saturday is January 7 (7 days in month) -> valid first week
-# - Interview weeks: Jan 1-7, Jan 8-14, Jan 15-21, Jan 22-28
-```
-
-### 2. Birthday Constraints
-
-If we know a respondent's birthdate and age, we can constrain when they were interviewed:
-
-- If `(Year - BirthYear) == Age`: Interview was **after** their birthday
-- If `(Year - BirthYear) == Age + 1`: Interview was **before** their birthday
-
-This narrows down the possible interview dates for each person.
-
-### 3. Cross-Quarter Aggregation (Key Insight)
-
-PNADC is a **rotating panel survey**. The same UPA-V1014 (household group) is interviewed 5 times over 15 months, always in the **same relative month** within each quarter.
-
-This means constraints from ANY quarter apply to ALL quarters for the same UPA-V1014:
-
-```{r cross-quarter}
-# If UPA 123, V1014 "01" is determined to be month 2 in Q1 2015,
-# they were also interviewed in month 2 in Q2 2015, Q3 2015, etc.
-```
-
-This cross-quarter aggregation dramatically improves the determination rate from ~70% (per-quarter) to ~96% (cross-quarter).
+---
 
 ## Using Modular Functions
 
@@ -274,24 +708,25 @@ months[, .(
 
 # Step 3: Validate input data
 validation <- validate_pnadc(pnadc, stop_on_error = FALSE)
-print(validation)
 
-# Step 4: Calibrate weights (if needed)
-calibrated <- calibrate_monthly_weights(merged_data, monthly_pop)
+# Step 4: Fetch population data manually
+pop_data <- fetch_monthly_population(verbose = TRUE)
 
-# Step 5: Compute labor indicators
-indicators <- compute_labor_indicators(calibrated)
+# Step 5: Calibrate weights separately
+calibrated <- calibrate_monthly_weights(merged_data, pop_data)
 ```
+
+---
 
 ## Performance
 
 The package is optimized for large datasets:
 
-| Dataset Size | Processing Time |
-|-------------|-----------------|
-| 1 quarter (~570K rows) | ~5 seconds |
-| 1 year (4 quarters, ~2.3M rows) | ~20 seconds |
-| 7 years (28 quarters, ~15.8M rows) | ~2.3 minutes |
+| Dataset Size | Rows | Time (basic) | Time (weights) |
+|--------------|------|--------------|----------------|
+| 1 quarter | ~570K | ~5 sec | ~8 sec |
+| 1 year | ~2.3M | ~26 sec | ~34 sec |
+| 14 years (2012-2025) | 28.4M | 6.3 min | 8.1 min |
 
 Tips for best performance:
 
@@ -299,51 +734,28 @@ Tips for best performance:
 - Load only required columns when reading data
 - Process multiple years together (cross-quarter aggregation improves accuracy)
 
+---
+
 ## Tips and Best Practices
 
-1. **Process multiple quarters together**: The algorithm benefits from cross-quarter aggregation. Processing 2013-2019 together gives better results than processing each year separately.
+1. **Process multiple quarters together**: The algorithm benefits from cross-quarter aggregation. Processing 2012-2025 together gives ~96% determination vs ~70% per-quarter.
 
 2. **Start with reference month identification**: You don't always need monthly weights. Often just knowing the reference month is enough.
 
-3. **Check determination rates by year**: Rates should be ~96-99% for 2013-2019. Lower rates may indicate data issues.
+3. **Check determination rates by year**: Rates should be 96-99% for 2013-2019. Lower rates may indicate data issues.
 
    ```{r check-rates}
-   crosswalk[, .(rate = mean(!is.na(ref_month_in_quarter))), by = Ano]
+   crosswalk[, .(rate = mean(!is.na(ref_month_in_quarter))), by = .(Ano, Trimestre)]
    ```
 
 4. **Handle indeterminate observations**: Decide whether to exclude them or use quarterly-level analysis for those cases.
 
 5. **Use `weight_monthly` for general analysis**: The rake-weighted output is appropriate for most purposes.
 
-6. **Use `calibrate_to_sidra()` only when needed**: Only use theme-specific calibration if you need exact alignment with specific IBGE SIDRA series.
-
-## Handling Special Cases
-
-### Unknown Birth Dates
-
-The algorithm handles missing birth information gracefully:
-
-- `V2008 = 99`: Unknown birth day
-- `V20081 = 99`: Unknown birth month
-- `V20082 = 9999`: Unknown birth year
-
-These are treated as NA and don't contribute birthday constraints, but the observation can still be determined through UPA-V1014 aggregation.
-
-### Indeterminate Observations
-
-Some observations cannot be assigned a definite month. Common reasons:
-
-1. All household members have unknown birth information
-2. Birthday constraints are contradictory
-3. UPA-V1014 appears in only one quarter with insufficient constraints
-
-For these cases, `ref_month_in_quarter = NA`. Options:
-- Exclude from monthly analysis
-- Use quarterly weights for these observations
-- Distribute proportionally across the three months
+---
 
 ## Further Reading
 
 - [IBGE PNADC Documentation](https://www.ibge.gov.br/estatisticas/sociais/trabalho/9171-pesquisa-nacional-por-amostra-de-domicilios-continua-mensal.html)
-- Package function reference: `?mensalizePNADC`, `?identify_reference_month`, `?calibrate_to_sidra`
-- Source code: [GitHub repository](https://github.com/PLACEHOLDER/mensalizePNADC)
+- Package function reference: `?mensalizePNADC`, `?identify_reference_month`
+- Source code: [GitHub repository](https://github.com/antrologos/mensalizePNADC)

@@ -187,8 +187,9 @@ identify_reference_month <- function(data, exception_quarters = NULL) {
 
   # Step 5: Aggregate to UPA-panel level ACROSS ALL QUARTERS
 
-  # PNADC is a rotating panel - same UPA-V1014 is interviewed in the same week
-  # across all their quarterly visits. So constraints from any quarter apply to all.
+  # PNADC is a rotating panel - same UPA-V1014 is interviewed in the same MONTH POSITION
+  # (always month 1, 2, or 3) across all their quarterly visits.
+  # So constraints from any quarter apply to all quarters for that UPA-V1014.
   # This is the key insight: aggregate by (UPA, V1014) only, NOT by (Ano, Trimestre, UPA, V1014)
   dt[, `:=`(
     upa_month_min = max(month_min_pos, na.rm = TRUE),
