@@ -36,6 +36,7 @@ Suggests:
     pkgdown
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-URL: https://github.com/antrologos/mensalizePNADC
+URL: https://antrologos.github.io/mensalizePNADC/,
+    https://github.com/antrologos/mensalizePNADC
 BugReports: https://github.com/antrologos/mensalizePNADC/issues
 LazyData: true

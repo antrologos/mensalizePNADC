@@ -23,13 +23,27 @@ reference:
   desc: Core functions for mensalization
   contents:
   - mensalizePNADC
+  - mensalizePNADC-package
   - identify_reference_month
   - calibrate_monthly_weights
+  - print.pnadc_crosswalk
+
+- title: Weight Calibration
+  desc: Functions for weight calibration and smoothing
+  contents:
+  - calibrate_to_sidra
+  - smooth_monthly_aggregates
 
 - title: Data Fetching
   desc: Functions for fetching external data
   contents:
   - fetch_monthly_population
+  - fetch-sidra-population
+
+- title: Indicators
+  desc: Labor market indicator calculations
+  contents:
+  - compute_labor_indicators
 
 - title: Utilities
   desc: Helper and validation functions
