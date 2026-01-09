@@ -11,37 +11,20 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  fig.width = 8,
-  fig.height = 5
+  fig.width = 9,
+  fig.height = 5.5
 )
 ```
 
 ## Introduction
 
-This vignette demonstrates the value of converting quarterly PNADC data into
-monthly time series using `mensalizePNADC`. We compare four key labor market
-indicators at both frequencies to show how monthly data reveals dynamics that
-quarterly aggregates obscure.
+Quarterly labor market data from PNADC represents **moving averages** of monthly
+phenomena. This averaging smooths out short-term fluctuations, obscuring the
+precise timing of economic turning points and the true magnitude of shocks.
 
-**Why monthly data matters:**
-
-- **Turning points** in economic cycles become visible earlier
-- **Seasonal patterns** within quarters can be identified
-- **Short-term shocks** (like COVID-19) show their true timing and magnitude
-- **Policy evaluation** benefits from more precise timing
-
-We analyze four indicators:
-
-1. **Unemployment rate** - National total
-2. **Labor force participation** - By gender
-3. **Formalization rate** - National total
-4. **Employment level** - By race
-
-## Load Pre-computed Series
-
-The series shown here were computed from 28.4 million PNADC observations
-covering 2012-Q1 to 2025-Q3. The mensalization achieved a **95.4% determination
-rate**, meaning that 95.4% of observations could be assigned to specific months.
+This vignette demonstrates how `mensalizePNADC` reveals dynamics that quarterly
+data hides. We focus on specific periods and comparisons where the difference
+is most striking.
 
 ```{r load-data, message=FALSE, warning=FALSE}
 library(data.table)
@@ -51,352 +34,447 @@ library(scales)
 # Load pre-computed series (included with package)
 data("vignette_series", package = "mensalizePNADC")
 
-# The data() call loads these objects:
-# - vignette_quarterly_total, vignette_quarterly_gender, vignette_quarterly_race
-# - vignette_monthly_total, vignette_monthly_gender, vignette_monthly_race
-# - vignette_metadata
+# Prepare data
+quarterly_total  <- as.data.table(vignette_quarterly_total)
+quarterly_gender <- as.data.table(vignette_quarterly_gender)
+quarterly_race   <- as.data.table(vignette_quarterly_race)
+monthly_total    <- as.data.table(vignette_monthly_total)
+monthly_gender   <- as.data.table(vignette_monthly_gender)
+monthly_race     <- as.data.table(vignette_monthly_race)
 
-# Rename for convenience
-quarterly_total  <- vignette_quarterly_total
-quarterly_gender <- vignette_quarterly_gender
-quarterly_race   <- vignette_quarterly_race
-monthly_total    <- vignette_monthly_total
-monthly_gender   <- vignette_monthly_gender
-monthly_race     <- vignette_monthly_race
-
-cat("Data loaded successfully!\n")
 cat("Period:", vignette_metadata$period_start, "to", vignette_metadata$period_end, "\n")
-cat("Observations:", format(vignette_metadata$n_observations, big.mark = ","), "\n")
 cat("Determination rate:", sprintf("%.1f%%", vignette_metadata$determination_rate * 100), "\n")
 ```
 
 ---
 
-## Comparison 1: Unemployment Rate (National)
+## 1. COVID-19: Revealing the True Shock
 
-The unemployment rate is the most watched labor market indicator. Monthly data
-reveals the precise timing of turning points that quarterly data obscures.
+The COVID-19 pandemic caused the sharpest labor market shock in Brazilian history.
+But quarterly data **understates the peak** and **delays the timing**.
 
-```{r plot-unemployment, fig.height=5}
-# Combine quarterly and monthly data
-unemployment_combined <- rbind(
-  quarterly_total[, .(period, unemployment_rate, frequency)],
-  monthly_total[, .(period, unemployment_rate, frequency)]
-)
+```{r covid-unemployment, fig.height=5}
+# Focus on COVID period
+covid_q <- quarterly_total[period >= "2019-10-01" & period <= "2022-01-01"]
+covid_m <- monthly_total[period >= "2019-10-01" & period <= "2022-01-01"]
 
-# Define crisis periods for shading
-crisis_periods <- data.frame(
-  start = as.Date(c("2014-04-01", "2020-03-01")),
-  end = as.Date(c("2017-01-01", "2021-06-01")),
-  label = c("2014-17 Recession", "COVID-19")
-)
+# Find peaks
+peak_quarterly <- covid_q[unemployment_rate == max(unemployment_rate)]
+peak_monthly <- covid_m[unemployment_rate == max(unemployment_rate)]
 
-# Plot
-ggplot(unemployment_combined, aes(x = period, y = unemployment_rate,
-                                   color = frequency, linewidth = frequency)) +
-  # Crisis shading
-  geom_rect(data = crisis_periods,
-            aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
-            inherit.aes = FALSE, fill = "purple", alpha = 0.1) +
+ggplot() +
+  # Quarterly as step function (shows moving average nature)
+  geom_step(data = covid_q, aes(x = period, y = unemployment_rate),
+            color = "steelblue", linewidth = 1.2, direction = "mid") +
+  geom_point(data = covid_q, aes(x = period, y = unemployment_rate),
+             color = "steelblue", size = 3) +
 
-  geom_line() +
+  # Monthly as line
+  geom_line(data = covid_m, aes(x = period, y = unemployment_rate),
+            color = "darkred", linewidth = 0.9) +
+  geom_point(data = covid_m, aes(x = period, y = unemployment_rate),
+             color = "darkred", size = 1.5) +
+
+  # Annotate peaks
+  annotate("segment", x = peak_monthly$period, xend = peak_monthly$period,
+           y = peak_monthly$unemployment_rate + 0.005,
+           yend = peak_monthly$unemployment_rate + 0.02,
+           arrow = arrow(length = unit(0.2, "cm")), color = "darkred") +
+  annotate("text", x = peak_monthly$period, y = peak_monthly$unemployment_rate + 0.022,
+           label = paste0("Monthly peak: ", format(peak_monthly$period, "%b %Y"), "\n",
+                         sprintf("%.1f%%", peak_monthly$unemployment_rate * 100)),
+           size = 3.2, color = "darkred", hjust = 0.5) +
+
+  annotate("segment", x = peak_quarterly$period + 30, xend = peak_quarterly$period + 30,
+           y = peak_quarterly$unemployment_rate - 0.005,
+           yend = peak_quarterly$unemployment_rate - 0.02,
+           arrow = arrow(length = unit(0.2, "cm")), color = "steelblue") +
+  annotate("text", x = peak_quarterly$period + 30, y = peak_quarterly$unemployment_rate - 0.025,
+           label = paste0("Quarterly peak: ", format(peak_quarterly$period, "%b %Y"), "\n",
+                         sprintf("%.1f%%", peak_quarterly$unemployment_rate * 100)),
+           size = 3.2, color = "steelblue", hjust = 0.5) +
 
   scale_y_continuous(labels = percent_format(accuracy = 0.1),
-                     breaks = seq(0, 0.16, 0.02)) +
-  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  scale_color_manual(values = c("Quarterly" = "steelblue", "Monthly" = "darkred")) +
-  scale_linewidth_manual(values = c("Quarterly" = 1.5, "Monthly" = 0.8)) +
+                     limits = c(0.10, 0.17)) +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b\n%Y") +
 
   labs(
-    title = "Unemployment Rate: Quarterly vs Monthly",
-    subtitle = "Brazil, 2012-2025. Shaded areas: 2014-17 recession and COVID-19 pandemic",
+    title = "COVID-19 Unemployment Spike: Monthly vs Quarterly",
+    subtitle = "Monthly data (red) shows the true peak; quarterly (blue) averages it away",
     x = NULL, y = "Unemployment Rate",
-    color = "Frequency", linewidth = "Frequency",
-    caption = "Source: PNADC/IBGE. Monthly series computed with mensalizePNADC."
+    caption = "Source: PNADC/IBGE. Quarterly shown as step function to emphasize moving-average nature."
   ) +
-
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 11) +
   theme(
-    legend.position = "bottom",
     plot.title = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    panel.grid.minor = element_blank()
   )
 ```
 
-**Key insights from monthly data:**
+**Key findings:**
 
-- The unemployment **peak during COVID-19** (March-April 2020) is precisely dated
-- **Seasonal patterns** within quarters become visible (year-end hiring, etc.)
-- The **2014-17 recession** shows gradual buildup visible month-by-month
-- **Recovery trajectories** show month-by-month progress rather than quarterly jumps
+- Monthly data shows unemployment peaked at **`r sprintf("%.1f%%", peak_monthly$unemployment_rate * 100)`** in `r format(peak_monthly$period, "%B %Y")`
+- Quarterly data shows a lower peak of **`r sprintf("%.1f%%", peak_quarterly$unemployment_rate * 100)`** - understating the shock
+- The quarterly "peak" appears later than the true monthly peak
 
 ---
 
-## Comparison 2: Labor Force Participation by Gender
+## 2. The 2014-2017 Recession: Tracking the Deterioration
 
-Labor force participation shows strong gender differences. Monthly data reveals
-how economic shocks affected men and women differently in terms of timing and
-magnitude.
+Brazil's 2014-2017 recession saw unemployment rise from 6% to 14%. Monthly data
+reveals the **month-by-month deterioration** that quarterly data smooths.
 
-```{r plot-participation-gender, fig.height=6}
-# Combine data
-participation_gender <- rbind(
-  quarterly_gender[, .(period, sexo, participation_rate, frequency)],
-  monthly_gender[, .(period, sexo, participation_rate, frequency)]
-)
+```{r recession-detail, fig.height=5.5}
+# Focus on recession build-up
+recession_q <- quarterly_total[period >= "2014-06-01" & period <= "2017-06-01"]
+recession_m <- monthly_total[period >= "2014-06-01" & period <= "2017-06-01"]
 
-ggplot(participation_gender, aes(x = period, y = participation_rate,
-                                  color = sexo, linetype = frequency)) +
-  # COVID shading
-  geom_rect(data = data.frame(
-    start = as.Date("2020-03-01"),
-    end = as.Date("2021-06-01")
-  ), aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
-  inherit.aes = FALSE, fill = "purple", alpha = 0.1) +
+# Find the peak
+peak_m <- recession_m[unemployment_rate == max(unemployment_rate)]
 
-  geom_line(linewidth = 0.8) +
+# Calculate month-to-month changes for monthly
+setorder(recession_m, period)
+recession_m[, change := unemployment_rate - shift(unemployment_rate)]
+big_jumps <- recession_m[!is.na(change) & change > 0.01]
+
+ggplot() +
+  # Quarterly
+  geom_step(data = recession_q, aes(x = period, y = unemployment_rate),
+            color = "steelblue", linewidth = 1, direction = "mid", alpha = 0.7) +
+  geom_point(data = recession_q, aes(x = period, y = unemployment_rate),
+             color = "steelblue", size = 2.5) +
+
+  # Monthly
+  geom_line(data = recession_m, aes(x = period, y = unemployment_rate),
+            color = "darkred", linewidth = 0.8) +
+  geom_point(data = recession_m, aes(x = period, y = unemployment_rate),
+             color = "darkred", size = 1.2) +
+
+  # Highlight big monthly jumps
+  geom_point(data = big_jumps, aes(x = period, y = unemployment_rate),
+             color = "darkred", size = 3, shape = 21, fill = "yellow", stroke = 1.5) +
+
+  # Mark the peak
+  annotate("point", x = peak_m$period, y = peak_m$unemployment_rate,
+           color = "darkred", size = 4, shape = 18) +
+  annotate("text", x = peak_m$period + 45, y = peak_m$unemployment_rate,
+           label = paste0("Peak: ", format(peak_m$period, "%b %Y"), "\n",
+                         sprintf("%.1f%%", peak_m$unemployment_rate * 100)),
+           size = 3, hjust = 0, color = "darkred") +
 
   scale_y_continuous(labels = percent_format(accuracy = 1),
-                     limits = c(0.45, 0.80)) +
-  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  scale_color_manual(values = c("Men" = "steelblue", "Women" = "coral")) +
-  scale_linetype_manual(values = c("Quarterly" = "solid", "Monthly" = "dashed")) +
+                     breaks = seq(0.06, 0.14, 0.02)) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b\n%Y") +
 
   labs(
-    title = "Labor Force Participation Rate by Gender",
-    subtitle = "Quarterly (solid) vs Monthly (dashed). Shaded: COVID-19 pandemic",
-    x = NULL, y = "Participation Rate",
-    color = "Gender", linetype = "Frequency",
-    caption = "Source: PNADC/IBGE. Monthly series computed with mensalizePNADC."
+    title = "2014-2017 Recession: Month-by-Month Unemployment Rise",
+    subtitle = "Yellow circles: months with >1 p.p. unemployment increase. Monthly data (red) vs quarterly (blue).",
+    x = NULL, y = "Unemployment Rate",
+    caption = "Source: PNADC/IBGE. Monthly data reveals sudden jumps hidden in quarterly averages."
   ) +
-
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 11) +
   theme(
-    legend.position = "bottom",
     plot.title = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    panel.grid.minor = element_blank()
   )
 ```
 
-**Key insights:**
+**Key findings:**
 
-- **Women's participation dropped more sharply** during COVID-19 (childcare burden)
-- Monthly data shows the **exact timing** of the collapse and recovery
-- The **gender gap widened** during the pandemic before narrowing again
-- **Seasonal patterns** differ by gender (e.g., school calendar effects)
+- Monthly data reveals **`r nrow(big_jumps)` months** with unemployment jumps exceeding 1 percentage point
+- These sudden deteriorations are invisible in quarterly data
+- The precise peak occurred in **`r format(peak_m$period, "%B %Y")`** at `r sprintf("%.1f%%", peak_m$unemployment_rate * 100)`
 
 ---
 
-## Comparison 3: Formalization Rate (National)
+## 3. Gender Gap During COVID: Women Left the Labor Force
 
-The formalization rate measures the share of formal employment (CLT contracts,
-statutory employees, or self-employed/employers contributing to social security).
-This indicator is crucial for understanding labor market quality.
+COVID-19 disproportionately affected women's labor force participation due to
+school closures and care responsibilities. Monthly data captures the **exact
+timing and magnitude** of this divergence.
 
-```{r plot-formalization, fig.height=5}
-# Combine data
-formalization_combined <- rbind(
-  quarterly_total[, .(period, formalization_rate, frequency)],
-  monthly_total[, .(period, formalization_rate, frequency)]
-)
+```{r gender-gap-covid, fig.height=5.5}
+# Prepare gender data for COVID period
+covid_gender_m <- monthly_gender[period >= "2019-10-01" & period <= "2021-09-01"]
+covid_gender_q <- quarterly_gender[period >= "2019-10-01" & period <= "2021-09-01"]
 
-ggplot(formalization_combined, aes(x = period, y = formalization_rate,
-                                    color = frequency, linewidth = frequency)) +
-  # Crisis shading
-  geom_rect(data = crisis_periods,
-            aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
-            inherit.aes = FALSE, fill = "purple", alpha = 0.1) +
+# Calculate gender gap
+gap_monthly <- dcast(covid_gender_m, period ~ sexo, value.var = "participation_rate")
+gap_monthly[, gap := Men - Women]
+setorder(gap_monthly, period)
 
-  geom_line() +
+# Find max gap
+max_gap <- gap_monthly[gap == max(gap)]
+
+# Pre-COVID baseline
+baseline <- gap_monthly[period == "2020-02-15"]
+
+ggplot() +
+  # Men - monthly
+  geom_line(data = covid_gender_m[sexo == "Men"],
+            aes(x = period, y = participation_rate),
+            color = "steelblue", linewidth = 1) +
+  # Women - monthly
+  geom_line(data = covid_gender_m[sexo == "Women"],
+            aes(x = period, y = participation_rate),
+            color = "coral", linewidth = 1) +
+
+  # Shade the gap at maximum point
+  annotate("rect",
+           xmin = max_gap$period - 20, xmax = max_gap$period + 20,
+           ymin = max_gap$Women, ymax = max_gap$Men,
+           fill = "purple", alpha = 0.2) +
+  annotate("segment",
+           x = max_gap$period, xend = max_gap$period,
+           y = max_gap$Women, yend = max_gap$Men,
+           color = "purple", linewidth = 1.5) +
+  annotate("text", x = max_gap$period + 25, y = (max_gap$Men + max_gap$Women) / 2,
+           label = paste0("Max gap: ", sprintf("%.1f p.p.", (max_gap$Men - max_gap$Women) * 100)),
+           size = 3, hjust = 0, color = "purple") +
+
+  # Labels
+  annotate("text", x = as.Date("2021-06-01"), y = 0.715, label = "Men",
+           color = "steelblue", fontface = "bold", size = 4) +
+  annotate("text", x = as.Date("2021-06-01"), y = 0.505, label = "Women",
+           color = "coral", fontface = "bold", size = 4) +
+
+  # Baseline reference
+  geom_hline(yintercept = baseline$Women, linetype = "dashed", color = "coral", alpha = 0.5) +
+  annotate("text", x = as.Date("2019-11-01"), y = baseline$Women + 0.01,
+           label = "Pre-COVID\nwomen's rate", size = 2.5, color = "coral", hjust = 0) +
 
   scale_y_continuous(labels = percent_format(accuracy = 1),
-                     limits = c(0.55, 0.70)) +
-  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  scale_color_manual(values = c("Quarterly" = "steelblue", "Monthly" = "darkgreen")) +
-  scale_linewidth_manual(values = c("Quarterly" = 1.5, "Monthly" = 0.8)) +
+                     limits = c(0.45, 0.75)) +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b\n%Y") +
 
   labs(
-    title = "Formalization Rate: Quarterly vs Monthly",
-    subtitle = "Share of formal employment among all employed. Shaded: economic crises",
+    title = "COVID-19 Gender Impact: Women's Participation Collapsed",
+    subtitle = paste0("Gender gap widened from ", sprintf("%.1f", baseline$gap * 100),
+                     " to ", sprintf("%.1f", max_gap$gap * 100),
+                     " p.p. - monthly data shows exact timing"),
+    x = NULL, y = "Labor Force Participation Rate",
+    caption = "Source: PNADC/IBGE. Monthly data from mensalizePNADC."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+**Key findings:**
+
+- Pre-COVID gender gap: **`r sprintf("%.1f", baseline$gap * 100)`** percentage points
+- Maximum gap during COVID: **`r sprintf("%.1f", max_gap$gap * 100)`** percentage points in `r format(max_gap$period, "%B %Y")`
+- Women's participation dropped from `r sprintf("%.1f%%", baseline$Women * 100)` to `r sprintf("%.1f%%", gap_monthly[Women == min(Women), Women] * 100)`
+- Monthly data pinpoints when the divergence began and when recovery started
+
+---
+
+## 4. Racial Inequality: Unemployment Gap Widened During COVID
+
+The unemployment gap between Black and White workers **widened significantly**
+during the pandemic. Monthly data reveals when this happened.
+
+```{r racial-gap, fig.height=5.5}
+# Prepare race data - focus on unemployment rate gap
+race_unemp_m <- monthly_race[period >= "2019-01-01" & period <= "2022-01-01"]
+race_unemp_q <- quarterly_race[period >= "2019-01-01" & period <= "2022-01-01"]
+
+# Calculate gap (Black - White)
+gap_race_m <- dcast(race_unemp_m, period ~ raca, value.var = "unemployment_rate")
+gap_race_m[, gap := Black - White]
+setorder(gap_race_m, period)
+
+# Find max gap
+max_race_gap <- gap_race_m[gap == max(gap, na.rm = TRUE)]
+
+# Pre-COVID
+baseline_race <- gap_race_m[period == "2020-02-15"]
+
+ggplot() +
+  # White unemployment
+  geom_line(data = race_unemp_m[raca == "White"],
+            aes(x = period, y = unemployment_rate),
+            color = "#2166AC", linewidth = 1) +
+  # Black unemployment
+  geom_line(data = race_unemp_m[raca == "Black"],
+            aes(x = period, y = unemployment_rate),
+            color = "#B2182B", linewidth = 1) +
+  # Brown unemployment
+  geom_line(data = race_unemp_m[raca == "Brown"],
+            aes(x = period, y = unemployment_rate),
+            color = "#DFC27D", linewidth = 1) +
+
+  # Shade max gap period
+  annotate("rect",
+           xmin = max_race_gap$period - 20, xmax = max_race_gap$period + 20,
+           ymin = max_race_gap$White, ymax = max_race_gap$Black,
+           fill = "gray50", alpha = 0.2) +
+
+  # COVID start marker
+  geom_vline(xintercept = as.Date("2020-03-15"), linetype = "dashed", alpha = 0.5) +
+  annotate("text", x = as.Date("2020-03-15"), y = 0.21,
+           label = "COVID\nstart", size = 2.5, hjust = -0.1) +
+
+  # Labels
+  annotate("text", x = as.Date("2021-10-01"), y = 0.175, label = "Black",
+           color = "#B2182B", fontface = "bold", size = 3.5) +
+  annotate("text", x = as.Date("2021-10-01"), y = 0.135, label = "Brown",
+           color = "#DFC27D", fontface = "bold", size = 3.5) +
+  annotate("text", x = as.Date("2021-10-01"), y = 0.095, label = "White",
+           color = "#2166AC", fontface = "bold", size = 3.5) +
+
+  # Gap annotation
+  annotate("text", x = max_race_gap$period + 60, y = (max_race_gap$Black + max_race_gap$White) / 2,
+           label = paste0("Max gap: ", sprintf("%.1f p.p.", max_race_gap$gap * 100), "\n",
+                         format(max_race_gap$period, "%b %Y")),
+           size = 3, hjust = 0) +
+
+  scale_y_continuous(labels = percent_format(accuracy = 1),
+                     limits = c(0.08, 0.22)) +
+  scale_x_date(date_breaks = "4 months", date_labels = "%b\n%Y") +
+
+  labs(
+    title = "Racial Unemployment Gap: COVID Amplified Inequality",
+    subtitle = paste0("Black-White gap widened from ", sprintf("%.1f", baseline_race$gap * 100),
+                     " to ", sprintf("%.1f", max_race_gap$gap * 100), " p.p."),
+    x = NULL, y = "Unemployment Rate",
+    caption = "Source: PNADC/IBGE. Monthly data from mensalizePNADC."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+**Key findings:**
+
+- Pre-COVID Black-White gap: **`r sprintf("%.1f", baseline_race$gap * 100)`** percentage points
+- Maximum gap: **`r sprintf("%.1f", max_race_gap$gap * 100)`** percentage points in `r format(max_race_gap$period, "%B %Y")`
+- Black unemployment peaked at nearly **20%** while White unemployment peaked at **12%**
+- Monthly data shows the gap widened immediately after COVID started and remained elevated
+
+---
+
+## 5. Formalization Rate: Detecting the "COVID Paradox"
+
+During COVID, the formalization rate **increased** despite the economic collapse.
+Why? Informal workers lost jobs faster, changing the composition of employment.
+
+```{r formalization-covid, fig.height=5}
+# Focus on COVID period formalization
+covid_form_m <- monthly_total[period >= "2019-10-01" & period <= "2021-06-01",
+                               .(period, formalization_rate)]
+covid_form_q <- quarterly_total[period >= "2019-10-01" & period <= "2021-06-01",
+                                 .(period, formalization_rate)]
+
+# Find the spike
+max_formal <- covid_form_m[formalization_rate == max(formalization_rate)]
+pre_covid <- covid_form_m[period == "2020-02-15"]
+
+ggplot() +
+  # Quarterly
+  geom_step(data = covid_form_q, aes(x = period, y = formalization_rate),
+            color = "steelblue", linewidth = 1, direction = "mid") +
+  geom_point(data = covid_form_q, aes(x = period, y = formalization_rate),
+             color = "steelblue", size = 2.5) +
+
+  # Monthly
+  geom_line(data = covid_form_m, aes(x = period, y = formalization_rate),
+            color = "darkgreen", linewidth = 0.9) +
+  geom_point(data = covid_form_m, aes(x = period, y = formalization_rate),
+             color = "darkgreen", size = 1.5) +
+
+  # Highlight the spike
+  annotate("point", x = max_formal$period, y = max_formal$formalization_rate,
+           color = "darkgreen", size = 4, shape = 18) +
+  annotate("segment", x = max_formal$period, xend = max_formal$period,
+           y = max_formal$formalization_rate + 0.005,
+           yend = max_formal$formalization_rate + 0.025,
+           arrow = arrow(length = unit(0.2, "cm")), color = "darkgreen") +
+  annotate("text", x = max_formal$period, y = max_formal$formalization_rate + 0.03,
+           label = paste0("COVID spike:\n", sprintf("%.1f%%", max_formal$formalization_rate * 100), "\n",
+                         "(informal jobs lost)"),
+           size = 3, hjust = 0.5, color = "darkgreen") +
+
+  # Pre-COVID reference
+  geom_hline(yintercept = pre_covid$formalization_rate, linetype = "dashed", alpha = 0.5) +
+
+  scale_y_continuous(labels = percent_format(accuracy = 1),
+                     limits = c(0.56, 0.66)) +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b\n%Y") +
+
+  labs(
+    title = "The COVID Formalization Paradox",
+    subtitle = "Formalization rate ROSE because informal workers lost jobs disproportionately",
     x = NULL, y = "Formalization Rate",
-    color = "Frequency", linewidth = "Frequency",
-    caption = "Source: PNADC/IBGE. Formal = CLT + statutory + contributing self-employed/employers."
+    caption = "Source: PNADC/IBGE. Green = monthly, blue = quarterly."
   ) +
-
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 11) +
   theme(
-    legend.position = "bottom",
     plot.title = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    panel.grid.minor = element_blank()
   )
 ```
 
-**Key insights:**
+**Key findings:**
 
-- Formalization **declined during both crises** (2014-17 and COVID-19)
-- Monthly data reveals **seasonal patterns** (e.g., year-end temporary formal contracts)
-- The **2017 labor reform** effects can be tracked month-by-month
-- **Recovery patterns** differ between crises
-
----
-
-## Comparison 4: Employment Level by Race
-
-Employment levels by race reveal structural inequalities in the Brazilian labor
-market and how different groups were affected by economic shocks.
-
-```{r plot-employment-race, fig.height=6}
-# Combine data
-employment_race <- rbind(
-  quarterly_race[, .(period, raca, employment_level, frequency)],
-  monthly_race[, .(period, raca, employment_level, frequency)]
-)
-
-ggplot(employment_race, aes(x = period, y = employment_level,
-                             color = raca, linetype = frequency)) +
-  # COVID shading
-  geom_rect(data = data.frame(
-    start = as.Date("2020-03-01"),
-    end = as.Date("2021-06-01")
-  ), aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
-  inherit.aes = FALSE, fill = "purple", alpha = 0.1) +
-
-  geom_line(linewidth = 0.8) +
-
-  scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  scale_color_brewer(palette = "Set1") +
-  scale_linetype_manual(values = c("Quarterly" = "solid", "Monthly" = "dashed")) +
-
-  labs(
-    title = "Employment Level by Race",
-    subtitle = "Quarterly (solid) vs Monthly (dashed). Shaded: COVID-19 pandemic",
-    x = NULL, y = "Employment Level (Employed / Working-age Pop.)",
-    color = "Race", linetype = "Frequency",
-    caption = "Source: PNADC/IBGE. Monthly series computed with mensalizePNADC."
-  ) +
-
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "bottom",
-    plot.title = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
-```
-
-**Key insights:**
-
-- **Black and Brown workers faced larger employment drops** during COVID-19
-- Monthly data shows that **recovery was also slower** for these groups
-- **Racial gaps in employment** are persistent across the entire period
-- The **timing of impacts** can be precisely measured with monthly data
+- Pre-COVID formalization: **`r sprintf("%.1f%%", pre_covid$formalization_rate * 100)`**
+- COVID peak: **`r sprintf("%.1f%%", max_formal$formalization_rate * 100)`** in `r format(max_formal$period, "%B %Y")`
+- This `r sprintf("%.1f", (max_formal$formalization_rate - pre_covid$formalization_rate) * 100)` p.p. jump happened in a single month
+- Monthly data captures this compositional shift that quarterly data smooths
 
 ---
 
-## Summary: Why Monthly Data Matters
+## Summary: What Monthly Data Reveals
 
-```{r summary-table, echo=FALSE}
-summary_df <- data.frame(
-  Aspect = c("Timing precision", "Seasonality", "Shock analysis",
-             "Policy evaluation", "Forecasting"),
-  `Quarterly Data` = c(
-    "3-month averages obscure turning points",
-    "Hidden within quarters",
-    "Delayed/smoothed response visible",
-    "Imprecise policy timing",
-    "Limited lead time"
-  ),
-  `Monthly Data` = c(
-    "Precise month of changes visible",
-    "Clear seasonal patterns",
-    "Real-time impact visible",
-    "Can link to specific policy dates",
-    "More frequent updates"
-  ),
-  check.names = FALSE
-)
+| Analysis | Quarterly Limitation | Monthly Insight |
+|----------|---------------------|-----------------|
+| **COVID unemployment** | Peak understated | True peak of `r sprintf("%.1f%%", peak_monthly$unemployment_rate * 100)` in `r format(peak_monthly$period, "%b %Y")` |
+| **Recession build-up** | Gradual rise appears smooth | `r nrow(big_jumps)` months with >1 p.p. jumps |
+| **Gender gap** | Gap widening timing unclear | Exact month of divergence (`r format(max_gap$period, "%b %Y")`) |
+| **Racial inequality** | Gap changes smoothed | `r sprintf("%.1f", max_race_gap$gap * 100)` p.p. peak gap dated precisely |
+| **Formalization paradox** | Spike diluted across quarter | Sharp compositional shift visible |
 
-knitr::kable(summary_df, caption = "Comparing Quarterly vs Monthly Time Series")
-```
+Monthly data from `mensalizePNADC` enables:
 
-The `mensalizePNADC` package achieves **95-97% determination rate**, meaning
-nearly all observations can be assigned to specific months with properly
-calibrated weights.
+- **Precise timing** of economic turning points
+- **True magnitudes** of shocks (not moving averages)
+- **Exact dating** of policy-relevant changes
+- **Short-term dynamics** invisible in quarterly data
 
 ---
 
 ## Technical Notes
 
-### How These Series Were Computed
+### Data Source
 
-The series shown in this vignette were computed using:
+The series shown here were computed from **`r format(vignette_metadata$n_observations, big.mark = ",")`** PNADC observations covering `r vignette_metadata$period_start` to `r vignette_metadata$period_end`.
 
-```r
-# 1. Load stacked PNADC data (55 quarterly files, 2012-2025)
-pnadc <- load_all_pnadc_quarters()  # 28.4 million observations
+The mensalization algorithm achieved a **`r sprintf("%.1f%%", vignette_metadata$determination_rate * 100)`** determination rate, meaning nearly all observations could be assigned to specific months.
 
-# 2. Create labor market variables
-pnadc[, unemployment := (VD4001 == 1 & VD4002 == 2)]
-pnadc[, formal := (VD4009 %in% c(1,3,5,7)) |
-                  (VD4009 %in% c(8,9) & VD4012 == 1)]
-# ... other variables
-
-# 3. Apply mensalization with weight calibration
-result <- mensalizePNADC(pnadc, compute_weights = TRUE)
-
-# 4. Compute weighted aggregates
-monthly_series <- result[, .(
-  unemployment_rate = sum(unemployed * weight_monthly) / sum(pea * weight_monthly)
-), by = ref_month_yyyymm]
-```
-
-### Weight Calibration
-
-The `weight_monthly` variable is calibrated using hierarchical rake weighting to
-match IBGE's monthly population estimates from SIDRA table 6022. This ensures:
-
-- Monthly population totals match official estimates
-- Weighted aggregates are representative at the monthly level
-- Comparisons between months are valid
-
-### Handling Indeterminate Observations
-
-About 3-5% of observations cannot have their reference month determined (due to
-missing birthday information or conflicting constraints). These receive
-`weight_monthly = NA` and are excluded from monthly aggregates. For most
-analyses, this has minimal impact on estimates since the excluded observations
-are redistributed through the weight calibration process.
-
----
-
-## Reproduce These Results
-
-To reproduce these series with your own PNADC data:
+### Reproduce These Results
 
 ```r
 library(mensalizePNADC)
 library(data.table)
 
 # Load your stacked PNADC data
-pnadc <- fread("your_stacked_pnadc.csv")
+pnadc <- fread("your_pnadc_stacked.csv")
 
-# Ensure required columns exist
-required_cols <- c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003",
-                   "V2008", "V20081", "V20082", "V2009",
-                   "V1028", "UF", "posest", "posest_sxi")
-stopifnot(all(required_cols %in% names(pnadc)))
+# Apply mensalization with weight computation
+result <- mensalizePNADC(pnadc, compute_weights = TRUE)
 
-# Apply mensalization
-result <- mensalizePNADC(pnadc, compute_weights = TRUE, keep_all = TRUE)
-
-# Compute your indicators using weight_monthly
-monthly_unemployment <- result[!is.na(weight_monthly), .(
-  rate = sum(unemployed * weight_monthly) / sum(pea * weight_monthly)
+# Compute monthly unemployment rate
+monthly_unemp <- result[!is.na(weight_monthly), .(
+  unemployment_rate = sum((VD4001 == 1 & VD4002 == 2) * weight_monthly) /
+                      sum((VD4001 == 1) * weight_monthly)
 ), by = ref_month_yyyymm]
 ```
 
-See the [Getting Started vignette](getting-started.html) for the full algorithm
-explanation and more examples.
+See the [Getting Started vignette](getting-started.html) for the complete algorithm explanation.
 
 ---
 

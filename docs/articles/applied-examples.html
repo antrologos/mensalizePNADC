@@ -69,44 +69,13 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p>This vignette demonstrates the value of converting quarterly PNADC
-data into monthly time series using <code>mensalizePNADC</code>. We
-compare four key labor market indicators at both frequencies to show how
-monthly data reveals dynamics that quarterly aggregates obscure.</p>
-<p><strong>Why monthly data matters:</strong></p>
-<ul>
-<li>
-<strong>Turning points</strong> in economic cycles become visible
-earlier</li>
-<li>
-<strong>Seasonal patterns</strong> within quarters can be
-identified</li>
-<li>
-<strong>Short-term shocks</strong> (like COVID-19) show their true
-timing and magnitude</li>
-<li>
-<strong>Policy evaluation</strong> benefits from more precise
-timing</li>
-</ul>
-<p>We analyze four indicators:</p>
-<ol style="list-style-type: decimal">
-<li>
-<strong>Unemployment rate</strong> - National total</li>
-<li>
-<strong>Labor force participation</strong> - By gender</li>
-<li>
-<strong>Formalization rate</strong> - National total</li>
-<li>
-<strong>Employment level</strong> - By race</li>
-</ol>
-</div>
-<div class="section level2">
-<h2 id="load-pre-computed-series">Load Pre-computed Series<a class="anchor" aria-label="anchor" href="#load-pre-computed-series"></a>
-</h2>
-<p>The series shown here were computed from 28.4 million PNADC
-observations covering 2012-Q1 to 2025-Q3. The mensalization achieved a
-<strong>95.4% determination rate</strong>, meaning that 95.4% of
-observations could be assigned to specific months.</p>
+<p>Quarterly labor market data from PNADC represents <strong>moving
+averages</strong> of monthly phenomena. This averaging smooths out
+short-term fluctuations, obscuring the precise timing of economic
+turning points and the true magnitude of shocks.</p>
+<p>This vignette demonstrates how <code>mensalizePNADC</code> reveals
+dynamics that quarterly data hides. We focus on specific periods and
+comparisons where the difference is most striking.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
@@ -115,395 +84,508 @@ observations could be assigned to specific months.</p>
 <span><span class="co"># Load pre-computed series (included with package)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="st">"vignette_series"</span>, package <span class="op">=</span> <span class="st">"mensalizePNADC"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># The data() call loads these objects:</span></span>
-<span><span class="co"># - vignette_quarterly_total, vignette_quarterly_gender, vignette_quarterly_race</span></span>
-<span><span class="co"># - vignette_monthly_total, vignette_monthly_gender, vignette_monthly_race</span></span>
-<span><span class="co"># - vignette_metadata</span></span>
+<span><span class="co"># Prepare data</span></span>
+<span><span class="va">quarterly_total</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">vignette_quarterly_total</span><span class="op">)</span></span>
+<span><span class="va">quarterly_gender</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">vignette_quarterly_gender</span><span class="op">)</span></span>
+<span><span class="va">quarterly_race</span>   <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">vignette_quarterly_race</span><span class="op">)</span></span>
+<span><span class="va">monthly_total</span>    <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">vignette_monthly_total</span><span class="op">)</span></span>
+<span><span class="va">monthly_gender</span>   <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">vignette_monthly_gender</span><span class="op">)</span></span>
+<span><span class="va">monthly_race</span>     <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">vignette_monthly_race</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Rename for convenience</span></span>
-<span><span class="va">quarterly_total</span>  <span class="op">&lt;-</span> <span class="va">vignette_quarterly_total</span></span>
-<span><span class="va">quarterly_gender</span> <span class="op">&lt;-</span> <span class="va">vignette_quarterly_gender</span></span>
-<span><span class="va">quarterly_race</span>   <span class="op">&lt;-</span> <span class="va">vignette_quarterly_race</span></span>
-<span><span class="va">monthly_total</span>    <span class="op">&lt;-</span> <span class="va">vignette_monthly_total</span></span>
-<span><span class="va">monthly_gender</span>   <span class="op">&lt;-</span> <span class="va">vignette_monthly_gender</span></span>
-<span><span class="va">monthly_race</span>     <span class="op">&lt;-</span> <span class="va">vignette_monthly_race</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Data loaded successfully!\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Data loaded successfully!</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Period:"</span>, <span class="va">vignette_metadata</span><span class="op">$</span><span class="va">period_start</span>, <span class="st">"to"</span>, <span class="va">vignette_metadata</span><span class="op">$</span><span class="va">period_end</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Period: 2012-Q1 to 2025-Q3</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Observations:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">vignette_metadata</span><span class="op">$</span><span class="va">n_observations</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Observations: 22,850,046</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Determination rate:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">vignette_metadata</span><span class="op">$</span><span class="va">determination_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Determination rate: 95.4%</span></span></code></pre></div>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="comparison-1-unemployment-rate-national">Comparison 1: Unemployment Rate (National)<a class="anchor" aria-label="anchor" href="#comparison-1-unemployment-rate-national"></a>
+<h2 id="covid-19-revealing-the-true-shock">1. COVID-19: Revealing the True Shock<a class="anchor" aria-label="anchor" href="#covid-19-revealing-the-true-shock"></a>
 </h2>
-<p>The unemployment rate is the most watched labor market indicator.
-Monthly data reveals the precise timing of turning points that quarterly
-data obscures.</p>
+<p>The COVID-19 pandemic caused the sharpest labor market shock in
+Brazilian history. But quarterly data <strong>understates the
+peak</strong> and <strong>delays the timing</strong>.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Combine quarterly and monthly data</span></span>
-<span><span class="va">unemployment_combined</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
-<span>  <span class="va">quarterly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">unemployment_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  <span class="va">monthly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">unemployment_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Focus on COVID period</span></span>
+<span><span class="va">covid_q</span> <span class="op">&lt;-</span> <span class="va">quarterly_total</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-10-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2022-01-01"</span><span class="op">]</span></span>
+<span><span class="va">covid_m</span> <span class="op">&lt;-</span> <span class="va">monthly_total</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-10-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2022-01-01"</span><span class="op">]</span></span>
 <span></span>
-<span><span class="co"># Define crisis periods for shading</span></span>
-<span><span class="va">crisis_periods</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2014-04-01"</span>, <span class="st">"2020-03-01"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  end <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2017-01-01"</span>, <span class="st">"2021-06-01"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2014-17 Recession"</span>, <span class="st">"COVID-19"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
+<span><span class="co"># Find peaks</span></span>
+<span><span class="va">peak_quarterly</span> <span class="op">&lt;-</span> <span class="va">covid_q</span><span class="op">[</span><span class="va">unemployment_rate</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">unemployment_rate</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">peak_monthly</span> <span class="op">&lt;-</span> <span class="va">covid_m</span><span class="op">[</span><span class="va">unemployment_rate</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">unemployment_rate</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
-<span><span class="co"># Plot</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">unemployment_combined</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span>,</span>
-<span>                                   color <span class="op">=</span> <span class="va">frequency</span>, linewidth <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="co"># Crisis shading</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">crisis_periods</span>,</span>
-<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
-<span>            inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Quarterly as step function (shows moving average nature)</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_step</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_q</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"steelblue"</span>, linewidth <span class="op">=</span> <span class="fl">1.2</span>, direction <span class="op">=</span> <span class="st">"mid"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_q</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"steelblue"</span>, size <span class="op">=</span> <span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Monthly as line</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_m</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"darkred"</span>, linewidth <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_m</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"darkred"</span>, size <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Annotate peaks</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"segment"</span>, x <span class="op">=</span> <span class="va">peak_monthly</span><span class="op">$</span><span class="va">period</span>, xend <span class="op">=</span> <span class="va">peak_monthly</span><span class="op">$</span><span class="va">period</span>,</span>
+<span>           y <span class="op">=</span> <span class="va">peak_monthly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">+</span> <span class="fl">0.005</span>,</span>
+<span>           yend <span class="op">=</span> <span class="va">peak_monthly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">+</span> <span class="fl">0.02</span>,</span>
+<span>           arrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/grid/arrow.html" class="external-link">arrow</a></span><span class="op">(</span>length <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/grid/unit.html" class="external-link">unit</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="st">"cm"</span><span class="op">)</span><span class="op">)</span>, color <span class="op">=</span> <span class="st">"darkred"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="va">peak_monthly</span><span class="op">$</span><span class="va">period</span>, y <span class="op">=</span> <span class="va">peak_monthly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">+</span> <span class="fl">0.022</span>,</span>
+<span>           label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Monthly peak: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">peak_monthly</span><span class="op">$</span><span class="va">period</span>, <span class="st">"%b %Y"</span><span class="op">)</span>, <span class="st">"\n"</span>,</span>
+<span>                         <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">peak_monthly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>           size <span class="op">=</span> <span class="fl">3.2</span>, color <span class="op">=</span> <span class="st">"darkred"</span>, hjust <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"segment"</span>, x <span class="op">=</span> <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">30</span>, xend <span class="op">=</span> <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">30</span>,</span>
+<span>           y <span class="op">=</span> <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">-</span> <span class="fl">0.005</span>,</span>
+<span>           yend <span class="op">=</span> <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">-</span> <span class="fl">0.02</span>,</span>
+<span>           arrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/grid/arrow.html" class="external-link">arrow</a></span><span class="op">(</span>length <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/grid/unit.html" class="external-link">unit</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="st">"cm"</span><span class="op">)</span><span class="op">)</span>, color <span class="op">=</span> <span class="st">"steelblue"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">30</span>, y <span class="op">=</span> <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">-</span> <span class="fl">0.025</span>,</span>
+<span>           label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Quarterly peak: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">peak_quarterly</span><span class="op">$</span><span class="va">period</span>, <span class="st">"%b %Y"</span><span class="op">)</span>, <span class="st">"\n"</span>,</span>
+<span>                         <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">peak_quarterly</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>           size <span class="op">=</span> <span class="fl">3.2</span>, color <span class="op">=</span> <span class="st">"steelblue"</span>, hjust <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>,</span>
-<span>                     breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.16</span>, <span class="fl">0.02</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"2 years"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_color_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="st">"steelblue"</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="st">"darkred"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_linewidth_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="fl">1.5</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.10</span>, <span class="fl">0.17</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"3 months"</span>, date_labels <span class="op">=</span> <span class="st">"%b\n%Y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    title <span class="op">=</span> <span class="st">"Unemployment Rate: Quarterly vs Monthly"</span>,</span>
-<span>    subtitle <span class="op">=</span> <span class="st">"Brazil, 2012-2025. Shaded areas: 2014-17 recession and COVID-19 pandemic"</span>,</span>
+<span>    title <span class="op">=</span> <span class="st">"COVID-19 Unemployment Spike: Monthly vs Quarterly"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="st">"Monthly data (red) shows the true peak; quarterly (blue) averages it away"</span>,</span>
 <span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Unemployment Rate"</span>,</span>
-<span>    color <span class="op">=</span> <span class="st">"Frequency"</span>, linewidth <span class="op">=</span> <span class="st">"Frequency"</span>,</span>
-<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Monthly series computed with mensalizePNADC."</span></span>
+<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Quarterly shown as step function to emphasize moving-average nature."</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
-<span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">12</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
-<span>    legend.position <span class="op">=</span> <span class="st">"bottom"</span>,</span>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
-<span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span></code></pre></div>
-<p><img src="applied-examples_files/figure-html/plot-unemployment-1.png" width="768"></p>
-<p><strong>Key insights from monthly data:</strong></p>
+<span>    panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="co">#&gt; Warning: Removed 1 row containing missing values or values outside the scale range</span></span>
+<span><span class="co">#&gt; (`geom_segment()`).</span></span>
+<span><span class="co">#&gt; Warning: Removed 1 row containing missing values or values outside the scale range</span></span>
+<span><span class="co">#&gt; (`geom_text()`).</span></span></code></pre></div>
+<p><img src="applied-examples_files/figure-html/covid-unemployment-1.png" width="864"></p>
+<p><strong>Key findings:</strong></p>
 <ul>
-<li>The unemployment <strong>peak during COVID-19</strong> (March-April
-2020) is precisely dated</li>
-<li>
-<strong>Seasonal patterns</strong> within quarters become visible
-(year-end hiring, etc.)</li>
-<li>The <strong>2014-17 recession</strong> shows gradual buildup visible
-month-by-month</li>
-<li>
-<strong>Recovery trajectories</strong> show month-by-month progress
-rather than quarterly jumps</li>
+<li>Monthly data shows unemployment peaked at <strong>15.3%</strong> in
+março 2021</li>
+<li>Quarterly data shows a lower peak of <strong>14.9%</strong> -
+understating the shock</li>
+<li>The quarterly “peak” appears later than the true monthly peak</li>
 </ul>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="comparison-2-labor-force-participation-by-gender">Comparison 2: Labor Force Participation by Gender<a class="anchor" aria-label="anchor" href="#comparison-2-labor-force-participation-by-gender"></a>
+<h2 id="the-2014-2017-recession-tracking-the-deterioration">2. The 2014-2017 Recession: Tracking the Deterioration<a class="anchor" aria-label="anchor" href="#the-2014-2017-recession-tracking-the-deterioration"></a>
 </h2>
-<p>Labor force participation shows strong gender differences. Monthly
-data reveals how economic shocks affected men and women differently in
-terms of timing and magnitude.</p>
+<p>Brazil’s 2014-2017 recession saw unemployment rise from 6% to 14%.
+Monthly data reveals the <strong>month-by-month deterioration</strong>
+that quarterly data smooths.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Combine data</span></span>
-<span><span class="va">participation_gender</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
-<span>  <span class="va">quarterly_gender</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">sexo</span>, <span class="va">participation_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  <span class="va">monthly_gender</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">sexo</span>, <span class="va">participation_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Focus on recession build-up</span></span>
+<span><span class="va">recession_q</span> <span class="op">&lt;-</span> <span class="va">quarterly_total</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2014-06-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2017-06-01"</span><span class="op">]</span></span>
+<span><span class="va">recession_m</span> <span class="op">&lt;-</span> <span class="va">monthly_total</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2014-06-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2017-06-01"</span><span class="op">]</span></span>
 <span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">participation_gender</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span>,</span>
-<span>                                  color <span class="op">=</span> <span class="va">sexo</span>, linetype <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="co"># COVID shading</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-01"</span><span class="op">)</span>,</span>
-<span>    end <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-06-01"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
-<span>  inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Find the peak</span></span>
+<span><span class="va">peak_m</span> <span class="op">&lt;-</span> <span class="va">recession_m</span><span class="op">[</span><span class="va">unemployment_rate</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">unemployment_rate</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>linewidth <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Calculate month-to-month changes for monthly</span></span>
+<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setorder.html" class="external-link">setorder</a></span><span class="op">(</span><span class="va">recession_m</span>, <span class="va">period</span><span class="op">)</span></span>
+<span><span class="va">recession_m</span><span class="op">[</span>, <span class="va">change</span> <span class="op">:=</span> <span class="va">unemployment_rate</span> <span class="op">-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/shift.html" class="external-link">shift</a></span><span class="op">(</span><span class="va">unemployment_rate</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">big_jumps</span> <span class="op">&lt;-</span> <span class="va">recession_m</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">change</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">change</span> <span class="op">&gt;</span> <span class="fl">0.01</span><span class="op">]</span></span>
+<span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Quarterly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_step</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">recession_q</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"steelblue"</span>, linewidth <span class="op">=</span> <span class="fl">1</span>, direction <span class="op">=</span> <span class="st">"mid"</span>, alpha <span class="op">=</span> <span class="fl">0.7</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">recession_q</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"steelblue"</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Monthly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">recession_m</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"darkred"</span>, linewidth <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">recession_m</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"darkred"</span>, size <span class="op">=</span> <span class="fl">1.2</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Highlight big monthly jumps</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">big_jumps</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"darkred"</span>, size <span class="op">=</span> <span class="fl">3</span>, shape <span class="op">=</span> <span class="fl">21</span>, fill <span class="op">=</span> <span class="st">"yellow"</span>, stroke <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Mark the peak</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"point"</span>, x <span class="op">=</span> <span class="va">peak_m</span><span class="op">$</span><span class="va">period</span>, y <span class="op">=</span> <span class="va">peak_m</span><span class="op">$</span><span class="va">unemployment_rate</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"darkred"</span>, size <span class="op">=</span> <span class="fl">4</span>, shape <span class="op">=</span> <span class="fl">18</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="va">peak_m</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">45</span>, y <span class="op">=</span> <span class="va">peak_m</span><span class="op">$</span><span class="va">unemployment_rate</span>,</span>
+<span>           label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Peak: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">peak_m</span><span class="op">$</span><span class="va">period</span>, <span class="st">"%b %Y"</span><span class="op">)</span>, <span class="st">"\n"</span>,</span>
+<span>                         <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">peak_m</span><span class="op">$</span><span class="va">unemployment_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>           size <span class="op">=</span> <span class="fl">3</span>, hjust <span class="op">=</span> <span class="fl">0</span>, color <span class="op">=</span> <span class="st">"darkred"</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
-<span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.45</span>, <span class="fl">0.80</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"2 years"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_color_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Men"</span> <span class="op">=</span> <span class="st">"steelblue"</span>, <span class="st">"Women"</span> <span class="op">=</span> <span class="st">"coral"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_linetype_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="st">"solid"</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>                     breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0.06</span>, <span class="fl">0.14</span>, <span class="fl">0.02</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"6 months"</span>, date_labels <span class="op">=</span> <span class="st">"%b\n%Y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    title <span class="op">=</span> <span class="st">"Labor Force Participation Rate by Gender"</span>,</span>
-<span>    subtitle <span class="op">=</span> <span class="st">"Quarterly (solid) vs Monthly (dashed). Shaded: COVID-19 pandemic"</span>,</span>
-<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Participation Rate"</span>,</span>
-<span>    color <span class="op">=</span> <span class="st">"Gender"</span>, linetype <span class="op">=</span> <span class="st">"Frequency"</span>,</span>
-<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Monthly series computed with mensalizePNADC."</span></span>
+<span>    title <span class="op">=</span> <span class="st">"2014-2017 Recession: Month-by-Month Unemployment Rise"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="st">"Yellow circles: months with &gt;1 p.p. unemployment increase. Monthly data (red) vs quarterly (blue)."</span>,</span>
+<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Unemployment Rate"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Monthly data reveals sudden jumps hidden in quarterly averages."</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
-<span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">12</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
-<span>    legend.position <span class="op">=</span> <span class="st">"bottom"</span>,</span>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
-<span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span>    panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
-<p><img src="applied-examples_files/figure-html/plot-participation-gender-1.png" width="768"></p>
-<p><strong>Key insights:</strong></p>
+<p><img src="applied-examples_files/figure-html/recession-detail-1.png" width="864"></p>
+<p><strong>Key findings:</strong></p>
 <ul>
-<li>
-<strong>Women’s participation dropped more sharply</strong> during
-COVID-19 (childcare burden)</li>
-<li>Monthly data shows the <strong>exact timing</strong> of the collapse
-and recovery</li>
-<li>The <strong>gender gap widened</strong> during the pandemic before
-narrowing again</li>
-<li>
-<strong>Seasonal patterns</strong> differ by gender (e.g., school
-calendar effects)</li>
+<li>Monthly data reveals <strong>3 months</strong> with unemployment
+jumps exceeding 1 percentage point</li>
+<li>These sudden deteriorations are invisible in quarterly data</li>
+<li>The precise peak occurred in <strong>fevereiro 2017</strong> at
+14.0%</li>
 </ul>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="comparison-3-formalization-rate-national">Comparison 3: Formalization Rate (National)<a class="anchor" aria-label="anchor" href="#comparison-3-formalization-rate-national"></a>
+<h2 id="gender-gap-during-covid-women-left-the-labor-force">3. Gender Gap During COVID: Women Left the Labor Force<a class="anchor" aria-label="anchor" href="#gender-gap-during-covid-women-left-the-labor-force"></a>
 </h2>
-<p>The formalization rate measures the share of formal employment (CLT
-contracts, statutory employees, or self-employed/employers contributing
-to social security). This indicator is crucial for understanding labor
-market quality.</p>
+<p>COVID-19 disproportionately affected women’s labor force
+participation due to school closures and care responsibilities. Monthly
+data captures the <strong>exact timing and magnitude</strong> of this
+divergence.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Combine data</span></span>
-<span><span class="va">formalization_combined</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
-<span>  <span class="va">quarterly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">formalization_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  <span class="va">monthly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">formalization_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Prepare gender data for COVID period</span></span>
+<span><span class="va">covid_gender_m</span> <span class="op">&lt;-</span> <span class="va">monthly_gender</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-10-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2021-09-01"</span><span class="op">]</span></span>
+<span><span class="va">covid_gender_q</span> <span class="op">&lt;-</span> <span class="va">quarterly_gender</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-10-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2021-09-01"</span><span class="op">]</span></span>
 <span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">formalization_combined</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">formalization_rate</span>,</span>
-<span>                                    color <span class="op">=</span> <span class="va">frequency</span>, linewidth <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="co"># Crisis shading</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">crisis_periods</span>,</span>
-<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
-<span>            inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Calculate gender gap</span></span>
+<span><span class="va">gap_monthly</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/dcast.data.table.html" class="external-link">dcast</a></span><span class="op">(</span><span class="va">covid_gender_m</span>, <span class="va">period</span> <span class="op">~</span> <span class="va">sexo</span>, value.var <span class="op">=</span> <span class="st">"participation_rate"</span><span class="op">)</span></span>
+<span><span class="va">gap_monthly</span><span class="op">[</span>, <span class="va">gap</span> <span class="op">:=</span> <span class="va">Men</span> <span class="op">-</span> <span class="va">Women</span><span class="op">]</span></span>
+<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setorder.html" class="external-link">setorder</a></span><span class="op">(</span><span class="va">gap_monthly</span>, <span class="va">period</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Find max gap</span></span>
+<span><span class="va">max_gap</span> <span class="op">&lt;-</span> <span class="va">gap_monthly</span><span class="op">[</span><span class="va">gap</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">gap</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Pre-COVID baseline</span></span>
+<span><span class="va">baseline</span> <span class="op">&lt;-</span> <span class="va">gap_monthly</span><span class="op">[</span><span class="va">period</span> <span class="op">==</span> <span class="st">"2020-02-15"</span><span class="op">]</span></span>
+<span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Men - monthly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_gender_m</span><span class="op">[</span><span class="va">sexo</span> <span class="op">==</span> <span class="st">"Men"</span><span class="op">]</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"steelblue"</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Women - monthly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_gender_m</span><span class="op">[</span><span class="va">sexo</span> <span class="op">==</span> <span class="st">"Women"</span><span class="op">]</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"coral"</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Shade the gap at maximum point</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"rect"</span>,</span>
+<span>           xmin <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">period</span> <span class="op">-</span> <span class="fl">20</span>, xmax <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">20</span>,</span>
+<span>           ymin <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">Women</span>, ymax <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">Men</span>,</span>
+<span>           fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"segment"</span>,</span>
+<span>           x <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">period</span>, xend <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">period</span>,</span>
+<span>           y <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">Women</span>, yend <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">Men</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"purple"</span>, linewidth <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">25</span>, y <span class="op">=</span> <span class="op">(</span><span class="va">max_gap</span><span class="op">$</span><span class="va">Men</span> <span class="op">+</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">Women</span><span class="op">)</span> <span class="op">/</span> <span class="fl">2</span>,</span>
+<span>           label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Max gap: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f p.p."</span>, <span class="op">(</span><span class="va">max_gap</span><span class="op">$</span><span class="va">Men</span> <span class="op">-</span> <span class="va">max_gap</span><span class="op">$</span><span class="va">Women</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>           size <span class="op">=</span> <span class="fl">3</span>, hjust <span class="op">=</span> <span class="fl">0</span>, color <span class="op">=</span> <span class="st">"purple"</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Labels</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-06-01"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">0.715</span>, label <span class="op">=</span> <span class="st">"Men"</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"steelblue"</span>, fontface <span class="op">=</span> <span class="st">"bold"</span>, size <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-06-01"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">0.505</span>, label <span class="op">=</span> <span class="st">"Women"</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"coral"</span>, fontface <span class="op">=</span> <span class="st">"bold"</span>, size <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Baseline reference</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_hline</a></span><span class="op">(</span>yintercept <span class="op">=</span> <span class="va">baseline</span><span class="op">$</span><span class="va">Women</span>, linetype <span class="op">=</span> <span class="st">"dashed"</span>, color <span class="op">=</span> <span class="st">"coral"</span>, alpha <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2019-11-01"</span><span class="op">)</span>, y <span class="op">=</span> <span class="va">baseline</span><span class="op">$</span><span class="va">Women</span> <span class="op">+</span> <span class="fl">0.01</span>,</span>
+<span>           label <span class="op">=</span> <span class="st">"Pre-COVID\nwomen's rate"</span>, size <span class="op">=</span> <span class="fl">2.5</span>, color <span class="op">=</span> <span class="st">"coral"</span>, hjust <span class="op">=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
-<span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.55</span>, <span class="fl">0.70</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"2 years"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_color_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="st">"steelblue"</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="st">"darkgreen"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_linewidth_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="fl">1.5</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.45</span>, <span class="fl">0.75</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"3 months"</span>, date_labels <span class="op">=</span> <span class="st">"%b\n%Y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    title <span class="op">=</span> <span class="st">"Formalization Rate: Quarterly vs Monthly"</span>,</span>
-<span>    subtitle <span class="op">=</span> <span class="st">"Share of formal employment among all employed. Shaded: economic crises"</span>,</span>
-<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Formalization Rate"</span>,</span>
-<span>    color <span class="op">=</span> <span class="st">"Frequency"</span>, linewidth <span class="op">=</span> <span class="st">"Frequency"</span>,</span>
-<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Formal = CLT + statutory + contributing self-employed/employers."</span></span>
+<span>    title <span class="op">=</span> <span class="st">"COVID-19 Gender Impact: Women's Participation Collapsed"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Gender gap widened from "</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f"</span>, <span class="va">baseline</span><span class="op">$</span><span class="va">gap</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>,</span>
+<span>                     <span class="st">" to "</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f"</span>, <span class="va">max_gap</span><span class="op">$</span><span class="va">gap</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>,</span>
+<span>                     <span class="st">" p.p. - monthly data shows exact timing"</span><span class="op">)</span>,</span>
+<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Labor Force Participation Rate"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Monthly data from mensalizePNADC."</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
-<span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">12</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
-<span>    legend.position <span class="op">=</span> <span class="st">"bottom"</span>,</span>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
-<span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span>    panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
-<p><img src="applied-examples_files/figure-html/plot-formalization-1.png" width="768"></p>
-<p><strong>Key insights:</strong></p>
+<p><img src="applied-examples_files/figure-html/gender-gap-covid-1.png" width="864"></p>
+<p><strong>Key findings:</strong></p>
 <ul>
-<li>Formalization <strong>declined during both crises</strong> (2014-17
-and COVID-19)</li>
-<li>Monthly data reveals <strong>seasonal patterns</strong> (e.g.,
-year-end temporary formal contracts)</li>
-<li>The <strong>2017 labor reform</strong> effects can be tracked
-month-by-month</li>
-<li>
-<strong>Recovery patterns</strong> differ between crises</li>
+<li>Pre-COVID gender gap: <strong>19.1</strong> percentage points</li>
+<li>Maximum gap during COVID: <strong>21.5</strong> percentage points in
+agosto 2020</li>
+<li>Women’s participation dropped from 54.0% to 46.4%</li>
+<li>Monthly data pinpoints when the divergence began and when recovery
+started</li>
 </ul>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="comparison-4-employment-level-by-race">Comparison 4: Employment Level by Race<a class="anchor" aria-label="anchor" href="#comparison-4-employment-level-by-race"></a>
+<h2 id="racial-inequality-unemployment-gap-widened-during-covid">4. Racial Inequality: Unemployment Gap Widened During COVID<a class="anchor" aria-label="anchor" href="#racial-inequality-unemployment-gap-widened-during-covid"></a>
 </h2>
-<p>Employment levels by race reveal structural inequalities in the
-Brazilian labor market and how different groups were affected by
-economic shocks.</p>
+<p>The unemployment gap between Black and White workers <strong>widened
+significantly</strong> during the pandemic. Monthly data reveals when
+this happened.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Combine data</span></span>
-<span><span class="va">employment_race</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
-<span>  <span class="va">quarterly_race</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">raca</span>, <span class="va">employment_level</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  <span class="va">monthly_race</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">raca</span>, <span class="va">employment_level</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Prepare race data - focus on unemployment rate gap</span></span>
+<span><span class="va">race_unemp_m</span> <span class="op">&lt;-</span> <span class="va">monthly_race</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-01-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2022-01-01"</span><span class="op">]</span></span>
+<span><span class="va">race_unemp_q</span> <span class="op">&lt;-</span> <span class="va">quarterly_race</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-01-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2022-01-01"</span><span class="op">]</span></span>
 <span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">employment_race</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">employment_level</span>,</span>
-<span>                             color <span class="op">=</span> <span class="va">raca</span>, linetype <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="co"># COVID shading</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-01"</span><span class="op">)</span>,</span>
-<span>    end <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-06-01"</span><span class="op">)</span></span>
-<span>  <span class="op">)</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
-<span>  inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Calculate gap (Black - White)</span></span>
+<span><span class="va">gap_race_m</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/dcast.data.table.html" class="external-link">dcast</a></span><span class="op">(</span><span class="va">race_unemp_m</span>, <span class="va">period</span> <span class="op">~</span> <span class="va">raca</span>, value.var <span class="op">=</span> <span class="st">"unemployment_rate"</span><span class="op">)</span></span>
+<span><span class="va">gap_race_m</span><span class="op">[</span>, <span class="va">gap</span> <span class="op">:=</span> <span class="va">Black</span> <span class="op">-</span> <span class="va">White</span><span class="op">]</span></span>
+<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setorder.html" class="external-link">setorder</a></span><span class="op">(</span><span class="va">gap_race_m</span>, <span class="va">period</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>linewidth <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Find max gap</span></span>
+<span><span class="va">max_race_gap</span> <span class="op">&lt;-</span> <span class="va">gap_race_m</span><span class="op">[</span><span class="va">gap</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">gap</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"2 years"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_brewer.html" class="external-link">scale_color_brewer</a></span><span class="op">(</span>palette <span class="op">=</span> <span class="st">"Set1"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_linetype_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="st">"solid"</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="co"># Pre-COVID</span></span>
+<span><span class="va">baseline_race</span> <span class="op">&lt;-</span> <span class="va">gap_race_m</span><span class="op">[</span><span class="va">period</span> <span class="op">==</span> <span class="st">"2020-02-15"</span><span class="op">]</span></span>
+<span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># White unemployment</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">race_unemp_m</span><span class="op">[</span><span class="va">raca</span> <span class="op">==</span> <span class="st">"White"</span><span class="op">]</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"#2166AC"</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Black unemployment</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">race_unemp_m</span><span class="op">[</span><span class="va">raca</span> <span class="op">==</span> <span class="st">"Black"</span><span class="op">]</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"#B2182B"</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Brown unemployment</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">race_unemp_m</span><span class="op">[</span><span class="va">raca</span> <span class="op">==</span> <span class="st">"Brown"</span><span class="op">]</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"#DFC27D"</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Shade max gap period</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"rect"</span>,</span>
+<span>           xmin <span class="op">=</span> <span class="va">max_race_gap</span><span class="op">$</span><span class="va">period</span> <span class="op">-</span> <span class="fl">20</span>, xmax <span class="op">=</span> <span class="va">max_race_gap</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">20</span>,</span>
+<span>           ymin <span class="op">=</span> <span class="va">max_race_gap</span><span class="op">$</span><span class="va">White</span>, ymax <span class="op">=</span> <span class="va">max_race_gap</span><span class="op">$</span><span class="va">Black</span>,</span>
+<span>           fill <span class="op">=</span> <span class="st">"gray50"</span>, alpha <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># COVID start marker</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_vline</a></span><span class="op">(</span>xintercept <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-15"</span><span class="op">)</span>, linetype <span class="op">=</span> <span class="st">"dashed"</span>, alpha <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-15"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">0.21</span>,</span>
+<span>           label <span class="op">=</span> <span class="st">"COVID\nstart"</span>, size <span class="op">=</span> <span class="fl">2.5</span>, hjust <span class="op">=</span> <span class="op">-</span><span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Labels</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-10-01"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">0.175</span>, label <span class="op">=</span> <span class="st">"Black"</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"#B2182B"</span>, fontface <span class="op">=</span> <span class="st">"bold"</span>, size <span class="op">=</span> <span class="fl">3.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-10-01"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">0.135</span>, label <span class="op">=</span> <span class="st">"Brown"</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"#DFC27D"</span>, fontface <span class="op">=</span> <span class="st">"bold"</span>, size <span class="op">=</span> <span class="fl">3.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-10-01"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">0.095</span>, label <span class="op">=</span> <span class="st">"White"</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"#2166AC"</span>, fontface <span class="op">=</span> <span class="st">"bold"</span>, size <span class="op">=</span> <span class="fl">3.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Gap annotation</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="va">max_race_gap</span><span class="op">$</span><span class="va">period</span> <span class="op">+</span> <span class="fl">60</span>, y <span class="op">=</span> <span class="op">(</span><span class="va">max_race_gap</span><span class="op">$</span><span class="va">Black</span> <span class="op">+</span> <span class="va">max_race_gap</span><span class="op">$</span><span class="va">White</span><span class="op">)</span> <span class="op">/</span> <span class="fl">2</span>,</span>
+<span>           label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Max gap: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f p.p."</span>, <span class="va">max_race_gap</span><span class="op">$</span><span class="va">gap</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span>,</span>
+<span>                         <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">max_race_gap</span><span class="op">$</span><span class="va">period</span>, <span class="st">"%b %Y"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>           size <span class="op">=</span> <span class="fl">3</span>, hjust <span class="op">=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
+<span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.08</span>, <span class="fl">0.22</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"4 months"</span>, date_labels <span class="op">=</span> <span class="st">"%b\n%Y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    title <span class="op">=</span> <span class="st">"Employment Level by Race"</span>,</span>
-<span>    subtitle <span class="op">=</span> <span class="st">"Quarterly (solid) vs Monthly (dashed). Shaded: COVID-19 pandemic"</span>,</span>
-<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Employment Level (Employed / Working-age Pop.)"</span>,</span>
-<span>    color <span class="op">=</span> <span class="st">"Race"</span>, linetype <span class="op">=</span> <span class="st">"Frequency"</span>,</span>
-<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Monthly series computed with mensalizePNADC."</span></span>
+<span>    title <span class="op">=</span> <span class="st">"Racial Unemployment Gap: COVID Amplified Inequality"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Black-White gap widened from "</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f"</span>, <span class="va">baseline_race</span><span class="op">$</span><span class="va">gap</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>,</span>
+<span>                     <span class="st">" to "</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f"</span>, <span class="va">max_race_gap</span><span class="op">$</span><span class="va">gap</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">" p.p."</span><span class="op">)</span>,</span>
+<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Unemployment Rate"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Monthly data from mensalizePNADC."</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
-<span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">12</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
-<span>    legend.position <span class="op">=</span> <span class="st">"bottom"</span>,</span>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
-<span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span>    panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
-<p><img src="applied-examples_files/figure-html/plot-employment-race-1.png" width="768"></p>
-<p><strong>Key insights:</strong></p>
+<p><img src="applied-examples_files/figure-html/racial-gap-1.png" width="864"></p>
+<p><strong>Key findings:</strong></p>
 <ul>
-<li>
-<strong>Black and Brown workers faced larger employment
-drops</strong> during COVID-19</li>
-<li>Monthly data shows that <strong>recovery was also slower</strong>
-for these groups</li>
-<li>
-<strong>Racial gaps in employment</strong> are persistent across the
-entire period</li>
-<li>The <strong>timing of impacts</strong> can be precisely measured
-with monthly data</li>
+<li>Pre-COVID Black-White gap: <strong>4.8</strong> percentage
+points</li>
+<li>Maximum gap: <strong>8.0</strong> percentage points in agosto
+2020</li>
+<li>Black unemployment peaked at nearly <strong>20%</strong> while White
+unemployment peaked at <strong>12%</strong>
+</li>
+<li>Monthly data shows the gap widened immediately after COVID started
+and remained elevated</li>
 </ul>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="summary-why-monthly-data-matters">Summary: Why Monthly Data Matters<a class="anchor" aria-label="anchor" href="#summary-why-monthly-data-matters"></a>
+<h2 id="formalization-rate-detecting-the-covid-paradox">5. Formalization Rate: Detecting the “COVID Paradox”<a class="anchor" aria-label="anchor" href="#formalization-rate-detecting-the-covid-paradox"></a>
+</h2>
+<p>During COVID, the formalization rate <strong>increased</strong>
+despite the economic collapse. Why? Informal workers lost jobs faster,
+changing the composition of employment.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Focus on COVID period formalization</span></span>
+<span><span class="va">covid_form_m</span> <span class="op">&lt;-</span> <span class="va">monthly_total</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-10-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2021-06-01"</span>,</span>
+<span>                               <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">formalization_rate</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">covid_form_q</span> <span class="op">&lt;-</span> <span class="va">quarterly_total</span><span class="op">[</span><span class="va">period</span> <span class="op">&gt;=</span> <span class="st">"2019-10-01"</span> <span class="op">&amp;</span> <span class="va">period</span> <span class="op">&lt;=</span> <span class="st">"2021-06-01"</span>,</span>
+<span>                                 <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">formalization_rate</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Find the spike</span></span>
+<span><span class="va">max_formal</span> <span class="op">&lt;-</span> <span class="va">covid_form_m</span><span class="op">[</span><span class="va">formalization_rate</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">formalization_rate</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">pre_covid</span> <span class="op">&lt;-</span> <span class="va">covid_form_m</span><span class="op">[</span><span class="va">period</span> <span class="op">==</span> <span class="st">"2020-02-15"</span><span class="op">]</span></span>
+<span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Quarterly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_step</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_form_q</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">formalization_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"steelblue"</span>, linewidth <span class="op">=</span> <span class="fl">1</span>, direction <span class="op">=</span> <span class="st">"mid"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_form_q</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">formalization_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"steelblue"</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Monthly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_form_m</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">formalization_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"darkgreen"</span>, linewidth <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_form_m</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">formalization_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"darkgreen"</span>, size <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Highlight the spike</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"point"</span>, x <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">period</span>, y <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">formalization_rate</span>,</span>
+<span>           color <span class="op">=</span> <span class="st">"darkgreen"</span>, size <span class="op">=</span> <span class="fl">4</span>, shape <span class="op">=</span> <span class="fl">18</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"segment"</span>, x <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">period</span>, xend <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">period</span>,</span>
+<span>           y <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">formalization_rate</span> <span class="op">+</span> <span class="fl">0.005</span>,</span>
+<span>           yend <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">formalization_rate</span> <span class="op">+</span> <span class="fl">0.025</span>,</span>
+<span>           arrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/grid/arrow.html" class="external-link">arrow</a></span><span class="op">(</span>length <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/grid/unit.html" class="external-link">unit</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="st">"cm"</span><span class="op">)</span><span class="op">)</span>, color <span class="op">=</span> <span class="st">"darkgreen"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/annotate.html" class="external-link">annotate</a></span><span class="op">(</span><span class="st">"text"</span>, x <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">period</span>, y <span class="op">=</span> <span class="va">max_formal</span><span class="op">$</span><span class="va">formalization_rate</span> <span class="op">+</span> <span class="fl">0.03</span>,</span>
+<span>           label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"COVID spike:\n"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">max_formal</span><span class="op">$</span><span class="va">formalization_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span>,</span>
+<span>                         <span class="st">"(informal jobs lost)"</span><span class="op">)</span>,</span>
+<span>           size <span class="op">=</span> <span class="fl">3</span>, hjust <span class="op">=</span> <span class="fl">0.5</span>, color <span class="op">=</span> <span class="st">"darkgreen"</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Pre-COVID reference</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_hline</a></span><span class="op">(</span>yintercept <span class="op">=</span> <span class="va">pre_covid</span><span class="op">$</span><span class="va">formalization_rate</span>, linetype <span class="op">=</span> <span class="st">"dashed"</span>, alpha <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
+<span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.56</span>, <span class="fl">0.66</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"3 months"</span>, date_labels <span class="op">=</span> <span class="st">"%b\n%Y"</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
+<span>    title <span class="op">=</span> <span class="st">"The COVID Formalization Paradox"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="st">"Formalization rate ROSE because informal workers lost jobs disproportionately"</span>,</span>
+<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Formalization Rate"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"Source: PNADC/IBGE. Green = monthly, blue = quarterly."</span></span>
+<span>  <span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
+<span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
+<span>    panel.grid.minor <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p><img src="applied-examples_files/figure-html/formalization-covid-1.png" width="864"></p>
+<p><strong>Key findings:</strong></p>
+<ul>
+<li>Pre-COVID formalization: <strong>58.9%</strong>
+</li>
+<li>COVID peak: <strong>62.6%</strong> in abril 2020</li>
+<li>This 3.7 p.p. jump happened in a single month</li>
+<li>Monthly data captures this compositional shift that quarterly data
+smooths</li>
+</ul>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="summary-what-monthly-data-reveals">Summary: What Monthly Data Reveals<a class="anchor" aria-label="anchor" href="#summary-what-monthly-data-reveals"></a>
 </h2>
 <table class="table">
-<caption>Comparing Quarterly vs Monthly Time Series</caption>
 <colgroup>
-<col width="19%">
+<col width="20%">
 <col width="43%">
-<col width="36%">
+<col width="35%">
 </colgroup>
 <thead><tr class="header">
-<th align="left">Aspect</th>
-<th align="left">Quarterly Data</th>
-<th align="left">Monthly Data</th>
+<th>Analysis</th>
+<th>Quarterly Limitation</th>
+<th>Monthly Insight</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td align="left">Timing precision</td>
-<td align="left">3-month averages obscure turning points</td>
-<td align="left">Precise month of changes visible</td>
+<td><strong>COVID unemployment</strong></td>
+<td>Peak understated</td>
+<td>True peak of 15.3% in mar 2021</td>
 </tr>
 <tr class="even">
-<td align="left">Seasonality</td>
-<td align="left">Hidden within quarters</td>
-<td align="left">Clear seasonal patterns</td>
+<td><strong>Recession build-up</strong></td>
+<td>Gradual rise appears smooth</td>
+<td>3 months with &gt;1 p.p. jumps</td>
 </tr>
 <tr class="odd">
-<td align="left">Shock analysis</td>
-<td align="left">Delayed/smoothed response visible</td>
-<td align="left">Real-time impact visible</td>
+<td><strong>Gender gap</strong></td>
+<td>Gap widening timing unclear</td>
+<td>Exact month of divergence (ago 2020)</td>
 </tr>
 <tr class="even">
-<td align="left">Policy evaluation</td>
-<td align="left">Imprecise policy timing</td>
-<td align="left">Can link to specific policy dates</td>
+<td><strong>Racial inequality</strong></td>
+<td>Gap changes smoothed</td>
+<td>8.0 p.p. peak gap dated precisely</td>
 </tr>
 <tr class="odd">
-<td align="left">Forecasting</td>
-<td align="left">Limited lead time</td>
-<td align="left">More frequent updates</td>
+<td><strong>Formalization paradox</strong></td>
+<td>Spike diluted across quarter</td>
+<td>Sharp compositional shift visible</td>
 </tr>
 </tbody>
 </table>
-<p>The <code>mensalizePNADC</code> package achieves <strong>95-97%
-determination rate</strong>, meaning nearly all observations can be
-assigned to specific months with properly calibrated weights.</p>
+<p>Monthly data from <code>mensalizePNADC</code> enables:</p>
+<ul>
+<li>
+<strong>Precise timing</strong> of economic turning points</li>
+<li>
+<strong>True magnitudes</strong> of shocks (not moving
+averages)</li>
+<li>
+<strong>Exact dating</strong> of policy-relevant changes</li>
+<li>
+<strong>Short-term dynamics</strong> invisible in quarterly
+data</li>
+</ul>
 <hr>
 </div>
 <div class="section level2">
 <h2 id="technical-notes">Technical Notes<a class="anchor" aria-label="anchor" href="#technical-notes"></a>
 </h2>
 <div class="section level3">
-<h3 id="how-these-series-were-computed">How These Series Were Computed<a class="anchor" aria-label="anchor" href="#how-these-series-were-computed"></a>
+<h3 id="data-source">Data Source<a class="anchor" aria-label="anchor" href="#data-source"></a>
 </h3>
-<p>The series shown in this vignette were computed using:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># 1. Load stacked PNADC data (55 quarterly files, 2012-2025)</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu">load_all_pnadc_quarters</span><span class="op">(</span><span class="op">)</span>  <span class="co"># 28.4 million observations</span></span>
-<span></span>
-<span><span class="co"># 2. Create labor market variables</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">unemployment</span> <span class="op">:=</span> <span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span> <span class="op">&amp;</span> <span class="va">VD4002</span> <span class="op">==</span> <span class="fl">2</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">formal</span> <span class="op">:=</span> <span class="op">(</span><span class="va">VD4009</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">3</span>,<span class="fl">5</span>,<span class="fl">7</span><span class="op">)</span><span class="op">)</span> <span class="op">|</span></span>
-<span>                  <span class="op">(</span><span class="va">VD4009</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8</span>,<span class="fl">9</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">VD4012</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="co"># ... other variables</span></span>
-<span></span>
-<span><span class="co"># 3. Apply mensalization with weight calibration</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># 4. Compute weighted aggregates</span></span>
-<span><span class="va">monthly_series</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span></code></pre></div>
+<p>The series shown here were computed from <strong>22,850,046</strong>
+PNADC observations covering 2012-Q1 to 2025-Q3.</p>
+<p>The mensalization algorithm achieved a <strong>95.4%</strong>
+determination rate, meaning nearly all observations could be assigned to
+specific months.</p>
 </div>
 <div class="section level3">
-<h3 id="weight-calibration">Weight Calibration<a class="anchor" aria-label="anchor" href="#weight-calibration"></a>
+<h3 id="reproduce-these-results">Reproduce These Results<a class="anchor" aria-label="anchor" href="#reproduce-these-results"></a>
 </h3>
-<p>The <code>weight_monthly</code> variable is calibrated using
-hierarchical rake weighting to match IBGE’s monthly population estimates
-from SIDRA table 6022. This ensures:</p>
-<ul>
-<li>Monthly population totals match official estimates</li>
-<li>Weighted aggregates are representative at the monthly level</li>
-<li>Comparisons between months are valid</li>
-</ul>
-</div>
-<div class="section level3">
-<h3 id="handling-indeterminate-observations">Handling Indeterminate Observations<a class="anchor" aria-label="anchor" href="#handling-indeterminate-observations"></a>
-</h3>
-<p>About 3-5% of observations cannot have their reference month
-determined (due to missing birthday information or conflicting
-constraints). These receive <code>weight_monthly = NA</code> and are
-excluded from monthly aggregates. For most analyses, this has minimal
-impact on estimates since the excluded observations are redistributed
-through the weight calibration process.</p>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="reproduce-these-results">Reproduce These Results<a class="anchor" aria-label="anchor" href="#reproduce-these-results"></a>
-</h2>
-<p>To reproduce these series with your own PNADC data:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load your stacked PNADC data</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"your_stacked_pnadc.csv"</span><span class="op">)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"your_pnadc_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Ensure required columns exist</span></span>
-<span><span class="va">required_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span>,</span>
-<span>                   <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span>,</span>
-<span>                   <span class="st">"V1028"</span>, <span class="st">"UF"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="va">required_cols</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co"># Apply mensalization with weight computation</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Apply mensalization</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span>, keep_all <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Compute your indicators using weight_monthly</span></span>
-<span><span class="va">monthly_unemployment</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span></span>
+<span><span class="co"># Compute monthly unemployment rate</span></span>
+<span><span class="va">monthly_unemp</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span> <span class="op">&amp;</span> <span class="va">VD4002</span> <span class="op">==</span> <span class="fl">2</span><span class="op">)</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span> <span class="op">/</span></span>
+<span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span></span>
 <span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span></code></pre></div>
 <p>See the <a href="getting-started.html">Getting Started vignette</a>
-for the full algorithm explanation and more examples.</p>
+for the complete algorithm explanation.</p>
 <hr>
+</div>
 </div>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
