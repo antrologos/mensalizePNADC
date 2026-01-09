@@ -69,10 +69,11 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p>This vignette demonstrates how to use <code>mensalizePNADC</code> to
-convert quarterly PNADC data into monthly time series and compare labor
-market indicators at both frequencies.</p>
-<p>Monthly data reveals dynamics that quarterly aggregates obscure:</p>
+<p>This vignette demonstrates the value of converting quarterly PNADC
+data into monthly time series using <code>mensalizePNADC</code>. We
+compare four key labor market indicators at both frequencies to show how
+monthly data reveals dynamics that quarterly aggregates obscure.</p>
+<p><strong>Why monthly data matters:</strong></p>
 <ul>
 <li>
 <strong>Turning points</strong> in economic cycles become visible
@@ -87,7 +88,7 @@ timing and magnitude</li>
 <strong>Policy evaluation</strong> benefits from more precise
 timing</li>
 </ul>
-<p>We’ll compute four key labor market indicators:</p>
+<p>We analyze four indicators:</p>
 <ol style="list-style-type: decimal">
 <li>
 <strong>Unemployment rate</strong> - National total</li>
@@ -100,360 +101,77 @@ timing</li>
 </ol>
 </div>
 <div class="section level2">
-<h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
+<h2 id="load-pre-computed-series">Load Pre-computed Series<a class="anchor" aria-label="anchor" href="#load-pre-computed-series"></a>
 </h2>
+<p>The series shown here were computed from 28.4 million PNADC
+observations covering 2012-Q1 to 2025-Q3. The mensalization achieved a
+<strong>95.4% determination rate</strong>, meaning that 95.4% of
+observations could be assigned to specific months.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Required packages</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://scales.r-lib.org" class="external-link">scales</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Optional for data loading</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://www.fstpackage.org" class="external-link">fst</a></span><span class="op">)</span>        <span class="co"># Fast data reading</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://lubridate.tidyverse.org" class="external-link">lubridate</a></span><span class="op">)</span>  <span class="co"># Date handling</span></span>
+<span><span class="co"># Load pre-computed series (included with package)</span></span>
+<span><span class="va">data_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"vignette_series.rds"</span>, package <span class="op">=</span> <span class="st">"mensalizePNADC"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Set data.table threads</span></span>
-<span><span class="fu">data.table</span><span class="fu">::</span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/openmp-utils.html" class="external-link">setDTthreads</a></span><span class="op">(</span><span class="fl">4</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">data_file</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar</a></span><span class="op">(</span><span class="va">data_file</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">vignette_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">data_file</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Paths</span></span>
-<span><span class="va">pnadc_dir</span>     <span class="op">&lt;-</span> <span class="st">"D:/Dropbox/Bancos_Dados/PNADC/Trimestral/Dados/"</span></span>
-<span><span class="va">processed_dir</span> <span class="op">&lt;-</span> <span class="st">"D:/Dropbox/Artigos/mensalizacao_pnad/data/processed/"</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="step-1-load-and-prepare-pnadc-data">Step 1: Load and Prepare PNADC Data<a class="anchor" aria-label="anchor" href="#step-1-load-and-prepare-pnadc-data"></a>
-</h2>
-<p>First, we load stacked quarterly PNADC microdata. The data must
-include:</p>
-<ul>
-<li>
-<strong>Mensalization columns</strong>: <code>Ano</code>,
-<code>Trimestre</code>, <code>UPA</code>, <code>V1008</code>,
-<code>V1014</code>, <code>V2003</code>, <code>V2008</code>,
-<code>V20081</code>, <code>V20082</code>, <code>V2009</code>
-</li>
-<li>
-<strong>Weight columns</strong>: <code>V1028</code>,
-<code>UF</code>, <code>posest</code>, <code>posest_sxi</code>
-</li>
-<li>
-<strong>Analysis columns</strong>: <code>VD4001</code> (PEA),
-<code>VD4002</code> (employment status), <code>VD4009</code> (position),
-<code>VD4012</code> (contribution), <code>V2007</code> (sex),
-<code>V2010</code> (race)</li>
-</ul>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># List all quarterly data files</span></span>
-<span><span class="va">files</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span><span class="va">pnadc_dir</span>, pattern <span class="op">=</span> <span class="st">"\\.fst$"</span>, full.names <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="va">files</span> <span class="op">&lt;-</span> <span class="va">files</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"input"</span>, <span class="va">files</span><span class="op">)</span><span class="op">]</span></span>
+<span>  <span class="co"># Extract series</span></span>
+<span>  <span class="va">quarterly_total</span>  <span class="op">&lt;-</span> <span class="va">vignette_data</span><span class="op">$</span><span class="va">quarterly_total</span></span>
+<span>  <span class="va">quarterly_gender</span> <span class="op">&lt;-</span> <span class="va">vignette_data</span><span class="op">$</span><span class="va">quarterly_gender</span></span>
+<span>  <span class="va">quarterly_race</span>   <span class="op">&lt;-</span> <span class="va">vignette_data</span><span class="op">$</span><span class="va">quarterly_race</span></span>
+<span>  <span class="va">monthly_total</span>    <span class="op">&lt;-</span> <span class="va">vignette_data</span><span class="op">$</span><span class="va">monthly_total</span></span>
+<span>  <span class="va">monthly_gender</span>   <span class="op">&lt;-</span> <span class="va">vignette_data</span><span class="op">$</span><span class="va">monthly_gender</span></span>
+<span>  <span class="va">monthly_race</span>     <span class="op">&lt;-</span> <span class="va">vignette_data</span><span class="op">$</span><span class="va">monthly_race</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Found"</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">files</span><span class="op">)</span>, <span class="st">"quarterly files\n"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Load and stack all quarters</span></span>
-<span><span class="co"># Select only necessary columns for efficiency</span></span>
-<span><span class="va">cols_needed</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span></span>
-<span>  <span class="co"># Identifiers and time</span></span>
-<span>  <span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UF"</span>,</span>
-<span>  <span class="co"># Mensalization columns</span></span>
-<span>  <span class="st">"UPA"</span>, <span class="st">"Estrato"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span>,</span>
-<span>  <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span>,</span>
-<span>  <span class="co"># Weight columns</span></span>
-<span>  <span class="st">"V1028"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span>,</span>
-<span>  <span class="co"># Labor market variables</span></span>
-<span>  <span class="st">"VD4001"</span>,  <span class="co"># PEA (economically active)</span></span>
-<span>  <span class="st">"VD4002"</span>,  <span class="co"># Employment condition</span></span>
-<span>  <span class="st">"VD4009"</span>,  <span class="co"># Position in occupation</span></span>
-<span>  <span class="st">"VD4012"</span>,  <span class="co"># Social security contribution</span></span>
-<span>  <span class="co"># Demographics</span></span>
-<span>  <span class="st">"V2007"</span>,   <span class="co"># Sex</span></span>
-<span>  <span class="st">"V2010"</span>    <span class="co"># Race</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Load all files</span></span>
-<span><span class="va">pnadc_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">files</span>, <span class="kw">function</span><span class="op">(</span><span class="va">f</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Loading:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="va">f</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span>  <span class="va">dt</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="va">f</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="va">dt</span>, <span class="fu"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">tolower</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">dt</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span>  <span class="co"># Select available columns (handle case differences)</span></span>
-<span>  <span class="va">available</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">intersect</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">tolower</a></span><span class="op">(</span><span class="va">cols_needed</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">dt</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="va">dt</span> <span class="op">&lt;-</span> <span class="va">dt</span><span class="op">[</span>, <span class="va">..available</span><span class="op">]</span></span>
-<span></span>
-<span>  <span class="co"># Standardize column names to expected case</span></span>
-<span>  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="va">dt</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">dt</span><span class="op">)</span>,</span>
-<span>           <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UF"</span>, <span class="st">"UPA"</span>, <span class="st">"Estrato"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>,</span>
-<span>             <span class="st">"V2003"</span>, <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span>, <span class="st">"V1028"</span>,</span>
-<span>             <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span>, <span class="st">"VD4001"</span>, <span class="st">"VD4002"</span>, <span class="st">"VD4009"</span>,</span>
-<span>             <span class="st">"VD4012"</span>, <span class="st">"V2007"</span>, <span class="st">"V2010"</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">available</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span></span>
-<span>  <span class="va">dt</span></span>
-<span><span class="op">}</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="va">pnadc_list</span>, fill <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/rm.html" class="external-link">rm</a></span><span class="op">(</span><span class="va">pnadc_list</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/base/gc.html" class="external-link">gc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"\nTotal observations:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Period:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">$</span><span class="va">Ano</span><span class="op">)</span>, <span class="st">"Q"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">[</span><span class="va">Ano</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="va">Ano</span><span class="op">)</span>, <span class="va">Trimestre</span><span class="op">]</span><span class="op">)</span>,</span>
-<span>    <span class="st">"to"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">$</span><span class="va">Ano</span><span class="op">)</span>, <span class="st">"Q"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">[</span><span class="va">Ano</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">Ano</span><span class="op">)</span>, <span class="va">Trimestre</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="step-2-create-labor-market-variables">Step 2: Create Labor Market Variables<a class="anchor" aria-label="anchor" href="#step-2-create-labor-market-variables"></a>
-</h2>
-<p>Before mensalization, we create the indicator variables we’ll
-analyze.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Ensure numeric types</span></span>
-<span><span class="va">numeric_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"V2009"</span>, <span class="st">"V1028"</span>, <span class="st">"VD4001"</span>, <span class="st">"VD4002"</span>, <span class="st">"VD4009"</span>, <span class="st">"VD4012"</span>, <span class="st">"V2007"</span>, <span class="st">"V2010"</span><span class="op">)</span></span>
-<span><span class="kw">for</span> <span class="op">(</span><span class="va">col</span> <span class="kw">in</span> <span class="va">numeric_cols</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="va">col</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">[[</span><span class="va">col</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">pnadc</span><span class="op">[</span>, <span class="op">(</span><span class="va">col</span><span class="op">)</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/get.html" class="external-link">get</a></span><span class="op">(</span><span class="va">col</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
-<span>  <span class="op">}</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Data loaded successfully!\n"</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Period:"</span>, <span class="va">vignette_data</span><span class="op">$</span><span class="va">period_start</span>, <span class="st">"to"</span>, <span class="va">vignette_data</span><span class="op">$</span><span class="va">period_end</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Observations:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">vignette_data</span><span class="op">$</span><span class="va">n_observations</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Determination rate:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">vignette_data</span><span class="op">$</span><span class="va">determination_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Pre-computed data not found. Please run generate_vignette_data.R first."</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># Filter to working-age population (14+)</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="va">pnadc</span><span class="op">[</span><span class="va">V2009</span> <span class="op">&gt;=</span> <span class="fl">14</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Create labor market indicators</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  <span class="co"># PEA: Economically Active Population (1 = yes)</span></span>
-<span>  pea <span class="op">=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span>,</span>
-<span></span>
-<span>  <span class="co"># Employment condition (1 = employed, 0 = unemployed among PEA)</span></span>
-<span>  employed <span class="op">=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">VD4002</span> <span class="op">==</span> <span class="fl">1</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span>,</span>
-<span></span>
-<span>  <span class="co"># Unemployed (among PEA)</span></span>
-<span>  unemployed <span class="op">=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span> <span class="op">&amp;</span> <span class="va">VD4002</span> <span class="op">==</span> <span class="fl">2</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Formality indicator (among employed)</span></span>
-<span><span class="co"># Formal: positions 1,3,5,7 (formal employees) OR</span></span>
-<span><span class="co">#         positions 8,9 (employers/self-employed) with contribution</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">formal</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span></span>
-<span>  <span class="va">VD4009</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1L</span>, <span class="fl">3L</span>, <span class="fl">5L</span>, <span class="fl">7L</span><span class="op">)</span>, <span class="fl">1L</span>,</span>
-<span>  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">VD4009</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8L</span>, <span class="fl">9L</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">VD4012</span> <span class="op">==</span> <span class="fl">1L</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span><span class="va">VD4002</span> <span class="op">!=</span> <span class="fl">1</span>, <span class="va">formal</span> <span class="op">:=</span> <span class="cn">NA_integer_</span><span class="op">]</span>  <span class="co"># Only for employed</span></span>
-<span></span>
-<span><span class="co"># Sex categories</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">sexo</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">V2007</span> <span class="op">==</span> <span class="fl">1</span>, <span class="st">"Men"</span>, <span class="st">"Women"</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Race categories</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">raca</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fcase.html" class="external-link">fcase</a></span><span class="op">(</span></span>
-<span>  <span class="va">V2010</span> <span class="op">==</span> <span class="fl">1</span>, <span class="st">"White"</span>,</span>
-<span>  <span class="va">V2010</span> <span class="op">==</span> <span class="fl">2</span>, <span class="st">"Black"</span>,</span>
-<span>  <span class="va">V2010</span> <span class="op">==</span> <span class="fl">4</span>, <span class="st">"Brown"</span>,</span>
-<span>  <span class="va">V2010</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">5</span><span class="op">)</span>, <span class="st">"Other"</span>,</span>
-<span>  default <span class="op">=</span> <span class="cn">NA_character_</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Variables created\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Working-age population (14+):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="step-3-apply-mensalization">Step 3: Apply Mensalization<a class="anchor" aria-label="anchor" href="#step-3-apply-mensalization"></a>
-</h2>
-<p>Now we use <code>mensalizePNADC</code> to identify reference months
-and compute monthly weights.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Apply mensalization with weight computation</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span></span>
-<span>  <span class="va">pnadc</span>,</span>
-<span>  compute_weights <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  keep_all <span class="op">=</span> <span class="cn">TRUE</span>,  <span class="co"># Keep indeterminate obs with NA weights</span></span>
-<span></span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Check determination rate</span></span>
-<span><span class="va">det_rate</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">result</span>, <span class="st">"determination_rate"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"\nDetermination rate:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="va">det_rate</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Merge mensalization results back to main data</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span></span>
-<span></span>
-<span>  <span class="va">pnadc</span>,</span>
-<span>  <span class="va">result</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">UPA</span>, <span class="va">V1008</span>, <span class="va">V1014</span>, <span class="va">V2003</span>,</span>
-<span>             <span class="va">ref_month</span>, <span class="va">ref_month_in_quarter</span>, <span class="va">ref_month_yyyymm</span>, <span class="va">weight_monthly</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span><span class="op">)</span>,</span>
-<span>  all.x <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Create date variables for plotting</span></span>
-<span><span class="va">pnadc</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  quarter_date <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">Ano</span>, <span class="st">"-"</span>, <span class="op">(</span><span class="va">Trimestre</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="fl">3</span> <span class="op">+</span> <span class="fl">2</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  month_date <span class="op">=</span> <span class="va">ref_month</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Mensalization complete\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Observations with determined month:"</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">$</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"(%.1f%%)"</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">$</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="step-4-compute-quarterly-and-monthly-series">Step 4: Compute Quarterly and Monthly Series<a class="anchor" aria-label="anchor" href="#step-4-compute-quarterly-and-monthly-series"></a>
-</h2>
-<p>We now compute labor market indicators at both frequencies.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># =============================================================================</span></span>
-<span><span class="co"># QUARTERLY SERIES (using original V1028 weights)</span></span>
-<span><span class="co"># =============================================================================</span></span>
-<span></span>
-<span><span class="va">quarterly_total</span> <span class="op">&lt;-</span> <span class="va">pnadc</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  <span class="co"># Population counts</span></span>
-<span>  pia <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  pea <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  employed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  unemployed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  formal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">formal</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span></span>
-<span>  <span class="co"># Rates</span></span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  participation_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  formalization_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">formal</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  employment_level <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">quarterly_total</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">Ano</span>, <span class="st">"-"</span>, <span class="op">(</span><span class="va">Trimestre</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="fl">3</span> <span class="op">+</span> <span class="fl">2</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  frequency <span class="op">=</span> <span class="st">"Quarterly"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># By gender</span></span>
-<span><span class="va">quarterly_gender</span> <span class="op">&lt;-</span> <span class="va">pnadc</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">sexo</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  participation_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">sexo</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">quarterly_gender</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">Ano</span>, <span class="st">"-"</span>, <span class="op">(</span><span class="va">Trimestre</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="fl">3</span> <span class="op">+</span> <span class="fl">2</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  frequency <span class="op">=</span> <span class="st">"Quarterly"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># By race</span></span>
-<span><span class="va">quarterly_race</span> <span class="op">&lt;-</span> <span class="va">pnadc</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">raca</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">raca</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>, <span class="st">"Black"</span>, <span class="st">"Brown"</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  employment_level <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">raca</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">quarterly_race</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">Ano</span>, <span class="st">"-"</span>, <span class="op">(</span><span class="va">Trimestre</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="fl">3</span> <span class="op">+</span> <span class="fl">2</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  frequency <span class="op">=</span> <span class="st">"Quarterly"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># =============================================================================</span></span>
-<span><span class="co"># MONTHLY SERIES (using weight_monthly)</span></span>
-<span><span class="co"># =============================================================================</span></span>
-<span></span>
-<span><span class="co"># Filter to determined observations</span></span>
-<span><span class="va">pnadc_monthly</span> <span class="op">&lt;-</span> <span class="va">pnadc</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">monthly_total</span> <span class="op">&lt;-</span> <span class="va">pnadc_monthly</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  <span class="co"># Population counts</span></span>
-<span>  pia <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  pea <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  employed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  unemployed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  formal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">formal</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span></span>
-<span>  <span class="co"># Rates</span></span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  participation_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  formalization_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">formal</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  employment_level <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">monthly_total</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">100</span>, <span class="st">"-"</span>,</span>
-<span>                          <span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">100</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  frequency <span class="op">=</span> <span class="st">"Monthly"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># By gender</span></span>
-<span><span class="va">monthly_gender</span> <span class="op">&lt;-</span> <span class="va">pnadc_monthly</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">sexo</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  participation_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                       <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">ref_month_yyyymm</span>, <span class="va">sexo</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">monthly_gender</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">100</span>, <span class="st">"-"</span>,</span>
-<span>                          <span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">100</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  frequency <span class="op">=</span> <span class="st">"Monthly"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># By race</span></span>
-<span><span class="va">monthly_race</span> <span class="op">&lt;-</span> <span class="va">pnadc_monthly</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">raca</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">raca</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>, <span class="st">"Black"</span>, <span class="st">"Brown"</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  employment_level <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">employed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
-<span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">ref_month_yyyymm</span>, <span class="va">raca</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">monthly_race</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  period <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">100</span>, <span class="st">"-"</span>,</span>
-<span>                          <span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">100</span>, <span class="st">"-15"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  frequency <span class="op">=</span> <span class="st">"Monthly"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Series computed\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Quarterly observations:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">quarterly_total</span><span class="op">)</span>, <span class="st">"\n</span></span>
-<span><span class="st">"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Monthly observations:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">monthly_total</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="step-5-save-processed-data">Step 5: Save Processed Data<a class="anchor" aria-label="anchor" href="#step-5-save-processed-data"></a>
-</h2>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Save series for future use</span></span>
-<span><span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">write_fst</a></span><span class="op">(</span><span class="va">quarterly_total</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_quarterly_total.fst"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">write_fst</a></span><span class="op">(</span><span class="va">quarterly_gender</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_quarterly_gender.fst"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">write_fst</a></span><span class="op">(</span><span class="va">quarterly_race</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_quarterly_race.fst"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">write_fst</a></span><span class="op">(</span><span class="va">monthly_total</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_monthly_total.fst"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">write_fst</a></span><span class="op">(</span><span class="va">monthly_gender</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_monthly_gender.fst"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">write_fst</a></span><span class="op">(</span><span class="va">monthly_race</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_monthly_race.fst"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Data saved to:"</span>, <span class="va">processed_dir</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co">#&gt; Data loaded successfully!</span></span>
+<span><span class="co">#&gt; Period: 2012-Q1 to 2025-Q3 </span></span>
+<span><span class="co">#&gt; Observations: 22,850,046 </span></span>
+<span><span class="co">#&gt; Determination rate: 95.4%</span></span></code></pre></div>
 <hr>
 </div>
 <div class="section level2">
 <h2 id="comparison-1-unemployment-rate-national">Comparison 1: Unemployment Rate (National)<a class="anchor" aria-label="anchor" href="#comparison-1-unemployment-rate-national"></a>
 </h2>
 <p>The unemployment rate is the most watched labor market indicator.
-Monthly data reveals the precise timing of turning points.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+Monthly data reveals the precise timing of turning points that quarterly
+data obscures.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Combine quarterly and monthly data</span></span>
 <span><span class="va">unemployment_combined</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
 <span>  <span class="va">quarterly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">unemployment_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
 <span>  <span class="va">monthly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">unemployment_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="op">)</span></span>
 <span></span>
+<span><span class="co"># Define crisis periods for shading</span></span>
+<span><span class="va">crisis_periods</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2014-04-01"</span>, <span class="st">"2020-03-01"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  end <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2017-01-01"</span>, <span class="st">"2021-06-01"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  label <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2014-17 Recession"</span>, <span class="st">"COVID-19"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
 <span><span class="co"># Plot</span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">unemployment_combined</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">unemployment_rate</span>,</span>
 <span>                                   color <span class="op">=</span> <span class="va">frequency</span>, linewidth <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span></span>
-<span>  <span class="co"># Recession/crisis shading</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2014-04-01"</span>, <span class="st">"2020-03-01"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    end <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2017-01-01"</span>, <span class="st">"2021-06-01"</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
-<span>  inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Crisis shading</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">crisis_periods</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
+<span>            inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>,</span>
-<span>                     breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.20</span>, <span class="fl">0.02</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"1 year"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>                     breaks <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.16</span>, <span class="fl">0.02</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"2 years"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_color_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="st">"steelblue"</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="st">"darkred"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_linewidth_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="fl">1.5</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
@@ -471,12 +189,19 @@ Monthly data reveals the precise timing of turning points.</p>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
 <span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
+<p><img src="applied-examples_files/figure-html/plot-unemployment-1.png" width="768"></p>
 <p><strong>Key insights from monthly data:</strong></p>
 <ul>
-<li>The unemployment peak during COVID-19 can be precisely dated to a
-specific month</li>
-<li>Seasonal patterns within quarters become visible</li>
-<li>The recovery trajectory shows month-by-month progress</li>
+<li>The unemployment <strong>peak during COVID-19</strong> (March-April
+2020) is precisely dated</li>
+<li>
+<strong>Seasonal patterns</strong> within quarters become visible
+(year-end hiring, etc.)</li>
+<li>The <strong>2014-17 recession</strong> shows gradual buildup visible
+month-by-month</li>
+<li>
+<strong>Recovery trajectories</strong> show month-by-month progress
+rather than quarterly jumps</li>
 </ul>
 <hr>
 </div>
@@ -484,8 +209,9 @@ specific month</li>
 <h2 id="comparison-2-labor-force-participation-by-gender">Comparison 2: Labor Force Participation by Gender<a class="anchor" aria-label="anchor" href="#comparison-2-labor-force-participation-by-gender"></a>
 </h2>
 <p>Labor force participation shows strong gender differences. Monthly
-data reveals how shocks affected men and women differently.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+data reveals how economic shocks affected men and women differently in
+terms of timing and magnitude.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Combine data</span></span>
 <span><span class="va">participation_gender</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
 <span>  <span class="va">quarterly_gender</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">sexo</span>, <span class="va">participation_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
@@ -494,7 +220,6 @@ data reveals how shocks affected men and women differently.</p>
 <span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">participation_gender</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span>,</span>
 <span>                                  color <span class="op">=</span> <span class="va">sexo</span>, linetype <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span></span>
 <span>  <span class="co"># COVID shading</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-01"</span><span class="op">)</span>,</span>
@@ -524,22 +249,30 @@ data reveals how shocks affected men and women differently.</p>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
 <span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
+<p><img src="applied-examples_files/figure-html/plot-participation-gender-1.png" width="768"></p>
 <p><strong>Key insights:</strong></p>
 <ul>
-<li>Women’s participation dropped more sharply during COVID-19</li>
-<li>Monthly data shows the exact timing of the collapse and
-recovery</li>
-<li>The gender gap widened during the pandemic before narrowing
-again</li>
+<li>
+<strong>Women’s participation dropped more sharply</strong> during
+COVID-19 (childcare burden)</li>
+<li>Monthly data shows the <strong>exact timing</strong> of the collapse
+and recovery</li>
+<li>The <strong>gender gap widened</strong> during the pandemic before
+narrowing again</li>
+<li>
+<strong>Seasonal patterns</strong> differ by gender (e.g., school
+calendar effects)</li>
 </ul>
 <hr>
 </div>
 <div class="section level2">
 <h2 id="comparison-3-formalization-rate-national">Comparison 3: Formalization Rate (National)<a class="anchor" aria-label="anchor" href="#comparison-3-formalization-rate-national"></a>
 </h2>
-<p>The formalization rate measures the share of formal employment. This
-indicator is crucial for understanding labor market quality.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<p>The formalization rate measures the share of formal employment (CLT
+contracts, statutory employees, or self-employed/employers contributing
+to social security). This indicator is crucial for understanding labor
+market quality.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Combine data</span></span>
 <span><span class="va">formalization_combined</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
 <span>  <span class="va">quarterly_total</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">formalization_rate</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
@@ -548,19 +281,16 @@ indicator is crucial for understanding labor market quality.</p>
 <span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">formalization_combined</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">formalization_rate</span>,</span>
 <span>                                    color <span class="op">=</span> <span class="va">frequency</span>, linewidth <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span></span>
 <span>  <span class="co"># Crisis shading</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2014-04-01"</span>, <span class="st">"2020-03-01"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    end <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2017-01-01"</span>, <span class="st">"2021-06-01"</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
-<span>  inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">crisis_periods</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>xmin <span class="op">=</span> <span class="va">start</span>, xmax <span class="op">=</span> <span class="va">end</span>, ymin <span class="op">=</span> <span class="op">-</span><span class="cn">Inf</span>, ymax <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>,</span>
+<span>            inherit.aes <span class="op">=</span> <span class="cn">FALSE</span>, fill <span class="op">=</span> <span class="st">"purple"</span>, alpha <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
 <span>                     limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.55</span>, <span class="fl">0.70</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"1 year"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"2 years"</span>, date_labels <span class="op">=</span> <span class="st">"%Y"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_color_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="st">"steelblue"</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="st">"darkgreen"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_linewidth_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Quarterly"</span> <span class="op">=</span> <span class="fl">1.5</span>, <span class="st">"Monthly"</span> <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span></span>
@@ -578,22 +308,27 @@ indicator is crucial for understanding labor market quality.</p>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
 <span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
+<p><img src="applied-examples_files/figure-html/plot-formalization-1.png" width="768"></p>
 <p><strong>Key insights:</strong></p>
 <ul>
-<li>Formalization declined during both the 2014-17 recession and
-COVID-19</li>
-<li>Monthly data reveals seasonal patterns (e.g., year-end temporary
-contracts)</li>
-<li>The 2017 labor reform effects can be tracked month-by-month</li>
+<li>Formalization <strong>declined during both crises</strong> (2014-17
+and COVID-19)</li>
+<li>Monthly data reveals <strong>seasonal patterns</strong> (e.g.,
+year-end temporary formal contracts)</li>
+<li>The <strong>2017 labor reform</strong> effects can be tracked
+month-by-month</li>
+<li>
+<strong>Recovery patterns</strong> differ between crises</li>
 </ul>
 <hr>
 </div>
 <div class="section level2">
 <h2 id="comparison-4-employment-level-by-race">Comparison 4: Employment Level by Race<a class="anchor" aria-label="anchor" href="#comparison-4-employment-level-by-race"></a>
 </h2>
-<p>Employment levels by race reveal structural inequalities in the labor
-market.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<p>Employment levels by race reveal structural inequalities in the
+Brazilian labor market and how different groups were affected by
+economic shocks.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Combine data</span></span>
 <span><span class="va">employment_race</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
 <span>  <span class="va">quarterly_race</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">period</span>, <span class="va">raca</span>, <span class="va">employment_level</span>, <span class="va">frequency</span><span class="op">)</span><span class="op">]</span>,</span>
@@ -602,7 +337,6 @@ market.</p>
 <span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">employment_race</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">employment_level</span>,</span>
 <span>                             color <span class="op">=</span> <span class="va">raca</span>, linetype <span class="op">=</span> <span class="va">frequency</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span></span>
 <span>  <span class="co"># COVID shading</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_tile.html" class="external-link">geom_rect</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-01"</span><span class="op">)</span>,</span>
@@ -631,14 +365,19 @@ market.</p>
 <span>    plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
 <span>    axis.text.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>angle <span class="op">=</span> <span class="fl">45</span>, hjust <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
+<p><img src="applied-examples_files/figure-html/plot-employment-race-1.png" width="768"></p>
 <p><strong>Key insights:</strong></p>
 <ul>
-<li>Black and Brown workers faced larger employment drops during
-COVID-19</li>
-<li>Monthly data shows that recovery was also slower for these
-groups</li>
-<li>Racial gaps in employment are persistent across the entire
-period</li>
+<li>
+<strong>Black and Brown workers faced larger employment
+drops</strong> during COVID-19</li>
+<li>Monthly data shows that <strong>recovery was also slower</strong>
+for these groups</li>
+<li>
+<strong>Racial gaps in employment</strong> are persistent across the
+entire period</li>
+<li>The <strong>timing of impacts</strong> can be precisely measured
+with monthly data</li>
 </ul>
 <hr>
 </div>
@@ -646,45 +385,46 @@ period</li>
 <h2 id="summary-why-monthly-data-matters">Summary: Why Monthly Data Matters<a class="anchor" aria-label="anchor" href="#summary-why-monthly-data-matters"></a>
 </h2>
 <table class="table">
+<caption>Comparing Quarterly vs Monthly Time Series</caption>
 <colgroup>
-<col width="21%">
-<col width="40%">
-<col width="37%">
+<col width="19%">
+<col width="43%">
+<col width="36%">
 </colgroup>
 <thead><tr class="header">
-<th>Aspect</th>
-<th>Quarterly Data</th>
-<th>Monthly Data</th>
+<th align="left">Aspect</th>
+<th align="left">Quarterly Data</th>
+<th align="left">Monthly Data</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><strong>Timing</strong></td>
-<td>3-month averages obscure turning points</td>
-<td>Precise month of changes visible</td>
+<td align="left">Timing precision</td>
+<td align="left">3-month averages obscure turning points</td>
+<td align="left">Precise month of changes visible</td>
 </tr>
 <tr class="even">
-<td><strong>Seasonality</strong></td>
-<td>Hidden within quarters</td>
-<td>Clear seasonal patterns</td>
+<td align="left">Seasonality</td>
+<td align="left">Hidden within quarters</td>
+<td align="left">Clear seasonal patterns</td>
 </tr>
 <tr class="odd">
-<td><strong>Shock analysis</strong></td>
-<td>Delayed/smoothed response</td>
-<td>Real-time impact visible</td>
+<td align="left">Shock analysis</td>
+<td align="left">Delayed/smoothed response visible</td>
+<td align="left">Real-time impact visible</td>
 </tr>
 <tr class="even">
-<td><strong>Policy evaluation</strong></td>
-<td>Imprecise timing</td>
-<td>Can link to specific policy dates</td>
+<td align="left">Policy evaluation</td>
+<td align="left">Imprecise policy timing</td>
+<td align="left">Can link to specific policy dates</td>
 </tr>
 <tr class="odd">
-<td><strong>Short-term forecasting</strong></td>
-<td>Limited lead time</td>
-<td>More frequent updates</td>
+<td align="left">Forecasting</td>
+<td align="left">Limited lead time</td>
+<td align="left">More frequent updates</td>
 </tr>
 </tbody>
 </table>
-<p>The <code>mensalizePNADC</code> package achieves <strong>97%
+<p>The <code>mensalizePNADC</code> package achieves <strong>95-97%
 determination rate</strong>, meaning nearly all observations can be
 assigned to specific months with properly calibrated weights.</p>
 <hr>
@@ -693,11 +433,33 @@ assigned to specific months with properly calibrated weights.</p>
 <h2 id="technical-notes">Technical Notes<a class="anchor" aria-label="anchor" href="#technical-notes"></a>
 </h2>
 <div class="section level3">
+<h3 id="how-these-series-were-computed">How These Series Were Computed<a class="anchor" aria-label="anchor" href="#how-these-series-were-computed"></a>
+</h3>
+<p>The series shown in this vignette were computed using:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># 1. Load stacked PNADC data (55 quarterly files, 2012-2025)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu">load_all_pnadc_quarters</span><span class="op">(</span><span class="op">)</span>  <span class="co"># 28.4 million observations</span></span>
+<span></span>
+<span><span class="co"># 2. Create labor market variables</span></span>
+<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">unemployment</span> <span class="op">:=</span> <span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span> <span class="op">&amp;</span> <span class="va">VD4002</span> <span class="op">==</span> <span class="fl">2</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">pnadc</span><span class="op">[</span>, <span class="va">formal</span> <span class="op">:=</span> <span class="op">(</span><span class="va">VD4009</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">3</span>,<span class="fl">5</span>,<span class="fl">7</span><span class="op">)</span><span class="op">)</span> <span class="op">|</span></span>
+<span>                  <span class="op">(</span><span class="va">VD4009</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8</span>,<span class="fl">9</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">VD4012</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co"># ... other variables</span></span>
+<span></span>
+<span><span class="co"># 3. Apply mensalization with weight calibration</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 4. Compute weighted aggregates</span></span>
+<span><span class="va">monthly_series</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span></span>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span></code></pre></div>
+</div>
+<div class="section level3">
 <h3 id="weight-calibration">Weight Calibration<a class="anchor" aria-label="anchor" href="#weight-calibration"></a>
 </h3>
-<p>The <code>weight_monthly</code> variable is calibrated to match
-IBGE’s monthly population estimates from SIDRA table 6022. This ensures
-that:</p>
+<p>The <code>weight_monthly</code> variable is calibrated using
+hierarchical rake weighting to match IBGE’s monthly population estimates
+from SIDRA table 6022. This ensures:</p>
 <ul>
 <li>Monthly population totals match official estimates</li>
 <li>Weighted aggregates are representative at the monthly level</li>
@@ -707,25 +469,42 @@ that:</p>
 <div class="section level3">
 <h3 id="handling-indeterminate-observations">Handling Indeterminate Observations<a class="anchor" aria-label="anchor" href="#handling-indeterminate-observations"></a>
 </h3>
-<p>About 3% of observations cannot have their reference month
-determined. These receive <code>weight_monthly = NA</code> and are
+<p>About 3-5% of observations cannot have their reference month
+determined (due to missing birthday information or conflicting
+constraints). These receive <code>weight_monthly = NA</code> and are
 excluded from monthly aggregates. For most analyses, this has minimal
-impact on estimates.</p>
+impact on estimates since the excluded observations are redistributed
+through the weight calibration process.</p>
+<hr>
 </div>
-<div class="section level3">
-<h3 id="reproducibility">Reproducibility<a class="anchor" aria-label="anchor" href="#reproducibility"></a>
-</h3>
-<p>All processed series are saved to <code>data/processed/</code> for
-reproducibility:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span><span class="va">processed_dir</span>, pattern <span class="op">=</span> <span class="st">"series_"</span><span class="op">)</span></span></code></pre></div>
-<p>To reload the series without reprocessing:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">monthly_total</span> <span class="op">&lt;-</span> <span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_monthly_total.fst"</span><span class="op">)</span>,</span>
-<span>                                as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="va">quarterly_total</span> <span class="op">&lt;-</span> <span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">processed_dir</span>, <span class="st">"series_quarterly_total.fst"</span><span class="op">)</span>,</span>
-<span>                                  as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 </div>
+<div class="section level2">
+<h2 id="reproduce-these-results">Reproduce These Results<a class="anchor" aria-label="anchor" href="#reproduce-these-results"></a>
+</h2>
+<p>To reproduce these series with your own PNADC data:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Load your stacked PNADC data</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"your_stacked_pnadc.csv"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Ensure required columns exist</span></span>
+<span><span class="va">required_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span>,</span>
+<span>                   <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span>,</span>
+<span>                   <span class="st">"V1028"</span>, <span class="st">"UF"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="va">required_cols</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Apply mensalization</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span>, keep_all <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Compute your indicators using weight_monthly</span></span>
+<span><span class="va">monthly_unemployment</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_monthly</span><span class="op">)</span></span>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span></code></pre></div>
+<p>See the <a href="getting-started.html">Getting Started vignette</a>
+for the full algorithm explanation and more examples.</p>
+<hr>
 </div>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
