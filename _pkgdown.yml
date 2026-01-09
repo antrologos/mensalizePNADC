@@ -52,6 +52,11 @@ reference:
   - validate_pnadc
   - adjust_weights_bayesian
 
+- title: Data
+  desc: Pre-computed data for examples
+  contents:
+  - vignette_series
+
 home:
   links:
   - text: Original methodology (Hecksher 2024)

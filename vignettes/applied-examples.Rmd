@@ -49,26 +49,25 @@ library(ggplot2)
 library(scales)
 
 # Load pre-computed series (included with package)
-data_file <- system.file("extdata", "vignette_series.rds", package = "mensalizePNADC")
+data("vignette_series", package = "mensalizePNADC")
 
-if (file.exists(data_file) && nchar(data_file) > 0) {
-  vignette_data <- readRDS(data_file)
+# The data() call loads these objects:
+# - vignette_quarterly_total, vignette_quarterly_gender, vignette_quarterly_race
+# - vignette_monthly_total, vignette_monthly_gender, vignette_monthly_race
+# - vignette_metadata
 
-  # Extract series
-  quarterly_total  <- vignette_data$quarterly_total
-  quarterly_gender <- vignette_data$quarterly_gender
-  quarterly_race   <- vignette_data$quarterly_race
-  monthly_total    <- vignette_data$monthly_total
-  monthly_gender   <- vignette_data$monthly_gender
-  monthly_race     <- vignette_data$monthly_race
+# Rename for convenience
+quarterly_total  <- vignette_quarterly_total
+quarterly_gender <- vignette_quarterly_gender
+quarterly_race   <- vignette_quarterly_race
+monthly_total    <- vignette_monthly_total
+monthly_gender   <- vignette_monthly_gender
+monthly_race     <- vignette_monthly_race
 
-  cat("Data loaded successfully!\n")
-  cat("Period:", vignette_data$period_start, "to", vignette_data$period_end, "\n")
-  cat("Observations:", format(vignette_data$n_observations, big.mark = ","), "\n")
-  cat("Determination rate:", sprintf("%.1f%%", vignette_data$determination_rate * 100), "\n")
-} else {
-  stop("Pre-computed data not found. Please run generate_vignette_data.R first.")
-}
+cat("Data loaded successfully!\n")
+cat("Period:", vignette_metadata$period_start, "to", vignette_metadata$period_end, "\n")
+cat("Observations:", format(vignette_metadata$n_observations, big.mark = ","), "\n")
+cat("Determination rate:", sprintf("%.1f%%", vignette_metadata$determination_rate * 100), "\n")
 ```
 
 ---
