@@ -5,8 +5,8 @@
 #'
 #' @description
 #' PNADC is a quarterly survey, but each interview actually refers to a specific
-#' week within the quarter. This function identifies which month that week belongs
-#' to, enabling monthly (instead of quarterly) time series analysis.
+#' month within the quarter. This function identifies which month that observation belongs
+#' to, enabling a shorter term time series analysis.
 #'
 #' The algorithm uses:
 #' \itemize{
@@ -47,11 +47,10 @@
 #'   }
 #'
 #' @details
-#' ## Dynamic Exception Detection
+#' ## Exception Detection
 #'
-#' This function **dynamically detects** which quarters need relaxed timing rules
-#' based on the data itself. This matches the original Stata implementation by
-#' Marcos Hecksher.
+#' This function detects which quarters need relaxed timing rules
+#' based on the data itself. 
 #'
 #' The algorithm detects exceptions at the per-month level within each quarter:
 #' \itemize{
@@ -62,14 +61,14 @@
 #'
 #' ## Cross-Quarter Aggregation (Important!)
 #'
-#' **For optimal determination rates (~96%), input data should be stacked across
-#' multiple quarters** (ideally 2+ years). The algorithm leverages PNADC's rotating
+#' **For optimal determination rates (~97%), input data should be stacked across
+#' multiple quarters** (ideally 4+ years). The algorithm leverages PNADC's rotating
 #' panel design where the same UPA-V1014 is interviewed in the same relative week
 #' across all quarterly visits.
 #'
 #' \itemize{
 #'   \item **Per-quarter processing**: ~65-75% determination rate
-#'   \item **Multi-quarter stacked**: ~96% determination rate
+#'   \item **Multi-quarter stacked**: ~97% determination rate
 #' }
 #'
 #' ## Processing Steps
@@ -101,8 +100,8 @@
 #' @export
 identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offset = 0L) {
 
-  # Validate input
-  validate_pnadc(data, check_weights = FALSE)
+  # Note: Validation is done in mensalizePNADC() for fail-fast behavior.
+  # When called directly, caller is responsible for valid input.
 
   # Initialize progress bar (8 steps total)
   # If external progress bar provided, use it; otherwise create our own
@@ -382,8 +381,7 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
 
   result <- dt[, ..output_cols]
 
-  # Add class for nice printing
-  class(result) <- c("pnadc_crosswalk", class(result))
+  # Store determination rate as attribute
   attr(result, "determination_rate") <- mean(!is.na(result$ref_month_in_quarter))
 
   update_pb(8)
@@ -537,34 +535,4 @@ calculate_month_position_max_dynamic <- function(date, year, quarter, exc_m1, ex
   pos <- adjusted_month - first_month + 1L
 
   pmin(pmax(pos, 1L), 3L)
-}
-
-
-#' Print Method for pnadc_crosswalk
-#'
-#' @param x A pnadc_crosswalk object
-#' @param ... Additional arguments (ignored)
-#' @return Invisibly returns x
-#' @export
-print.pnadc_crosswalk <- function(x, ...) {
-  cat("PNADC Reference Month Crosswalk\n")
-  cat("-------------------------------\n")
-  cat("Observations:", format(nrow(x), big.mark = ","), "\n")
-
-  det_rate <- attr(x, "determination_rate")
-  if (!is.null(det_rate)) {
-    cat("Determination rate:", sprintf("%.1f%%", det_rate * 100), "\n")
-  }
-
-  if (nrow(x) > 0 && "ref_month_yyyymm" %in% names(x)) {
-    date_range <- range(x$ref_month_yyyymm, na.rm = TRUE)
-    if (!any(is.na(date_range))) {
-      cat("Date range:", date_range[1], "-", date_range[2], "\n")
-    }
-  }
-
-  cat("\nJoin keys:", paste(intersect(join_key_vars(), names(x)), collapse = ", "), "\n")
-  cat("Output columns:", paste(setdiff(names(x), join_key_vars()), collapse = ", "), "\n")
-
-  invisible(x)
 }

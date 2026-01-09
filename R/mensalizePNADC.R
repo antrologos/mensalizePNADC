@@ -8,10 +8,10 @@
 #' This function processes stacked quarterly PNADC microdata to:
 #' \enumerate{
 #'   \item Identify which month within each quarter each observation refers to
-#'   \item Optionally compute monthly survey weights (if \code{compute_weights = TRUE})
+#'   \item Optionally compute monthly adjusted survey weights (if \code{compute_weights = TRUE})
 #' }
 #'
-#' The output is a crosswalk table that can be joined with original (unstacked)
+#' The output is a crosswalk table that can be joined with original (stacked or unstacked)
 #' PNADC data files to add monthly time information.
 #'
 #' @param data A data.frame or data.table with stacked quarterly PNADC microdata.
@@ -28,9 +28,10 @@
 #'   For monthly weight computation (\code{compute_weights = TRUE}), additional
 #'   columns are required. See Details.
 #'
-#' @param compute_weights Logical. If TRUE, compute monthly survey weights in
+#' @param compute_weights Logical. If TRUE, compute monthly adjusted survey weights in
 #'   addition to identifying reference months. Default is FALSE. Requires the
-#'   \code{sidrar} package to fetch population data from IBGE SIDRA API.
+#'   \code{sidrar} package to fetch population data from IBGE SIDRA API. It makes the monthly
+#'   weights sum up to the population results at https://sidra.ibge.gov.br/tabela/6022.
 #'
 #' @param output Character. What to return:
 #'   \itemize{
@@ -38,6 +39,12 @@
 #'     \item \code{"microdata"}: Full microdata with all computed columns
 #'     \item \code{"aggregates"}: Monthly aggregated indicators
 #'   }
+#'
+#' @param keep_all Logical. If TRUE (default), return all rows from input data,
+#'   with \code{weight_monthly = NA} for observations where reference month
+#'   could not be determined. If FALSE, only return observations with
+#'   determined reference months (smaller output). Only applies when
+#'   \code{compute_weights = TRUE}.
 #'
 #' @param verbose Logical. Print progress messages? Default TRUE.
 #'
@@ -71,14 +78,15 @@
 #'
 #' ## Cross-Quarter Aggregation (Important!)
 #'
-#' **For optimal determination rates (~95%), input data should be stacked across
-#' multiple quarters** (ideally 2+ years). The algorithm leverages PNADC's rotating
-#' panel design where the same UPA-V1014 is interviewed in the same relative week
+#' **For optimal determination rates (~97%), input data should be stacked across
+#' multiple quarter datasets** (ideally 4+ years). The algorithm leverages PNADC's rotating
+#' panel design where the locations defined by the same values in variables 
+#' UPA-V1014 are always interviewed in the same relative month within a given quarter
 #' across all quarterly visits.
 #'
 #' \itemize{
 #'   \item **Per-quarter processing**: ~65-75% determination rate
-#'   \item **Multi-quarter stacked**: ~95% determination rate
+#'   \item **Multi-quarter stacked**: ~97% determination rate
 #' }
 #'
 #' The cross-quarter aggregation dramatically improves accuracy by combining
@@ -93,8 +101,8 @@
 #'   \item Smooths monthly aggregates to remove quarterly artifacts
 #' }
 #'
-#' The resulting \code{weight_monthly} is the **final** weight for general-purpose
-#' monthly analysis. No Bayesian adjustment is applied.
+#' The resulting \code{weight_monthly} is the adjusted weight for general-purpose
+#' monthly analysis. 
 #'
 #' For theme-specific calibration to match IBGE SIDRA series (e.g., unemployment
 #' rate, employment levels), use \code{\link{calibrate_to_sidra}} separately.
@@ -139,20 +147,23 @@
 #'
 #' @seealso
 #' \code{\link{identify_reference_month}} for just reference month identification
-#' \code{\link{calibrate_monthly_weights}} for weight calibration details
-#' \code{\link{calibrate_to_sidra}} for theme-specific Bayesian calibration
-#' \code{\link{compute_labor_indicators}} for computing indicators from results
 #'
 #' @export
 mensalizePNADC <- function(data,
                             compute_weights = FALSE,
+                            keep_all = TRUE,
                             output = c("crosswalk", "microdata", "aggregates"),
                             verbose = TRUE) {
 
   # Validate arguments
   output <- match.arg(output)
   checkmate::assert_logical(compute_weights, len = 1)
+  checkmate::assert_logical(keep_all, len = 1)
   checkmate::assert_logical(verbose, len = 1)
+
+  # Validate input data columns FIRST (fail fast)
+  # Check for weight-related columns only if compute_weights = TRUE
+  validate_pnadc(data, check_weights = compute_weights, stop_on_error = TRUE)
 
   # Determine number of steps for progress bar
   # Basic: 8 steps (identify_reference_month internal steps)
@@ -210,7 +221,7 @@ mensalizePNADC <- function(data,
   dt <- merge(dt, crosswalk, by = key_cols, all.x = TRUE)
 
   # Calibrate weights using hierarchical rake weighting
-  dt <- calibrate_monthly_weights(dt, monthly_totals, verbose = FALSE)
+  dt <- calibrate_monthly_weights(dt, monthly_totals, keep_all = keep_all, verbose = FALSE)
 
   if (verbose) setTxtProgressBar(pb, 10)
 
@@ -241,7 +252,6 @@ mensalizePNADC <- function(data,
                      "ref_month_yyyymm", "weight_monthly")
     output_cols <- intersect(output_cols, names(dt))
     result <- dt[, ..output_cols]
-    class(result) <- c("pnadc_crosswalk", class(result))
     attr(result, "determination_rate") <- det_rate
     return(result)
   } else if (output == "microdata") {
@@ -263,11 +273,13 @@ mensalizePNADC <- function(data,
 #' @noRd
 smooth_calibrated_weights <- function(dt) {
   # Aggregate to monthly totals
+  # Use z_ prefix so smooth_monthly_aggregates() processes it
   monthly_totals <- dt[!is.na(ref_month_in_quarter), .(
-    pop_calibrated = sum(weight_calibrated, na.rm = TRUE)
+    z_populacao = sum(weight_calibrated, na.rm = TRUE)
   ), by = ref_month_yyyymm]
 
   # Apply smoothing to remove quarterly artifacts
+  # This will produce m_populacao from z_populacao
   smoothed <- smooth_monthly_aggregates(monthly_totals)
 
   if ("m_populacao" %in% names(smoothed)) {

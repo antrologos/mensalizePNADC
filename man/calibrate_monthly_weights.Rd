@@ -4,7 +4,13 @@
 \alias{calibrate_monthly_weights}
 \title{Calibrate Monthly Weights}
 \usage{
-calibrate_monthly_weights(data, monthly_totals, n_cells = 4L, verbose = TRUE)
+calibrate_monthly_weights(
+  data,
+  monthly_totals,
+  n_cells = 4L,
+  keep_all = TRUE,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{data}{A data.frame or data.table with PNADC microdata including reference
@@ -25,6 +31,10 @@ Required columns include:
 
 \item{n_cells}{Integer. Number of hierarchical cell levels to use (1-4).
 Default is 4 (full hierarchy). Lower values are faster but less precise.}
+
+\item{keep_all}{Logical. If TRUE (default), return all rows including those
+with indeterminate reference months (with \code{weight_calibrated = NA}).
+If FALSE, only return observations with determined reference months.}
 
 \item{verbose}{Logical. Print progress messages? Default TRUE.}
 }
@@ -76,5 +86,5 @@ result <- calibrate_monthly_weights(merged, monthly_pop)
 
 }
 \seealso{
-\code{\link{identify_reference_month}}, \code{\link{adjust_weights_bayesian}}
+\code{\link{identify_reference_month}}, \code{\link{calibrate_to_sidra}}
 }

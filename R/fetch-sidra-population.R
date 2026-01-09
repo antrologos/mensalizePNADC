@@ -76,7 +76,8 @@ fetch_monthly_population <- function(start_yyyymm = NULL,
  # n1/all: National level
  # p/all: All periods
  raw <- tryCatch({
-   sidrar::get_sidra(api = "/t/6022/n1/all/v/606/p/all")
+   # suppressMessages to hide sidrar's "All others arguments are desconsidered when 'api' is informed"
+   suppressMessages(sidrar::get_sidra(api = "/t/6022/n1/all/v/606/p/all"))
  }, error = function(e) {
    stop(
      "Failed to fetch from SIDRA API. Check internet connection.\n",

@@ -29,8 +29,8 @@ Tested on 55 quarters (2012Q1 - 2025Q3) with 28,395,273 observations:
 | Metric | Result |
 |--------|--------|
 | Overall determination rate | **97.0%** |
-| Processing time (basic mode) | ~14-16 minutes |
-| Processing time (with weights) | ~20 minutes |
+| Processing time (basic mode) | **~1 minute** (~450,000 rows/sec) |
+| Processing time (with weights) | **~5 minutes** |
 | Best period (2013-2019) | 96-99% determination |
 
 **Note**: Results are **identical to the original Stata implementation** by Marcos Hecksher.
@@ -205,18 +205,19 @@ cat("Quarters:", uniqueN(pnadc[, .(Ano, Trimestre)]), "\n")
 
 ```{r get-crosswalk}
 crosswalk <- mensalizePNADC(pnadc)
-# Step 1/1: Identifying reference months...
+# Processing PNADC data...
+# |==============================| 100%
 #   Determination rate: 97.0%
 
-print(crosswalk)
-# PNADC Reference Month Crosswalk
-# -------------------------------
-# Observations: 28,395,273
-# Determination rate: 97.0%
-# Date range: 201201 - 202509
-#
-# Join keys: Ano, Trimestre, UPA, V1008, V1014, V2003
-# Output columns: ref_month, ref_month_in_quarter, ref_month_yyyymm
+# View the crosswalk (a data.table)
+head(crosswalk)
+#    Ano Trimestre    UPA V1008 V1014 V2003   ref_month ref_month_in_quarter ref_month_yyyymm
+# 1: 2012         1 110000     1     1     1 2012-01-01                    1           201201
+# 2: 2012         1 110000     1     1     2 2012-01-01                    1           201201
+
+# Check the determination rate attribute
+attr(crosswalk, "determination_rate")
+# [1] 0.97
 ```
 
 ### Step 3: Join with original data
@@ -681,6 +682,25 @@ monthly_pop <- result[, .(
 
 The `weight_monthly` output is calibrated to match IBGE's official monthly population estimates (~206 million average).
 
+### Handling Indeterminate Observations
+
+About 3% of observations cannot have their reference month determined. By default (`keep_all = TRUE`), all input rows are returned, with `weight_monthly = NA` for indeterminate observations:
+
+```{r keep-all-example}
+# Default: returns all rows (indeterminate have weight_monthly = NA)
+result <- mensalizePNADC(pnadc_full, compute_weights = TRUE)
+nrow(result) == nrow(pnadc_full)  # TRUE - all rows returned
+sum(is.na(result$weight_monthly))  # ~3% of rows have NA weights
+
+# Use na.rm = TRUE when aggregating
+monthly_pop <- result[, .(pop = sum(weight_monthly, na.rm = TRUE)), by = ref_month_yyyymm]
+
+# Alternative: returns only determined rows
+result_determined <- mensalizePNADC(pnadc_full, compute_weights = TRUE, keep_all = FALSE)
+nrow(result_determined) < nrow(pnadc_full)  # TRUE (~97% of rows)
+sum(is.na(result_determined$weight_monthly))  # 0 - no NA weights
+```
+
 ---
 
 ## Topic-Specific Calibration (Coming Soon)
@@ -761,13 +781,15 @@ calibrated <- calibrate_monthly_weights(merged_data, pop_data)
 
 ## Performance
 
-The package is optimized for large datasets:
+The package is highly optimized for large datasets using pre-computed lookup tables for date creation:
 
-| Dataset Size | Rows | Time (basic) | Time (weights) |
-|--------------|------|--------------|----------------|
-| 1 quarter | ~570K | ~20 sec | ~30 sec |
-| 1 year | ~2.3M | ~1.5 min | ~2 min |
-| 14 years (2012-2025) | 28.4M | ~14-16 min | ~20 min |
+| Dataset Size | Rows | Time (basic) | Throughput |
+|--------------|------|--------------|------------|
+| 1 quarter | ~570K | ~1.5 sec | ~380K rows/sec |
+| 1 year | ~2.3M | ~5 sec | ~460K rows/sec |
+| 14 years (2012-2025) | 28.4M | **~1 minute** | ~450K rows/sec |
+
+**Key optimization**: The `make_date()` function uses pre-computed lookup tables instead of `ISOdate()`, achieving **20x speedup** on date operations which were the main bottleneck.
 
 Tips for best performance:
 

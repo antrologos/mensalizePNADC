@@ -64,18 +64,24 @@
 #' result <- calibrate_monthly_weights(merged, monthly_pop)
 #' }
 #'
+#' @param keep_all Logical. If TRUE (default), return all rows including those
+#'   with indeterminate reference months (with \code{weight_calibrated = NA}).
+#'   If FALSE, only return observations with determined reference months.
+#'
 #' @param verbose Logical. Print progress messages? Default TRUE.
 #'
-#' @seealso \code{\link{identify_reference_month}}, \code{\link{adjust_weights_bayesian}}
+#' @seealso \code{\link{identify_reference_month}}, \code{\link{calibrate_to_sidra}}
 #'
 #' @export
-calibrate_monthly_weights <- function(data, monthly_totals, n_cells = 4L, verbose = TRUE) {
+calibrate_monthly_weights <- function(data, monthly_totals, n_cells = 4L,
+                                       keep_all = TRUE, verbose = TRUE) {
 
   checkmate::assert_int(n_cells, lower = 1L, upper = 4L)
+  checkmate::assert_logical(keep_all, len = 1)
   checkmate::assert_logical(verbose, len = 1)
 
-  # Validate inputs
-  validate_pnadc(data, check_weights = TRUE, stop_on_error = TRUE)
+  # Note: PNADC data validation is done in mensalizePNADC() for fail-fast behavior.
+  # Only validate monthly_totals here since it's not validated upstream.
   validate_monthly_totals(monthly_totals, stop_on_error = TRUE)
 
   # Convert to data.table
@@ -87,11 +93,21 @@ calibrate_monthly_weights <- function(data, monthly_totals, n_cells = 4L, verbos
     mt[, ref_month_yyyymm := anomesexato]
   }
 
-  # Remove observations with indeterminate reference month
+  # Store indeterminate rows if keeping all
+  dt_indeterminate <- NULL
+  if (keep_all) {
+    dt_indeterminate <- dt[is.na(ref_month_in_quarter)]
+  }
+
+  # Filter to determined observations for calibration
   dt <- dt[!is.na(ref_month_in_quarter)]
 
   if (nrow(dt) == 0) {
     warning("No observations with determined reference month")
+    if (keep_all && !is.null(dt_indeterminate) && nrow(dt_indeterminate) > 0) {
+      dt_indeterminate[, weight_calibrated := NA_real_]
+      return(dt_indeterminate)
+    }
     return(dt)
   }
 
@@ -118,6 +134,18 @@ calibrate_monthly_weights <- function(data, monthly_totals, n_cells = 4L, verbos
   # Clean up temporary columns
   temp_cols <- c("quarter_yyyyq", "pop_quarter", "pop_month")
   dt[, (intersect(temp_cols, names(dt))) := NULL]
+
+  # Merge back indeterminate rows if keep_all = TRUE
+  if (keep_all && !is.null(dt_indeterminate) && nrow(dt_indeterminate) > 0) {
+    dt_indeterminate[, weight_calibrated := NA_real_]
+    # Add calibration cell columns as NA
+    for (col in c("celula1", "celula2", "celula3", "celula4")) {
+      if (col %in% names(dt) && !col %in% names(dt_indeterminate)) {
+        dt_indeterminate[, (col) := NA_integer_]
+      }
+    }
+    dt <- data.table::rbindlist(list(dt, dt_indeterminate), use.names = TRUE, fill = TRUE)
+  }
 
   dt
 }
@@ -230,52 +258,4 @@ calibrate_to_monthly_totals <- function(dt, mt) {
   dt[, c("pop_current", "m_populacao") := NULL]
 
   dt
-}
-
-#' Aggregate Weighted Indicators
-#'
-#' Aggregates microdata to monthly totals using calibrated weights.
-#' This is an intermediate step used for time series smoothing.
-#'
-#' @param dt data.table with calibrated weights and indicator variables
-#' @param weight_var Name of weight column
-#' @param indicator_vars Character vector of indicator variable names
-#'
-#' @return data.table with monthly aggregates
-#' @keywords internal
-#' @noRd
-aggregate_monthly_indicators <- function(dt, weight_var = "weight_calibrated",
-                                          indicator_vars = NULL) {
-
-  if (is.null(indicator_vars)) {
-    # Default PNADC labor indicators
-    indicator_vars <- c(
-      "pop14mais", "popocup", "popdesocup", "popforadaforca",
-      "empregprivcomcart", "empregprivsemcart",
-      "domesticocomcart", "domesticosemcart",
-      "empregpublcomcart", "empregpublsemcart",
-      "estatutmilitar", "empregador", "contapropria", "trabfamauxiliar"
-    )
-  }
-
-  # Create indicator columns if they don't exist
-  available_vars <- intersect(indicator_vars, names(dt))
-
-  if (length(available_vars) == 0) {
-    warning("No indicator variables found")
-    return(NULL)
-  }
-
-  # Aggregate
-  agg_expr <- lapply(available_vars, function(v) {
-    bquote(sum(.(as.name(v)) * .(as.name(weight_var)), na.rm = TRUE))
-  })
-  names(agg_expr) <- paste0("z_", available_vars)
-
-  result <- dt[, c(
-    list(n_obs = .N),
-    lapply(agg_expr, eval)
-  ), by = ref_month_yyyymm]
-
-  result
 }

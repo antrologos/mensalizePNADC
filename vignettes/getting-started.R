@@ -24,18 +24,19 @@ knitr::opts_chunk$set(
 
 ## ----get-crosswalk------------------------------------------------------------
 # crosswalk <- mensalizePNADC(pnadc)
-# # Step 1/1: Identifying reference months...
+# # Processing PNADC data...
+# # |==============================| 100%
 # #   Determination rate: 97.0%
 # 
-# print(crosswalk)
-# # PNADC Reference Month Crosswalk
-# # -------------------------------
-# # Observations: 28,395,273
-# # Determination rate: 97.0%
-# # Date range: 201201 - 202509
-# #
-# # Join keys: Ano, Trimestre, UPA, V1008, V1014, V2003
-# # Output columns: ref_month, ref_month_in_quarter, ref_month_yyyymm
+# # View the crosswalk (a data.table)
+# head(crosswalk)
+# #    Ano Trimestre    UPA V1008 V1014 V2003   ref_month ref_month_in_quarter ref_month_yyyymm
+# # 1: 2012         1 110000     1     1     1 2012-01-01                    1           201201
+# # 2: 2012         1 110000     1     1     2 2012-01-01                    1           201201
+# 
+# # Check the determination rate attribute
+# attr(crosswalk, "determination_rate")
+# # [1] 0.97
 
 ## ----join-data----------------------------------------------------------------
 # # Load an original quarterly file
@@ -88,6 +89,20 @@ knitr::opts_chunk$set(
 # monthly_pop <- result[, .(
 #   population = sum(weight_monthly, na.rm = TRUE)
 # ), by = ref_month_yyyymm]
+
+## ----keep-all-example---------------------------------------------------------
+# # Default: returns all rows (indeterminate have weight_monthly = NA)
+# result <- mensalizePNADC(pnadc_full, compute_weights = TRUE)
+# nrow(result) == nrow(pnadc_full)  # TRUE - all rows returned
+# sum(is.na(result$weight_monthly))  # ~3% of rows have NA weights
+# 
+# # Use na.rm = TRUE when aggregating
+# monthly_pop <- result[, .(pop = sum(weight_monthly, na.rm = TRUE)), by = ref_month_yyyymm]
+# 
+# # Alternative: returns only determined rows
+# result_determined <- mensalizePNADC(pnadc_full, compute_weights = TRUE, keep_all = FALSE)
+# nrow(result_determined) < nrow(pnadc_full)  # TRUE (~97% of rows)
+# sum(is.na(result_determined$weight_monthly))  # 0 - no NA weights
 
 ## ----modular------------------------------------------------------------------
 # # Step 1: Just identify reference months

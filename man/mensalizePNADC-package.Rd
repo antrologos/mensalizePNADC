@@ -5,73 +5,29 @@
 \alias{mensalizePNADC-package}
 \title{mensalizePNADC: Convert Quarterly PNADC Survey Data to Monthly Time Series}
 \description{
-The mensalizePNADC package provides tools to convert Brazil's quarterly
-PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data
-into monthly time series.
-
+The mensalizePNADC package provides tools to identify the exact month of
+Brazil's quarterly official household survey, PNADC (Pesquisa Nacional por
+Amostra de Domicilios Continua - IBGE), allowing for analyzing the survey
+data as a monthly time series.
+}
+\details{
 The package offers two main capabilities:
 \enumerate{
 \item \strong{Reference month identification}: Determines which month within
 each quarter each survey observation refers to, using IBGE's "Parada Tecnica"
 rules and respondent birthdates
 \item \strong{Monthly weight computation}: Adjusts survey weights for monthly
-(instead of quarterly) estimates using hierarchical calibration and
-Bayesian methods
-}
-}
-\section{Main Functions}{
-
-\describe{
-\item{\code{\link{mensalizePNADC}}}{Main function that processes stacked
-quarterly PNADC data and returns a crosswalk for joining with original data}
-\item{\code{\link{identify_reference_month}}}{Identifies which month each
-observation refers to (the core algorithm)}
-\item{\code{\link{calibrate_monthly_weights}}}{Redistributes quarterly
-weights to monthly using hierarchical calibration}
-\item{\code{\link{smooth_monthly_aggregates}}}{Removes quarterly artifacts
-from monthly series}
-\item{\code{\link{adjust_weights_bayesian}}}{Final Bayesian weight adjustment}
-\item{\code{\link{compute_labor_indicators}}}{Computes standard labor force
-indicators from weighted data}
-}
+(instead of quarterly) estimates using customized calibration
 }
 
-\section{Utility Functions}{
+The package is highly optimized for large datasets: approximately 1 minute to
+process 28.4 million rows (450,000 rows/sec), with 97.0 percent determination
+rate (identical to Stata implementation). Uses pre-computed lookup tables for
+20x faster date creation.
 
-\describe{
-\item{\code{\link{validate_pnadc}}}{Validates input data has required columns}
+The main function is \code{\link{mensalizePNADC}}, which processes stacked
+quarterly PNADC data and returns a crosswalk for joining with original data.
 }
-}
-
-\section{Background}{
-
-PNADC is a quarterly household survey conducted by IBGE (Brazilian Institute
-of Geography and Statistics) that provides labor market and demographic
-information. While the survey is published quarterly, each interview actually
-refers to a specific week within the quarter.
-
-This package implements the methodology developed by Marcos Hecksher to
-identify reference months and compute monthly-appropriate survey weights,
-enabling monthly time series analysis of PNADC data.
-}
-
-\section{Methodology}{
-
-The reference month identification algorithm uses:
-\itemize{
-\item IBGE's reference week timing rules ("Parada Tecnica")
-\item Respondent birthdates to constrain possible interview dates
-\item UPA-panel level aggregation (everyone interviewed together)
-}
-
-The monthly weight computation uses:
-\itemize{
-\item Hierarchical calibration across demographic/geographic cells
-\item Moving average smoothing to remove quarterly artifacts
-\item Bayesian posterior adjustment to match employment targets
-}
-}
-
 \references{
 IBGE Manual Basico da Entrevista PNADC (methodology on "Parada Tecnica")
 }
@@ -86,4 +42,7 @@ Useful links:
 }
 \author{
 Marcos Hecksher \email{mdhecksher@gmail.com}
+
+Rogerio Barbosa \email{rogerio.barbosa@iesp.uerj.br}
 }
+\keyword{internal}

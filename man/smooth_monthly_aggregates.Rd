@@ -59,12 +59,12 @@ For each indicator variable:
 }
 \examples{
 \dontrun{
-# After calibrating weights and aggregating
-aggregates <- aggregate_monthly_indicators(calibrated_data)
-smoothed <- smooth_monthly_aggregates(aggregates)
+# After calibrating weights, aggregate to monthly totals
+monthly_agg <- calibrated_data[, .(z_populacao = sum(weight_calibrated)), by = ref_month_yyyymm]
+smoothed <- smooth_monthly_aggregates(monthly_agg)
 }
 
 }
 \seealso{
-\code{\link{calibrate_monthly_weights}}, \code{\link{adjust_weights_bayesian}}
+\code{\link{calibrate_monthly_weights}}, \code{\link{calibrate_to_sidra}}
 }

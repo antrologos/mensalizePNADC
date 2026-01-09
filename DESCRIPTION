@@ -3,7 +3,7 @@ Title: Convert Quarterly PNADC Survey Data to Monthly Time Series
 Version: 0.1.0
 Authors@R: c(
     person("Marcos", "Hecksher", email = "mdhecksher@gmail.com", role = c("aut"),
-           comment = c(ORCID = "0000-0002-5449-6787")),
+           comment = c(ORCID = "0000-0003-2992-1252")),
     person("Rogerio", "Barbosa", email = "rogerio.barbosa@iesp.uerj.br", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-6796-4547")),
     person("Claude", "AI", role = "ctb",
@@ -25,9 +25,9 @@ Depends:
     R (>= 4.0.0)
 Imports:
     data.table (>= 1.14.0),
-    checkmate (>= 2.0.0)
+    checkmate (>= 2.0.0),
+    sidrar (>= 0.2.9)
 Suggests:
-    sidrar,
     dplyr,
     haven,
     testthat (>= 3.0.0),

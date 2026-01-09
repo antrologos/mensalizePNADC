@@ -370,11 +370,11 @@ observations:</p>
 </tr>
 <tr class="even">
 <td>Processing time (basic mode)</td>
-<td>~14-16 minutes</td>
+<td><strong>~1 minute</strong> (~450,000 rows/sec)</td>
 </tr>
 <tr class="odd">
 <td>Processing time (with weights)</td>
-<td>~20 minutes</td>
+<td><strong>~5 minutes</strong></td>
 </tr>
 <tr class="even">
 <td>Best period (2013-2019)</td>
@@ -599,18 +599,19 @@ columns:</p>
 <div id="step-2-get-the-crosswalk" class="section level3">
 <h3>Step 2: Get the crosswalk</h3>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc)</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># Step 1/1: Identifying reference months...</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#   Determination rate: 97.0%</span></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="fu">print</span>(crosswalk)</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co"># PNADC Reference Month Crosswalk</span></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co"># -------------------------------</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co"># Observations: 28,395,273</span></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co"># Determination rate: 97.0%</span></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># Date range: 201201 - 202509</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co"># Join keys: Ano, Trimestre, UPA, V1008, V1014, V2003</span></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co"># Output columns: ref_month, ref_month_in_quarter, ref_month_yyyymm</span></span></code></pre></div>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># Processing PNADC data...</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co"># |==============================| 100%</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#   Determination rate: 97.0%</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co"># View the crosswalk (a data.table)</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">head</span>(crosswalk)</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#    Ano Trimestre    UPA V1008 V1014 V2003   ref_month ref_month_in_quarter ref_month_yyyymm</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co"># 1: 2012         1 110000     1     1     1 2012-01-01                    1           201201</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># 2: 2012         1 110000     1     1     2 2012-01-01                    1           201201</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co"># Check the determination rate attribute</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="fu">attr</span>(crosswalk, <span class="st">&quot;determination_rate&quot;</span>)</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co"># [1] 0.97</span></span></code></pre></div>
 </div>
 <div id="step-3-join-with-original-data" class="section level3">
 <h3>Step 3: Join with original data</h3>
@@ -1094,6 +1095,25 @@ cells:
 <span id="cb25-18"><a href="#cb25-18" tabindex="-1"></a>), by <span class="ot">=</span> ref_month_yyyymm]</span></code></pre></div>
 <p>The <code>weight_monthly</code> output is calibrated to match IBGE’s
 official monthly population estimates (~206 million average).</p>
+</div>
+<div id="handling-indeterminate-observations" class="section level3">
+<h3>Handling Indeterminate Observations</h3>
+<p>About 3% of observations cannot have their reference month
+determined. By default (<code>keep_all = TRUE</code>), all input rows
+are returned, with <code>weight_monthly = NA</code> for indeterminate
+observations:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="co"># Default: returns all rows (indeterminate have weight_monthly = NA)</span></span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a><span class="fu">nrow</span>(result) <span class="sc">==</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE - all rows returned</span></span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(result<span class="sc">$</span>weight_monthly))  <span class="co"># ~3% of rows have NA weights</span></span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a></span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a><span class="co"># Use na.rm = TRUE when aggregating</span></span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(<span class="at">pop =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)), by <span class="ot">=</span> ref_month_yyyymm]</span>
+<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a></span>
+<span id="cb26-9"><a href="#cb26-9" tabindex="-1"></a><span class="co"># Alternative: returns only determined rows</span></span>
+<span id="cb26-10"><a href="#cb26-10" tabindex="-1"></a>result_determined <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>, <span class="at">keep_all =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb26-11"><a href="#cb26-11" tabindex="-1"></a><span class="fu">nrow</span>(result_determined) <span class="sc">&lt;</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE (~97% of rows)</span></span>
+<span id="cb26-12"><a href="#cb26-12" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(result_determined<span class="sc">$</span>weight_monthly))  <span class="co"># 0 - no NA weights</span></span></code></pre></div>
 <hr />
 </div>
 </div>
@@ -1249,59 +1269,64 @@ estimates match official series</li>
 <div id="using-modular-functions" class="section level2">
 <h2>Using Modular Functions</h2>
 <p>For more control, use the individual functions:</p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="co"># Step 1: Just identify reference months</span></span>
-<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>months <span class="ot">&lt;-</span> <span class="fu">identify_reference_month</span>(pnadc)</span>
-<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a></span>
-<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a><span class="co"># Step 2: Check determination rate by quarter</span></span>
-<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a>months[, .(</span>
-<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a>  <span class="at">total =</span> .N,</span>
-<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>  <span class="at">determined =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)),</span>
-<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a>  <span class="at">rate =</span> <span class="fu">round</span>(<span class="fu">mean</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)) <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>)</span>
-<span id="cb26-9"><a href="#cb26-9" tabindex="-1"></a>), by <span class="ot">=</span> .(Ano, Trimestre)]</span>
-<span id="cb26-10"><a href="#cb26-10" tabindex="-1"></a></span>
-<span id="cb26-11"><a href="#cb26-11" tabindex="-1"></a><span class="co"># Step 3: Validate input data</span></span>
-<span id="cb26-12"><a href="#cb26-12" tabindex="-1"></a>validation <span class="ot">&lt;-</span> <span class="fu">validate_pnadc</span>(pnadc, <span class="at">stop_on_error =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb26-13"><a href="#cb26-13" tabindex="-1"></a></span>
-<span id="cb26-14"><a href="#cb26-14" tabindex="-1"></a><span class="co"># Step 4: Fetch population data manually</span></span>
-<span id="cb26-15"><a href="#cb26-15" tabindex="-1"></a>pop_data <span class="ot">&lt;-</span> <span class="fu">fetch_monthly_population</span>(<span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb26-16"><a href="#cb26-16" tabindex="-1"></a></span>
-<span id="cb26-17"><a href="#cb26-17" tabindex="-1"></a><span class="co"># Step 5: Calibrate weights separately</span></span>
-<span id="cb26-18"><a href="#cb26-18" tabindex="-1"></a>calibrated <span class="ot">&lt;-</span> <span class="fu">calibrate_monthly_weights</span>(merged_data, pop_data)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="co"># Step 1: Just identify reference months</span></span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>months <span class="ot">&lt;-</span> <span class="fu">identify_reference_month</span>(pnadc)</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a><span class="co"># Step 2: Check determination rate by quarter</span></span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>months[, .(</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>  <span class="at">total =</span> .N,</span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>  <span class="at">determined =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)),</span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a>  <span class="at">rate =</span> <span class="fu">round</span>(<span class="fu">mean</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)) <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>)</span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a>), by <span class="ot">=</span> .(Ano, Trimestre)]</span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a></span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a><span class="co"># Step 3: Validate input data</span></span>
+<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a>validation <span class="ot">&lt;-</span> <span class="fu">validate_pnadc</span>(pnadc, <span class="at">stop_on_error =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a></span>
+<span id="cb27-14"><a href="#cb27-14" tabindex="-1"></a><span class="co"># Step 4: Fetch population data manually</span></span>
+<span id="cb27-15"><a href="#cb27-15" tabindex="-1"></a>pop_data <span class="ot">&lt;-</span> <span class="fu">fetch_monthly_population</span>(<span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb27-16"><a href="#cb27-16" tabindex="-1"></a></span>
+<span id="cb27-17"><a href="#cb27-17" tabindex="-1"></a><span class="co"># Step 5: Calibrate weights separately</span></span>
+<span id="cb27-18"><a href="#cb27-18" tabindex="-1"></a>calibrated <span class="ot">&lt;-</span> <span class="fu">calibrate_monthly_weights</span>(merged_data, pop_data)</span></code></pre></div>
 <hr />
 </div>
 <div id="performance" class="section level2">
 <h2>Performance</h2>
-<p>The package is optimized for large datasets:</p>
+<p>The package is highly optimized for large datasets using pre-computed
+lookup tables for date creation:</p>
 <table>
 <thead>
 <tr class="header">
 <th>Dataset Size</th>
 <th>Rows</th>
 <th>Time (basic)</th>
-<th>Time (weights)</th>
+<th>Throughput</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>1 quarter</td>
 <td>~570K</td>
-<td>~20 sec</td>
-<td>~30 sec</td>
+<td>~1.5 sec</td>
+<td>~380K rows/sec</td>
 </tr>
 <tr class="even">
 <td>1 year</td>
 <td>~2.3M</td>
-<td>~1.5 min</td>
-<td>~2 min</td>
+<td>~5 sec</td>
+<td>~460K rows/sec</td>
 </tr>
 <tr class="odd">
 <td>14 years (2012-2025)</td>
 <td>28.4M</td>
-<td>~14-16 min</td>
-<td>~20 min</td>
+<td><strong>~1 minute</strong></td>
+<td>~450K rows/sec</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Key optimization</strong>: The <code>make_date()</code>
+function uses pre-computed lookup tables instead of
+<code>ISOdate()</code>, achieving <strong>20x speedup</strong> on date
+operations which were the main bottleneck.</p>
 <p>Tips for best performance:</p>
 <ul>
 <li>Use <code>data.table</code> directly (automatic conversion from
@@ -1323,7 +1348,7 @@ don’t always need monthly weights. Often just knowing the reference
 month is enough.</p></li>
 <li><p><strong>Check determination rates by year</strong>: Rates should
 be 96-99% for 2013-2019. Lower rates may indicate data issues.</p>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>crosswalk[, .(<span class="at">rate =</span> <span class="fu">mean</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter))), by <span class="ot">=</span> .(Ano, Trimestre)]</span></code></pre></div></li>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>crosswalk[, .(<span class="at">rate =</span> <span class="fu">mean</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter))), by <span class="ot">=</span> .(Ano, Trimestre)]</span></code></pre></div></li>
 <li><p><strong>Handle indeterminate observations</strong>: Decide
 whether to exclude them or use quarterly-level analysis for those
 cases.</p></li>

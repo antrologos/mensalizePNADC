@@ -46,12 +46,12 @@
 #'
 #' @examples
 #' \dontrun{
-#' # After calibrating weights and aggregating
-#' aggregates <- aggregate_monthly_indicators(calibrated_data)
-#' smoothed <- smooth_monthly_aggregates(aggregates)
+#' # After calibrating weights, aggregate to monthly totals
+#' monthly_agg <- calibrated_data[, .(z_populacao = sum(weight_calibrated)), by = ref_month_yyyymm]
+#' smoothed <- smooth_monthly_aggregates(monthly_agg)
 #' }
 #'
-#' @seealso \code{\link{calibrate_monthly_weights}}, \code{\link{adjust_weights_bayesian}}
+#' @seealso \code{\link{calibrate_monthly_weights}}, \code{\link{calibrate_to_sidra}}
 #'
 #' @export
 smooth_monthly_aggregates <- function(monthly_aggregates,
@@ -239,30 +239,4 @@ determine_scale <- function(values) {
   } else {
     return(1000000)
   }
-}
-
-#' Smooth Income Variables
-#'
-#' Special handling for income variables which have different scale.
-#'
-#' @param dt data.table with monthly aggregates
-#' @param income_vars Character vector of income variable names
-#' @param cal_start Calibration start
-#' @param cal_end Calibration end
-#' @return data.table with smoothed income variables
-#' @keywords internal
-#' @noRd
-smooth_income_variables <- function(dt, income_vars, cal_start, cal_end) {
-
-  for (zvar in income_vars) {
-    if (!zvar %in% names(dt)) next
-
-    base_name <- sub("^z_", "", zvar)
-    m_var <- paste0("m_", base_name)
-
-    # Income variables use scale of 1000000 (millions)
-    dt <- smooth_single_variable(dt, zvar, m_var, cal_start, cal_end)
-  }
-
-  dt
 }

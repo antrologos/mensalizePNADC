@@ -16,7 +16,7 @@ The `mensalizePNADC` package identifies reference months in Brazil's quarterly P
 
 - **High accuracy**: **97.0%** determination rate on 28.4 million observations (2012-2025) — **identical to Stata**
 - **Dynamic exception detection**: Automatically detects quarters needing relaxed timing rules
-- **Fast processing**: ~14 minutes for 28.4 million rows (basic mode)
+- **Fast processing**: **~1 minute** for 28.4 million rows (basic mode) — ~450,000 rows/sec
 - **Minimal dependencies**: Requires `data.table` and `checkmate`; `sidrar` needed only for weight calibration
 - **Flexible output**: Returns a crosswalk for easy joins with original data
 
@@ -204,7 +204,7 @@ The output `weight_monthly` is calibrated to match IBGE's official monthly popul
 | `ref_month` | Date | Reference month (first day, e.g., "2023-01-01") |
 | `ref_month_in_quarter` | Integer | Position in quarter: 1, 2, 3, or NA |
 | `ref_month_yyyymm` | Integer | YYYYMM format (e.g., 202301) |
-| `weight_monthly` | Numeric | Monthly weight (if `compute_weights = TRUE`) |
+| `weight_monthly` | Numeric | Monthly weight (if `compute_weights = TRUE`); NA for indeterminate observations |
 
 ## Required Input Variables
 
@@ -239,6 +239,8 @@ The output `weight_monthly` is calibrated to match IBGE's official monthly popul
 | `mensalizePNADC()` | Main function: identify months + optional weights |
 | `identify_reference_month()` | Just reference month identification |
 | `calibrate_monthly_weights()` | Rake weighting for monthly weights |
+| `smooth_monthly_aggregates()` | Remove quarterly artifacts from series |
+| `calibrate_to_sidra()` | Optional Bayesian calibration to match SIDRA |
 | `fetch_monthly_population()` | Fetch population from SIDRA API |
 | `validate_pnadc()` | Input data validation |
 
@@ -250,10 +252,12 @@ Tested on 55 quarters (2012Q1 - 2025Q3) with 28,395,273 total observations:
 
 ### Processing Time
 
-| Mode | Loading | Processing | Total |
-|------|---------|------------|-------|
-| Basic (`compute_weights=FALSE`) | 17.4 sec | ~14 min | **~14 minutes** |
-| Weights (`compute_weights=TRUE`) | 17.4 sec | ~20 min | **~20 minutes** |
+| Mode | Processing | Throughput |
+|------|------------|------------|
+| Basic (`compute_weights=FALSE`) | **~1 minute** | ~450,000 rows/sec |
+| Weights (`compute_weights=TRUE`) | **~5 minutes** | ~95,000 rows/sec |
+
+*Performance achieved via optimized date creation using pre-computed lookup tables (20x faster than ISOdate).*
 
 ### Determination Rates by Period
 
@@ -282,10 +286,24 @@ result <- mensalizePNADC(pnadc_full,
   compute_weights = TRUE)
 
 # Use weight_monthly for estimates
-result[, .(pop = sum(weight_monthly)), by = ref_month_yyyymm]
+result[, .(pop = sum(weight_monthly, na.rm = TRUE)), by = ref_month_yyyymm]
 ```
 
 The `weight_monthly` output is calibrated to match IBGE's official monthly population estimates from SIDRA table 6022. Average monthly population: ~206 million (matching Brazil's population).
+
+### Handling Indeterminate Observations
+
+By default (`keep_all = TRUE`), all input rows are returned. Observations where reference month could not be determined (~3%) will have `weight_monthly = NA`. Set `keep_all = FALSE` to return only observations with determined reference months:
+
+```r
+# Default: returns all rows (indeterminate have weight_monthly = NA)
+result <- mensalizePNADC(pnadc_full, compute_weights = TRUE)
+nrow(result) == nrow(pnadc_full)  # TRUE
+
+# Alternative: returns only determined rows
+result <- mensalizePNADC(pnadc_full, compute_weights = TRUE, keep_all = FALSE)
+nrow(result) < nrow(pnadc_full)   # TRUE (~97% of rows)
+```
 
 ---
 

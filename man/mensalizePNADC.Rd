@@ -7,6 +7,7 @@
 mensalizePNADC(
   data,
   compute_weights = FALSE,
+  keep_all = TRUE,
   output = c("crosswalk", "microdata", "aggregates"),
   verbose = TRUE
 )
@@ -26,9 +27,16 @@ minimum required columns are:
 For monthly weight computation (\code{compute_weights = TRUE}), additional
 columns are required. See Details.}
 
-\item{compute_weights}{Logical. If TRUE, compute monthly survey weights in
+\item{compute_weights}{Logical. If TRUE, compute monthly adjusted survey weights in
 addition to identifying reference months. Default is FALSE. Requires the
-\code{sidrar} package to fetch population data from IBGE SIDRA API.}
+\code{sidrar} package to fetch population data from IBGE SIDRA API. It makes the monthly
+weights sum up to the population results at https://sidra.ibge.gov.br/tabela/6022.}
+
+\item{keep_all}{Logical. If TRUE (default), return all rows from input data,
+with \code{weight_monthly = NA} for observations where reference month
+could not be determined. If FALSE, only return observations with
+determined reference months (smaller output). Only applies when
+\code{compute_weights = TRUE}.}
 
 \item{output}{Character. What to return:
 \itemize{
@@ -62,10 +70,10 @@ Monthly aggregated indicators.
 This function processes stacked quarterly PNADC microdata to:
 \enumerate{
 \item Identify which month within each quarter each observation refers to
-\item Optionally compute monthly survey weights (if \code{compute_weights = TRUE})
+\item Optionally compute monthly adjusted survey weights (if \code{compute_weights = TRUE})
 }
 
-The output is a crosswalk table that can be joined with original (unstacked)
+The output is a crosswalk table that can be joined with original (stacked or unstacked)
 PNADC data files to add monthly time information.
 }
 \details{
@@ -84,14 +92,15 @@ The algorithm determines which month each survey response refers to based on:
 
 \subsection{Cross-Quarter Aggregation (Important!)}{
 
-\strong{For optimal determination rates (~95\%), input data should be stacked across
-multiple quarters} (ideally 2+ years). The algorithm leverages PNADC's rotating
-panel design where the same UPA-V1014 is interviewed in the same relative week
+\strong{For optimal determination rates (~97\%), input data should be stacked across
+multiple quarter datasets} (ideally 4+ years). The algorithm leverages PNADC's rotating
+panel design where the locations defined by the same values in variables
+UPA-V1014 are always interviewed in the same relative month within a given quarter
 across all quarterly visits.
 
 \itemize{
 \item \strong{Per-quarter processing}: ~65-75\% determination rate
-\item \strong{Multi-quarter stacked}: ~95\% determination rate
+\item \strong{Multi-quarter stacked}: ~97\% determination rate
 }
 
 The cross-quarter aggregation dramatically improves accuracy by combining
@@ -107,8 +116,8 @@ When \code{compute_weights = TRUE}, the function:
 \item Smooths monthly aggregates to remove quarterly artifacts
 }
 
-The resulting \code{weight_monthly} is the \strong{final} weight for general-purpose
-monthly analysis. No Bayesian adjustment is applied.
+The resulting \code{weight_monthly} is the adjusted weight for general-purpose
+monthly analysis.
 
 For theme-specific calibration to match IBGE SIDRA series (e.g., unemployment
 rate, employment levels), use \code{\link{calibrate_to_sidra}} separately.
@@ -157,7 +166,4 @@ result[, .(pop = sum(weight_monthly)), by = ref_month_yyyymm]
 }
 \seealso{
 \code{\link{identify_reference_month}} for just reference month identification
-\code{\link{calibrate_monthly_weights}} for weight calibration details
-\code{\link{calibrate_to_sidra}} for theme-specific Bayesian calibration
-\code{\link{compute_labor_indicators}} for computing indicators from results
 }

@@ -43,8 +43,8 @@ A data.table with the original key columns plus:
 }
 \description{
 PNADC is a quarterly survey, but each interview actually refers to a specific
-week within the quarter. This function identifies which month that week belongs
-to, enabling monthly (instead of quarterly) time series analysis.
+month within the quarter. This function identifies which month that observation belongs
+to, enabling a shorter term time series analysis.
 
 The algorithm uses:
 \itemize{
@@ -57,11 +57,10 @@ The algorithm uses:
 \details{
 Determines which month within each quarter corresponds to each survey
 observation based on IBGE's "Parada Tecnica" (technical break) rules.
-\subsection{Dynamic Exception Detection}{
+\subsection{Exception Detection}{
 
-This function \strong{dynamically detects} which quarters need relaxed timing rules
-based on the data itself. This matches the original Stata implementation by
-Marcos Hecksher.
+This function detects which quarters need relaxed timing rules
+based on the data itself.
 
 The algorithm detects exceptions at the per-month level within each quarter:
 \itemize{
@@ -73,14 +72,14 @@ The algorithm detects exceptions at the per-month level within each quarter:
 
 \subsection{Cross-Quarter Aggregation (Important!)}{
 
-\strong{For optimal determination rates (~96\%), input data should be stacked across
-multiple quarters} (ideally 2+ years). The algorithm leverages PNADC's rotating
+\strong{For optimal determination rates (~97\%), input data should be stacked across
+multiple quarters} (ideally 4+ years). The algorithm leverages PNADC's rotating
 panel design where the same UPA-V1014 is interviewed in the same relative week
 across all quarterly visits.
 
 \itemize{
 \item \strong{Per-quarter processing}: ~65-75\% determination rate
-\item \strong{Multi-quarter stacked}: ~96\% determination rate
+\item \strong{Multi-quarter stacked}: ~97\% determination rate
 }
 }
 
