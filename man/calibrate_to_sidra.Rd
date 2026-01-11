@@ -2,7 +2,6 @@
 % Please edit documentation in R/calibrate-to-sidra.R
 \name{calibrate_to_sidra}
 \alias{calibrate_to_sidra}
-\alias{adjust_weights_bayesian}
 \title{Calibrate Weights to IBGE SIDRA Series (Optional)}
 \usage{
 calibrate_to_sidra(
@@ -11,8 +10,6 @@ calibrate_to_sidra(
   sidra_series = NULL,
   verbose = TRUE
 )
-
-adjust_weights_bayesian(data, monthly_targets, employment_detail = TRUE)
 }
 \arguments{
 \item{data}{A data.table output from \code{\link{mensalizePNADC}} with

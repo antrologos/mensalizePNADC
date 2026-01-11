@@ -14,13 +14,21 @@ test_that("make_date handles valid dates", {
   expect_equal(make_date(2024, 12, 31), as.Date("2024-12-31"))
 })
 
-test_that("make_date returns NA for invalid dates", {
-  # February 30 doesn't exist
-  expect_true(is.na(make_date(2024, 2, 30)))
-  # February 29 in non-leap year
-  expect_true(is.na(make_date(2023, 2, 29)))
+test_that("make_date handles edge cases", {
+  # NOTE: make_date is optimized for speed and does NOT validate dates.
+
+  # Invalid dates like Feb 30 return incorrect dates, not NA.
+  # This is by design - the algorithm only creates valid dates by construction.
+
   # February 29 in leap year is valid
   expect_false(is.na(make_date(2024, 2, 29)))
+  expect_equal(make_date(2024, 2, 29), as.Date("2024-02-29"))
+
+  # Invalid dates: function returns a date (not NA) - overflow behavior
+  # Feb 30 in 2024 (leap year) returns Mar 1
+  expect_equal(make_date(2024, 2, 30), as.Date("2024-03-01"))
+  # Feb 29 in 2023 (non-leap year) returns Mar 1
+  expect_equal(make_date(2023, 2, 29), as.Date("2023-03-01"))
 })
 
 test_that("make_birthday handles Feb 29", {

@@ -450,8 +450,15 @@ create_demographic_category <- function(dt) {
   dt
 }
 
-# Legacy function for backwards compatibility
-#' @rdname calibrate_to_sidra
+#' Adjust Weights Using Bayesian Method (Deprecated)
+#'
+#' This function is deprecated. Use [calibrate_to_sidra()] instead.
+#'
+#' @param data data.table with mensalized PNADC data
+#' @param monthly_targets data.table with monthly targets
+#' @param employment_detail Logical, ignored (kept for backward compatibility)
+#'
+#' @return data.table with adjusted weights
 #' @export
 adjust_weights_bayesian <- function(data, monthly_targets, employment_detail = TRUE) {
   .Deprecated("calibrate_to_sidra")
