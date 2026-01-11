@@ -17,6 +17,8 @@ navbar:
       menu:
       - text: Getting Started
         href: articles/getting-started.html
+      - text: Download and Prepare Data
+        href: articles/download-and-prepare.html
       - text: Applied Examples
         href: articles/applied-examples.html
 

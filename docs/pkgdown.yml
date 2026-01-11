@@ -3,8 +3,9 @@ pkgdown: 2.1.3
 pkgdown_sha: ~
 articles:
   applied-examples: applied-examples.html
+  download-and-prepare: download-and-prepare.html
   getting-started: getting-started.html
-last_built: 2026-01-11T13:18Z
+last_built: 2026-01-11T15:53Z
 urls:
   reference: https://antrologos.github.io/mensalizePNADC/reference
   article: https://antrologos.github.io/mensalizePNADC/articles
