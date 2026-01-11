@@ -34,25 +34,25 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-Brazil's Continuous National Household Sample Survey (PNADC) is one of the most important sources of labor market data in Latin America. Every quarter, IBGE (Brazil's statistics agency) publishes unemployment rates, employment levels, and other key indicators based on this survey. However, what many users don't realize is that these **quarterly statistics are actually moving averages of monthly phenomena**.
+Brazil's Continuous National Household Sample Survey (PNADC) is one of the most important sources of labor market data in Latin America. Regularly, IBGE (Brazil's statistics agency) publishes the quarterly and annual microdata used for the calculation of official labor market statistics: unemployment rates, employment levels, and other key indicators. However, what many users don't realize is that these **quarterly (or annual) statistics are actually an average of three-month phenomena**. In the official IBGE website for indicators extration (SIDRA) there is indeed monthly information. However, these monthly series are not a snapshot of a particular month, but instead a rolling average of all interviews conducted during three months.
 
-Here's why this matters: IBGE conducts interviews throughout the quarter, with different households interviewed in different weeks. When IBGE reports the "Q2 2020 unemployment rate," they're averaging together interviews conducted in April, May, and June. This averaging has three important consequences:
+This averaging has three important consequences:
 
 1. **Timing errors**: The quarterly peak of unemployment may not coincide with the actual monthly peak. A crisis that peaked in April might show up as a "Q2" phenomenon, obscuring when the shock actually hit.
 
-2. **Magnitude errors**: The true peak or trough of a variable is diluted by averaging with adjacent months. If unemployment spiked to 16% in one month but was 12% in the surrounding months, the quarterly average would show something like 13-14%---understating the severity of the shock.
+2. **Magnitude errors**: The true size of a peak or trough of a variable is diluted by averaging with adjacent months. If unemployment spiked to 16% in one month but was 12% in the surrounding months, the quarterly average would show something like 13-14%---understating the severity of the shock.
 
 3. **Turning point detection**: The precise month when a trend reversed direction becomes blurred. Did the economy start recovering in May or June? Quarterly data can't tell you.
 
 The `mensalizePNADC` package solves this problem by identifying which specific month each interview refers to, using birthday information and IBGE's interview scheduling rules. With stacked data spanning multiple quarters, the algorithm achieves a **97% determination rate**---meaning we can assign specific reference months to nearly all observations.
 
-This vignette demonstrates six compelling cases where monthly data reveals dynamics that quarterly data hides. Each example shows the same underlying data, but the monthly series consistently provides sharper, more timely, and more accurate insights than the quarterly series.
+This vignette demonstrates three compelling cases where monthly data reveals dynamics that quarterly data hides, culminating in a powerful validation using minimum wage transitions.
 
 ---
 
 ## Prerequisites
 
-To reproduce these analyses, you need stacked PNADC microdata spanning multiple quarters. The code below assumes you have already loaded and processed your data. See the [Getting Started vignette](getting-started.html) for detailed instructions on data preparation.
+To reproduce these analyses, you need stacked PNADC microdata spanning multiple quarters. The code below assumes you have already loaded and processed your data. See the [Download and Prepare vignette](download-and-prepare.html) for detailed instructions on data preparation. For a intituitive overview of the mensalization methodology, see the [Getting Started vignette](getting-started.html).
 
 ```{r libraries}
 # Load required packages
@@ -61,6 +61,103 @@ library(data.table)
 library(ggplot2)
 library(scales)
 ```
+
+---
+
+## Preparing the Data
+
+This section shows how to create the aggregate time series used in the examples below. 
+
+### Step 1: Load Your Mensalized Data
+
+```{r load-data}
+# Load the mensalized data from download-and-prepare workflow
+# This should contain all PNADC variables plus the mensalization results
+pnadc <- fread("path/to/your/pnadc_mensalized.fst")
+
+# Alternative: If you have full microdata separately, join with crosswalk
+full_data <- fread("path/to/pnadc_full.csv")
+crosswalk <- fread("path/to/mensalized_crosswalk.fst")
+
+pnadc <- merge(
+  full_data,
+  crosswalk[, .(Ano, Trimestre, UPA, V1008, V1014, V2003,
+                ref_month, ref_month_in_quarter, ref_month_yyyymm, weight_monthly)],
+  by = c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003"),
+  all.x = TRUE
+)
+```
+
+### Step 2: Create Labor Market Variables
+
+```{r create-variables}
+# Filter to working-age population (14+)
+pnadc <- pnadc[V2009 >= 14]
+
+# Create labor market indicators
+pnadc[, `:=`(
+  # PEA: Economically Active Population (VD4001 == 1)
+  pea = fifelse(VD4001 == 1, 1L, 0L),
+
+  # Employed (VD4002 == 1)
+  employed = fifelse(VD4002 == 1, 1L, 0L),
+
+  # Unemployed (in labor force but not employed)
+  unemployed = fifelse(VD4002 == 2, 1L, 0L)
+)]
+
+# Formality indicator (among employed)
+# Formal: positions 1,3,5,7 OR positions 8,9 with social security contribution
+pnadc[, formal := fifelse(
+  VD4009 %in% c(1L, 3L, 5L, 7L), 1L,
+  fifelse(VD4009 %in% c(8L, 9L) & VD4012 == 1L, 1L, 0L)
+)]
+pnadc[VD4002 != 1, formal := NA_integer_]
+```
+
+### Step 3: Create Quarterly Series
+
+Quarterly aggregates use the original IBGE weight (`V1028`):
+
+```{r create-quarterly}
+quarterly_total <- pnadc[, .(
+  unemployment_rate = sum(unemployed * V1028, na.rm = TRUE) /
+                      sum(pea * V1028, na.rm = TRUE),
+  participation_rate = sum(pea * V1028, na.rm = TRUE) /
+                       sum(V1028, na.rm = TRUE),
+  formalization_rate = sum(formal * V1028, na.rm = TRUE) /
+                       sum(employed * V1028, na.rm = TRUE)
+), by = .(Ano, Trimestre)]
+
+# Add period column for plotting (mid-quarter date)
+quarterly_total[, period := as.Date(paste0(Ano, "-", (Trimestre - 1) * 3 + 2, "-15"))]
+```
+
+### Step 4: Create Monthly Series
+
+Monthly aggregates use `weight_monthly` from mensalizePNADC:
+
+```{r create-monthly}
+# Filter to observations with determined reference month
+pnadc_monthly <- pnadc[!is.na(weight_monthly)]
+
+monthly_total <- pnadc_monthly[, .(
+  unemployment_rate = sum(unemployed * weight_monthly, na.rm = TRUE) /
+                      sum(pea * weight_monthly, na.rm = TRUE),
+  participation_rate = sum(pea * weight_monthly, na.rm = TRUE) /
+                       sum(weight_monthly, na.rm = TRUE),
+  formalization_rate = sum(formal * weight_monthly, na.rm = TRUE) /
+                       sum(employed * weight_monthly, na.rm = TRUE)
+), by = ref_month_yyyymm]
+
+# Add period column for plotting (mid-month date)
+monthly_total[, period := as.Date(paste0(
+  ref_month_yyyymm %/% 100, "-",
+  ref_month_yyyymm %% 100, "-15"
+))]
+```
+
+With these objects created, you can now run all the examples below.
 
 ---
 
@@ -144,7 +241,7 @@ ggplot() +
 
 ![COVID-19 Unemployment: Monthly vs Quarterly](figures/applied-examples/fig-covid-unemployment.png){width=100%}
 
-The monthly series reveals that unemployment peaked roughly 2 percentage points higher than the quarterly data suggests, and the timing of the peak is more precisely identified. This difference isn't just academic---it represents millions of additional unemployed workers whose situation was masked by quarterly averaging.
+The monthly series reveals that unemployment peaked roughly 2 percentage points higher than the quarterly data suggests, and the timing of the peak is more precisely identified. This difference represents millions of additional unemployed workers whose situation was masked by quarterly averaging.
 
 ---
 
@@ -152,9 +249,9 @@ The monthly series reveals that unemployment peaked roughly 2 percentage points 
 
 Brazil's 2014-2017 recession was one of the deepest in the country's history. Unemployment rose from around 6% to over 13%, a catastrophic deterioration affecting tens of millions of families. But how did this deterioration unfold? Did unemployment rise gradually, or in sudden jumps?
 
-Quarterly data suggests a relatively smooth upward climb. The monthly data tells a different story: the recession unfolded in fits and starts, with several months showing unemployment increases exceeding 1 percentage point---sudden shocks that were invisible in the averaged quarterly figures.
+The monthly data tells reveals that the recession unfolded in fits and starts, with several months showing unemployment increases exceeding 1 percentage point---sudden shocks that were invisible in the averaged quarterly figures.
 
-This distinction matters for understanding the political economy of recessions. Sudden jumps in unemployment create different social and political pressures than gradual deterioration. They may trigger policy responses, protests, or changes in government. Monthly data lets researchers connect these events to specific timing.
+This distinction matters for understanding the political economy of recessions. Sudden jumps in unemployment create different social and political pressures than gradual deterioration. They may trigger policy responses, protests, or other social reactions.
 
 ```{r recession-detail}
 # Filter to recession period (Jun 2014 - Jun 2017)
@@ -222,262 +319,19 @@ ggplot() +
 
 ![2014-2017 Recession: Month-by-Month Detail](figures/applied-examples/fig-recession-detail.png){width=100%}
 
-The yellow circles mark months where unemployment jumped by more than 1 percentage point---sudden deteriorations that are completely invisible in the smooth quarterly trend. These moments likely correspond to specific economic or policy events that researchers can now investigate.
+The yellow circles mark months where unemployment jumped by more than 1 percentage point: sudden deteriorations that are completely invisible in the smooth quarterly trend. These moments likely correspond to specific economic or policy events that researchers can now investigate.
+
 
 ---
 
-## 3. Gender Gap During COVID: Women Left the Labor Force
-
-The COVID-19 pandemic had dramatically different effects on men and women in the labor market. International research has documented a "she-cession"---a recession that disproportionately affected women. In Brazil, school closures and the collapse of domestic service employment forced millions of women out of the labor force entirely.
-
-Monthly data answers three questions that quarterly data cannot:
-1. **When exactly** did the gender gap start widening?
-2. **How large** did the gap become at its peak?
-3. **When** did recovery begin, and was it symmetric for men and women?
-
-```{r gender-gap}
-# Filter to COVID period
-covid_gender_monthly <- monthly_gender[period >= "2019-10-01" & period <= "2021-09-01"]
-
-# Reshape to wide format to calculate gap
-gap_monthly <- dcast(covid_gender_monthly, period ~ sexo, value.var = "participation_rate")
-gap_monthly[, gap := Men - Women]
-setorder(gap_monthly, period)
-
-# Find maximum gap and pre-COVID baseline
-max_gap <- gap_monthly[which.max(gap)]
-baseline <- gap_monthly[period == "2020-02-15"]
-
-# Create the plot
-ggplot() +
-  # Men participation rate
-  geom_line(data = covid_gender_monthly[sexo == "Men"],
-            aes(x = period, y = participation_rate),
-            color = "steelblue", linewidth = 1) +
-  # Women participation rate
-  geom_line(data = covid_gender_monthly[sexo == "Women"],
-            aes(x = period, y = participation_rate),
-            color = "coral", linewidth = 1) +
-
-  # Shade the gap at maximum point
-  annotate("rect",
-           xmin = max_gap$period - 20, xmax = max_gap$period + 20,
-           ymin = max_gap$Women, ymax = max_gap$Men,
-           fill = "purple", alpha = 0.2) +
-  annotate("segment",
-           x = max_gap$period, xend = max_gap$period,
-           y = max_gap$Women, yend = max_gap$Men,
-           color = "purple", linewidth = 1.5) +
-  annotate("text",
-           x = max_gap$period + 25, y = (max_gap$Men + max_gap$Women) / 2,
-           label = paste0("Max gap: ", sprintf("%.1f p.p.", max_gap$gap * 100)),
-           size = 3, hjust = 0, color = "purple") +
-
-  # Labels for each line
-  annotate("text", x = as.Date("2021-06-01"), y = 0.715, label = "Men",
-           color = "steelblue", fontface = "bold", size = 4) +
-  annotate("text", x = as.Date("2021-06-01"), y = 0.505, label = "Women",
-           color = "coral", fontface = "bold", size = 4) +
-
-  # Pre-COVID baseline reference
-  geom_hline(yintercept = baseline$Women, linetype = "dashed", color = "coral", alpha = 0.5) +
-  annotate("text", x = as.Date("2019-11-01"), y = baseline$Women + 0.01,
-           label = "Pre-COVID\nwomen's rate", size = 2.5, color = "coral", hjust = 0) +
-
-  # Scales and labels
-  scale_y_continuous(labels = percent_format(accuracy = 1),
-                     limits = c(0.45, 0.75)) +
-  scale_x_date(date_breaks = "3 months", date_labels = "%b\n%Y") +
-  labs(
-    title = "COVID-19 Gender Impact: Women's Participation Collapsed",
-    subtitle = paste0("Gender gap widened from ", sprintf("%.1f", baseline$gap * 100),
-                     " to ", sprintf("%.1f", max_gap$gap * 100),
-                     " p.p. - monthly data shows exact timing"),
-    x = NULL, y = "Labor Force Participation Rate",
-    caption = "Source: PNADC/IBGE. Monthly data from mensalizePNADC."
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    panel.grid.minor = element_blank()
-  )
-```
-
-![Gender Gap During COVID](figures/applied-examples/fig-gender-gap.png){width=100%}
-
-The monthly data shows that women's participation rate collapsed dramatically in the early months of COVID, creating a gender gap far wider than anything visible in quarterly statistics. The exact timing helps researchers connect this to specific policy events---school closures, lockdown orders, and the suspension of domestic services.
-
----
-
-## 4. Racial Inequality: Unemployment Gap Widened During COVID
-
-COVID-19 didn't affect all racial groups equally. Black and Brown workers faced higher unemployment rates before the pandemic, and these disparities widened during the crisis. Understanding when and how much the gap widened is essential for designing targeted recovery policies.
-
-The pre-existing disparity reflects structural inequalities in the Brazilian labor market---Black and Brown workers are more likely to be in informal employment, in sectors hit hardest by the pandemic, and with less access to remote work options. Monthly data lets us track how these vulnerabilities translated into actual outcomes during the crisis.
-
-```{r racial-gap}
-# Filter to analysis period
-race_monthly <- monthly_race[period >= "2019-01-01" & period <= "2022-01-01"]
-
-# Reshape to calculate Black-White gap
-gap_race <- dcast(race_monthly, period ~ raca, value.var = "unemployment_rate")
-gap_race[, gap := Black - White]
-setorder(gap_race, period)
-
-# Find maximum gap and pre-COVID baseline
-max_race_gap <- gap_race[which.max(gap)]
-baseline_race <- gap_race[period == "2020-02-15"]
-
-# Create the plot
-ggplot() +
-  # White unemployment
-  geom_line(data = race_monthly[raca == "White"],
-            aes(x = period, y = unemployment_rate),
-            color = "#2166AC", linewidth = 1) +
-  # Black unemployment
-  geom_line(data = race_monthly[raca == "Black"],
-            aes(x = period, y = unemployment_rate),
-            color = "#B2182B", linewidth = 1) +
-  # Brown unemployment
-  geom_line(data = race_monthly[raca == "Brown"],
-            aes(x = period, y = unemployment_rate),
-            color = "#DFC27D", linewidth = 1) +
-
-  # Shade maximum gap period
-  annotate("rect",
-           xmin = max_race_gap$period - 20, xmax = max_race_gap$period + 20,
-           ymin = max_race_gap$White, ymax = max_race_gap$Black,
-           fill = "gray50", alpha = 0.2) +
-
-  # COVID start marker
-  geom_vline(xintercept = as.Date("2020-03-15"), linetype = "dashed", alpha = 0.5) +
-  annotate("text", x = as.Date("2020-03-15"), y = 0.21,
-           label = "COVID\nstart", size = 2.5, hjust = -0.1) +
-
-  # Labels for each line
-  annotate("text", x = as.Date("2021-10-01"), y = 0.175, label = "Black",
-           color = "#B2182B", fontface = "bold", size = 3.5) +
-  annotate("text", x = as.Date("2021-10-01"), y = 0.135, label = "Brown",
-           color = "#DFC27D", fontface = "bold", size = 3.5) +
-  annotate("text", x = as.Date("2021-10-01"), y = 0.095, label = "White",
-           color = "#2166AC", fontface = "bold", size = 3.5) +
-
-  # Gap annotation
-  annotate("text",
-           x = max_race_gap$period + 60, y = (max_race_gap$Black + max_race_gap$White) / 2,
-           label = paste0("Max gap: ", sprintf("%.1f p.p.", max_race_gap$gap * 100), "\n",
-                         format(max_race_gap$period, "%b %Y")),
-           size = 3, hjust = 0) +
-
-  # Scales and labels
-  scale_y_continuous(labels = percent_format(accuracy = 1),
-                     limits = c(0.08, 0.22)) +
-  scale_x_date(date_breaks = "4 months", date_labels = "%b\n%Y") +
-  labs(
-    title = "Racial Unemployment Gap: COVID Amplified Inequality",
-    subtitle = paste0("Black-White gap widened from ", sprintf("%.1f", baseline_race$gap * 100),
-                     " to ", sprintf("%.1f", max_race_gap$gap * 100), " p.p."),
-    x = NULL, y = "Unemployment Rate",
-    caption = "Source: PNADC/IBGE. Monthly data from mensalizePNADC."
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    panel.grid.minor = element_blank()
-  )
-```
-
-![Racial Unemployment Gap](figures/applied-examples/fig-racial-gap.png){width=100%}
-
-The figure shows that the Black-White unemployment gap widened immediately after COVID began and remained elevated throughout the crisis. Monthly precision allows researchers to evaluate whether specific policies (like emergency benefits) helped close this gap and when.
-
----
-
-## 5. The Formalization Paradox: Why Formalization Rose During a Crisis
-
-Here's a puzzle: during COVID-19, the formalization rate---the share of employed workers with formal contracts---actually *increased*. How can this be, when the economy was collapsing?
-
-The answer is a **composition effect**. Informal workers (street vendors, domestic workers, construction day laborers) lost their jobs at much higher rates than formal workers. Many formal sector workers could work from home or were protected by employment contracts. The result: the remaining pool of employed workers had a higher share of formal employment, even though the absolute number of both formal and informal workers declined.
-
-This example serves as a methodological caution. Aggregate statistics can move in counterintuitive directions when the underlying population changes. Monthly data reveals this paradox with precision that quarterly data obscures.
-
-```{r formalization}
-# Filter to COVID period
-covid_form_monthly <- monthly_total[period >= "2019-10-01" & period <= "2021-06-01",
-                                     .(period, formalization_rate)]
-covid_form_quarterly <- quarterly_total[period >= "2019-10-01" & period <= "2021-06-01",
-                                          .(period, formalization_rate)]
-
-# Find the spike and pre-COVID baseline
-max_formal <- covid_form_monthly[which.max(formalization_rate)]
-pre_covid <- covid_form_monthly[period == "2020-02-15"]
-
-# Create the plot
-ggplot() +
-  # Quarterly
-  geom_step(data = covid_form_quarterly,
-            aes(x = period, y = formalization_rate),
-            color = "steelblue", linewidth = 1, direction = "mid") +
-  geom_point(data = covid_form_quarterly,
-             aes(x = period, y = formalization_rate),
-             color = "steelblue", size = 2.5) +
-
-  # Monthly
-  geom_line(data = covid_form_monthly,
-            aes(x = period, y = formalization_rate),
-            color = "darkgreen", linewidth = 0.9) +
-  geom_point(data = covid_form_monthly,
-             aes(x = period, y = formalization_rate),
-             color = "darkgreen", size = 1.5) +
-
-  # Highlight the spike
-  annotate("point", x = max_formal$period, y = max_formal$formalization_rate,
-           color = "darkgreen", size = 4, shape = 18) +
-  annotate("segment",
-           x = max_formal$period, xend = max_formal$period,
-           y = max_formal$formalization_rate + 0.005,
-           yend = max_formal$formalization_rate + 0.025,
-           arrow = arrow(length = unit(0.2, "cm")), color = "darkgreen") +
-  annotate("text",
-           x = max_formal$period, y = max_formal$formalization_rate + 0.03,
-           label = paste0("COVID spike:\n", sprintf("%.1f%%", max_formal$formalization_rate * 100), "\n",
-                         "(informal jobs lost)"),
-           size = 3, hjust = 0.5, color = "darkgreen") +
-
-  # Pre-COVID reference
-  geom_hline(yintercept = pre_covid$formalization_rate, linetype = "dashed", alpha = 0.5) +
-
-  # Scales and labels
-  scale_y_continuous(labels = percent_format(accuracy = 1),
-                     limits = c(0.56, 0.66)) +
-  scale_x_date(date_breaks = "3 months", date_labels = "%b\n%Y") +
-  labs(
-    title = "The COVID Formalization Paradox",
-    subtitle = "Formalization rate ROSE because informal workers lost jobs disproportionately",
-    x = NULL, y = "Formalization Rate",
-    caption = "Source: PNADC/IBGE. Green = monthly, blue = quarterly."
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    panel.grid.minor = element_blank()
-  )
-```
-
-![The Formalization Paradox](figures/applied-examples/fig-formalization.png){width=100%}
-
-The monthly series shows the spike in formalization rate with precision---a sharp jump that occurred in a single month, directly coinciding with the pandemic lockdowns. Quarterly data smooths this out, making the paradox less visible.
-
----
-
-## 6. Minimum Wage Adjustments: Validating Mensalization
+## 3. Minimum Wage Adjustments: Validating Mensalization
 
 Perhaps the most compelling validation of the mensalization methodology comes from tracking minimum wage adjustments. PNADC collects two income measures:
 
 - **Habitual income (VD4016)**: What the worker usually earns---refers to the **current** reference month
 - **Effective income (VD4017)**: What the worker actually received---refers to the **previous** month
 
-This distinction creates a natural experiment. When the minimum wage increases (typically in January), workers earning the minimum wage should show the new value in their *habitual* income immediately, but their *effective* income should still show the old value (since it refers to the previous month). The following month, effective income catches up.
+This distinction creates almost a natural experiment. When the minimum wage increases (typically in January), workers earning the minimum wage should show the new value in their *habitual* income immediately, but their *effective* income should still show the old value (since it refers to the previous month). The following month, effective income catches up.
 
 This one-month lag is a prediction of the mensalization methodology. If our reference month identification is correct, we should see this pattern clearly. If it's wrong, the pattern would be blurred or absent.
 
@@ -485,8 +339,12 @@ This one-month lag is a prediction of the mensalization methodology. If our refe
 
 We focus on formal private sector employees (VD4009 == 1) aged 18 and older, tracking the share earning **exactly** each historical minimum wage value. This precise measurement (not "around minimum wage" but "exactly R$ 622" or "exactly R$ 678") makes the transition patterns especially clear.
 
-```{r mw-big-picture}
-# Create long format for plotting
+### The Smoking Gun: January 2013 Transition
+
+The clearest test of our methodology comes from examining a single, clean transition. In January 2013, the minimum wage increased from R$ 622 to R$ 678:
+
+```{r mw-2013-transition}
+# Create long format for plotting (needed for all MW examples)
 mw_long <- melt(monthly_mw_exact,
                 id.vars = c("ref_month_yyyymm", "period", "mw_value", "n_workers"),
                 measure.vars = c("pct_habitual", "pct_effective"),
@@ -502,6 +360,118 @@ mw_long[, income_label := fifelse(income_type == "pct_habitual",
 adj_dates <- as.Date(paste0(mw_adjustment_months %/% 100, "-",
                              mw_adjustment_months %% 100, "-15"))
 
+# Filter to the first transition period (Oct 2012 - Apr 2013)
+mw_2013 <- mw_long[period >= "2012-10-15" & period <= "2013-04-15" &
+                   mw_value %in% c(622, 678)]
+
+# Create the plot
+ggplot(mw_2013,
+       aes(x = period, y = pct_at_mw, color = factor(mw_value), linetype = factor(mw_value))) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2.5) +
+
+  # Mark the adjustment date (January 2013)
+  geom_vline(xintercept = as.Date("2013-01-15"),
+             linetype = "dashed", linewidth = 0.8, color = "gray40") +
+
+  # Facet by income type
+  facet_wrap(~ income_label, ncol = 2) +
+
+  # Scales and labels
+  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b\n%Y") +
+  scale_color_manual(values = c("622" = "#b2182b", "678" = "#2166ac"),
+                     labels = c("622" = "R$ 622 (old)", "678" = "R$ 678 (new)"),
+                     name = "MW Value") +
+  scale_linetype_manual(values = c("622" = "solid", "678" = "solid"), guide = "none") +
+  labs(
+    title = "MW Transition: January 2013 (R$ 622 -> R$ 678)",
+    subtitle = "Habitual income shows transition in January; Effective income shows same pattern in February",
+    x = NULL, y = "Share Earning Exact MW",
+    caption = "Vertical line = MW adjustment. Habitual income refers to current month; effective to previous month."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+![MW 2013 Transition Detail](figures/applied-examples/fig-mw-2013-transition.png){width=100%}
+
+This is the smoking gun. In the left panel (habitual income), workers shift from R$ 622 to R$ 678 in **January**. In the right panel (effective income), the same shift happens in **February**---exactly the one-month lag predicted by the temporal reference of each variable.
+
+### A Harder Test: The 2020 Double Adjustment
+
+The January 2013 transition demonstrates the one-month lag with perfect clarity. But what happens when things get more complicated? The year 2020 provides an unusually demanding test.
+
+In an unusual sequence, Brazil adjusted the minimum wage twice in consecutive months:
+
+- **January 2020**: R$ 998 → R$ 1,039 (annual adjustment)
+- **February 2020**: R$ 1,039 → R$ 1,045 (correction)
+
+This creates a situation where R$ 1,039 was the official minimum wage for only one month. If our reference month identification were imprecise, these rapid transitions would blur together. Instead:
+
+```{r mw-2020-double}
+# Filter to 2020 double adjustment period (Jul 2019 - Jul 2020)
+mw_2020 <- mw_long[period >= "2019-07-15" & period <= "2020-07-15" &
+                   mw_value %in% c(998, 1039, 1045)]
+
+# Get adjustment dates in this period
+adj_2020 <- adj_dates[adj_dates >= "2019-07-15" & adj_dates <= "2020-07-15"]
+
+# Create the plot
+ggplot(mw_2020,
+       aes(x = period, y = pct_at_mw, color = factor(mw_value), linetype = factor(mw_value))) +
+  geom_line(linewidth = 1.1) +
+  geom_point(size = 2.5) +
+
+  # Mark adjustment months
+  geom_vline(xintercept = adj_2020, linetype = "dashed", linewidth = 0.8, color = "gray40") +
+
+  # Facet by income type
+  facet_wrap(~ income_label, ncol = 2) +
+
+  # Scales and labels
+  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b\n%Y") +
+  scale_color_manual(values = c("998" = "#b2182b", "1039" = "#7b3294", "1045" = "#2166ac"),
+                     labels = c("998" = "R$ 998 (2019)", "1039" = "R$ 1,039 (Jan 2020)",
+                               "1045" = "R$ 1,045 (Feb 2020+)"),
+                     name = "MW Value") +
+  scale_linetype_manual(values = c("998" = "solid", "1039" = "solid", "1045" = "solid"),
+                        guide = "none") +
+  labs(
+    title = "The 2020 Double Adjustment: A Demanding Test",
+    subtitle = "R$ 998 -> R$ 1,039 (Jan) -> R$ 1,045 (Feb). Three values, two transitions, one-month lag preserved.",
+    x = NULL, y = "Share Earning Exact MW",
+    caption = "Vertical lines = MW adjustments. The short-lived R$ 1,039 value (one month only) creates a sharp test."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+![MW 2020 Double Adjustment](figures/applied-examples/fig-mw-2020-double.png){width=100%}
+
+The pattern remains crisp even under this demanding test. In habitual income:
+
+- January shows R$ 1,039 replacing R$ 998
+- February shows R$ 1,045 replacing R$ 1,039
+
+In effective income, each transition appears exactly one month later. The short-lived R$ 1,039 value creates a distinctive spike visible in both panels, offset by precisely one month.
+
+### The Full Picture: 2012-2024
+
+Even with consecutive monthly adjustments creating overlapping transitions, the one-month lag remains crisp. Does this pattern hold across the entire series?
+
+```{r mw-big-picture}
 # Create color palette (blue to red gradient)
 mw_vals <- sort(unique(monthly_mw_exact$mw_value))
 n_mw <- length(mw_vals)
@@ -548,102 +518,9 @@ ggplot(mw_long_filtered,
 
 ![MW Big Picture: All Values Over Time](figures/applied-examples/fig-mw-big-picture.png){width=100%}
 
-The figure shows all minimum wage values tracked over the full period. Each vertical line marks a MW adjustment. Notice how the pattern in the top panel (habitual income) is shifted one month earlier than the bottom panel (effective income)---exactly as predicted.
+The figure shows all minimum wage values tracked over the full period. Each vertical line marks a MW adjustment. Notice how the pattern in the top panel (habitual income) is shifted one month earlier than the bottom panel (effective income)---exactly as predicted, consistently across twelve years and more than a dozen minimum wage values.
 
-### Close-up: January 2013 Transition
-
-Let's zoom in on the first transition in our data, when the minimum wage increased from R$ 622 to R$ 678 in January 2013:
-
-```{r mw-2013-transition}
-# Filter to the first transition period (Oct 2012 - Apr 2013)
-mw_2013 <- mw_long[period >= "2012-10-15" & period <= "2013-04-15" &
-                   mw_value %in% c(622, 678)]
-
-# Create the plot
-ggplot(mw_2013,
-       aes(x = period, y = pct_at_mw, color = factor(mw_value), linetype = factor(mw_value))) +
-  geom_line(linewidth = 1.2) +
-  geom_point(size = 2.5) +
-
-  # Mark the adjustment date (January 2013)
-  geom_vline(xintercept = as.Date("2013-01-15"),
-             linetype = "dashed", linewidth = 0.8, color = "gray40") +
-
-  # Facet by income type
-  facet_wrap(~ income_label, ncol = 2) +
-
-  # Scales and labels
-  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
-  scale_x_date(date_breaks = "1 month", date_labels = "%b\n%Y") +
-  scale_color_manual(values = c("622" = "#b2182b", "678" = "#2166ac"),
-                     labels = c("622" = "R$ 622 (old)", "678" = "R$ 678 (new)"),
-                     name = "MW Value") +
-  scale_linetype_manual(values = c("622" = "solid", "678" = "solid"), guide = "none") +
-  labs(
-    title = "MW Transition: January 2013 (R$ 622 -> R$ 678)",
-    subtitle = "Habitual income shows transition in January; Effective income shows same pattern in February",
-    x = NULL, y = "Share Earning Exact MW",
-    caption = "Vertical line = MW adjustment. Habitual income refers to current month; effective to previous month."
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.position = "bottom",
-    panel.grid.minor = element_blank(),
-    strip.text = element_text(face = "bold")
-  )
-```
-
-![MW 2013 Transition Detail](figures/applied-examples/fig-mw-2013-transition.png){width=100%}
-
-This is the smoking gun. In the left panel (habitual income), workers shift from R$ 622 to R$ 678 in **January**. In the right panel (effective income), the same shift happens in **February**---exactly the one-month lag predicted by the temporal reference of each variable.
-
-### Multi-Year Period: 2019-2023
-
-The pattern holds across all MW adjustments, including unusual cases like the February 2020 correction (from R$ 1,039 to R$ 1,045) and the May 2023 mid-year adjustment:
-
-```{r mw-2019-2023}
-# Filter to multi-year period with interesting events
-mw_special <- mw_long[period >= "2019-10-15" & period <= "2023-04-15" &
-                      mw_value %in% c(998, 1039, 1045, 1100, 1212, 1302, 1320)]
-
-# Get adjustment dates in this period
-adj_special <- adj_dates[adj_dates >= "2019-10-15" & adj_dates <= "2023-04-15"]
-
-# Create the plot
-ggplot(mw_special,
-       aes(x = period, y = pct_at_mw, color = factor(mw_value), group = mw_value)) +
-  geom_line(linewidth = 0.9) +
-  geom_point(size = 1.5, alpha = 0.7) +
-
-  # Mark adjustment months
-  geom_vline(xintercept = adj_special, linetype = "dashed", alpha = 0.5, color = "gray40") +
-
-  # Facet by income type
-  facet_wrap(~ income_label, ncol = 1) +
-
-  # Scales and labels
-  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
-  scale_x_date(date_breaks = "3 months", date_labels = "%b\n%Y") +
-  scale_color_brewer(palette = "Set1", name = "MW Value (R$)") +
-  labs(
-    title = "MW Transitions: October 2019 - April 2023",
-    subtitle = "Includes Feb 2020 correction (1039->1045) and May 2023 mid-year adjustment (1302->1320)",
-    x = NULL, y = "Share Earning Exact MW",
-    caption = "Vertical lines = MW adjustments. Pattern is consistently shifted 1 month between panels."
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.position = "right",
-    panel.grid.minor = element_blank(),
-    strip.text = element_text(face = "bold")
-  )
-```
-
-![MW Transitions 2019-2023](figures/applied-examples/fig-mw-2019-2023.png){width=100%}
-
-The one-month lag is consistent across all adjustment events. This provides strong validation that the mensalization algorithm correctly identifies reference months.
+This provides strong validation that the mensalization algorithm correctly identifies reference months.
 
 ---
 
@@ -653,9 +530,6 @@ The one-month lag is consistent across all adjustment events. This provides stro
 |----------|---------------------|-----------------|
 | **COVID unemployment** | Peak understated | True peak ~2 p.p. higher |
 | **Recession tracking** | Appears as smooth climb | Multiple months with >1 p.p. jumps |
-| **Gender gap** | Timing unclear | Exact month of divergence identified |
-| **Racial inequality** | Gap changes smoothed | Precise timing of gap widening |
-| **Formalization paradox** | Spike diluted | Sharp composition shift visible |
 | **Minimum wage** | Timing impossible | 1-month lag validates methodology |
 
 Monthly data from `mensalizePNADC` enables:
