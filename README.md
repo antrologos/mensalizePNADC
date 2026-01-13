@@ -1,7 +1,10 @@
 # mensalizePNADC
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/antrologos/mensalizePNADC/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/antrologos/mensalizePNADC/actions/workflows/R-CMD-check.yaml)
 [![pkgdown](https://github.com/antrologos/mensalizePNADC/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/antrologos/mensalizePNADC/actions/workflows/pkgdown.yaml)
+[![codecov](https://codecov.io/gh/antrologos/mensalizePNADC/branch/master/graph/badge.svg)](https://codecov.io/gh/antrologos/mensalizePNADC)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html)
 <!-- badges: end -->
 
 Convert Brazil's quarterly PNADC survey data into monthly time series.
