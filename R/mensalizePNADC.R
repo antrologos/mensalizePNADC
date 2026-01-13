@@ -102,10 +102,7 @@
 #' }
 #'
 #' The resulting \code{weight_monthly} is the adjusted weight for general-purpose
-#' monthly analysis. 
-#'
-#' For theme-specific calibration to match IBGE SIDRA series (e.g., unemployment
-#' rate, employment levels), use \code{\link{calibrate_to_sidra}} separately.
+#' monthly analysis.
 #'
 #' Additional required columns for weight computation:
 #' \itemize{

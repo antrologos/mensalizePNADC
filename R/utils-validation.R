@@ -29,8 +29,6 @@ join_key_vars <- function() {
 #' Required Variables for Weight Calibration
 #'
 #' Returns the additional column names required for computing monthly weights.
-#' Note: This is for rake weighting only. Labor force variables (VD4001, etc.)
-#' are only needed for theme-specific calibration via calibrate_to_sidra().
 #'
 #' @return Character vector of required column names
 #' @keywords internal

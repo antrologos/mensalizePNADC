@@ -24,8 +24,6 @@ The `mensalizePNADC` package converts Brazil's quarterly PNADC (Pesquisa Naciona
 1. **Reference month identification**: Determines which month within each quarter each survey observation refers to
 2. **Monthly weight computation**: Adjusts survey weights for monthly (instead of quarterly) estimates
 
-**Note**: Results are **identical to the original Stata implementation** by Marcos Hecksher.
-
 ---
 
 ## Quick Reference
@@ -73,7 +71,6 @@ The `mensalizePNADC` package converts Brazil's quarterly PNADC (Pesquisa Naciona
 | `identify_reference_month()` | Just reference month identification |
 | `calibrate_monthly_weights()` | Rake weighting for monthly weights |
 | `smooth_monthly_aggregates()` | Remove quarterly artifacts from series |
-| `calibrate_to_sidra()` | Optional Bayesian calibration to match SIDRA |
 | `fetch_monthly_population()` | Fetch population from SIDRA API |
 | `validate_pnadc()` | Input data validation |
 
@@ -571,20 +568,6 @@ pop_data <- fetch_monthly_population(verbose = TRUE)
 # Step 5: Calibrate weights separately
 calibrated <- calibrate_monthly_weights(merged_data, pop_data)
 ```
-
-### Topic-Specific Calibration (Coming Soon)
-
-The `calibrate_to_sidra()` function provides **theme-specific Bayesian calibration** to exactly match IBGE's published SIDRA series.
-
-The base `weight_monthly` provides general-purpose monthly weights. For exact alignment with specific published series (unemployment rate, employment levels), use theme-specific calibration:
-
-| Theme | What's Calibrated |
-|-------|-------------------|
-| `unemployment` | Unemployment rate matches IBGE exactly |
-| `employment` | Employment levels match IBGE exactly |
-| `labor_force` | Labor force participation matches IBGE |
-| `income` | Income aggregates match IBGE |
-| `custom` | User supplies their own target series |
 
 ---
 

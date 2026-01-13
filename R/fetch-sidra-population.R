@@ -194,7 +194,7 @@ transform_moving_quarter_to_monthly <- function(dt, verbose = FALSE) {
 
  # Shift: m_populacao gets value from NEXT row's populacao
  # This aligns the moving quarter value with its middle month
- # Stata: gen m_populacao = populacao[_n+1] is equivalent to shift(x, n=1, type="lead")
+ # shift(x, n=1, type="lead") gets the value from the next row
  dt[, m_populacao := data.table::shift(populacao, n = 1L, type = "lead")]
 
  # Clean up

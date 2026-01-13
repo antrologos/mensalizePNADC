@@ -47,7 +47,6 @@ reference:
 - title: Weight Calibration
   desc: Functions for weight calibration and smoothing
   contents:
-  - calibrate_to_sidra
   - smooth_monthly_aggregates
 
 - title: Data Fetching
@@ -56,16 +55,10 @@ reference:
   - fetch_monthly_population
   - fetch-sidra-population
 
-- title: Indicators
-  desc: Labor market indicator calculations
-  contents:
-  - compute_labor_indicators
-
 - title: Utilities
   desc: Helper and validation functions
   contents:
   - validate_pnadc
-  - adjust_weights_bayesian
 
 home:
   links:

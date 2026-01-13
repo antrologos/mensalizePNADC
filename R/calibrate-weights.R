@@ -70,7 +70,7 @@
 #'
 #' @param verbose Logical. Print progress messages? Default TRUE.
 #'
-#' @seealso \code{\link{identify_reference_month}}, \code{\link{calibrate_to_sidra}}
+#' @seealso \code{\link{identify_reference_month}}, \code{\link{mensalizePNADC}}
 #'
 #' @export
 calibrate_monthly_weights <- function(data, monthly_totals, n_cells = 4L,

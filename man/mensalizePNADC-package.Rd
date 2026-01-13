@@ -17,13 +17,12 @@ The package offers two main capabilities:
 each quarter each survey observation refers to, using IBGE's "Parada Tecnica"
 rules and respondent birthdates
 \item \strong{Monthly weight computation}: Adjusts survey weights for monthly
-(instead of quarterly) estimates using customized calibration
+(instead of quarterly) estimates using hierarchical rake weighting
 }
 
 The package is highly optimized for large datasets: approximately 1 minute to
 process 28.4 million rows (450,000 rows/sec), with 97.0 percent determination
-rate (identical to Stata implementation). Uses pre-computed lookup tables for
-20x faster date creation.
+rate. Uses pre-computed lookup tables for 20x faster date creation.
 
 The main function is \code{\link{mensalizePNADC}}, which processes stacked
 quarterly PNADC data and returns a crosswalk for joining with original data.

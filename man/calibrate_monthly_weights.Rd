@@ -86,5 +86,5 @@ result <- calibrate_monthly_weights(merged, monthly_pop)
 
 }
 \seealso{
-\code{\link{identify_reference_month}}, \code{\link{calibrate_to_sidra}}
+\code{\link{identify_reference_month}}, \code{\link{mensalizePNADC}}
 }

@@ -296,7 +296,6 @@ For the full algorithm explanation, see [How mensalizePNADC Works](how-it-works.
 | `identify_reference_month()` | Just reference month identification |
 | `calibrate_monthly_weights()` | Rake weighting for monthly weights |
 | `smooth_monthly_aggregates()` | Remove quarterly artifacts from series |
-| `calibrate_to_sidra()` | Optional Bayesian calibration to match SIDRA |
 | `fetch_monthly_population()` | Fetch population from SIDRA API |
 | `validate_pnadc()` | Input data validation |
 

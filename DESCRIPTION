@@ -15,8 +15,7 @@ Description: Identifies reference months in Brazil's quarterly PNADC (Pesquisa
     Tecnica" (technical break) rules combined with respondent birthdates to
     determine which month each survey observation refers to. For users needing
     monthly aggregate estimates, the package also provides hierarchical weight
-    calibration and Bayesian adjustment to produce monthly-appropriate survey
-    weights.
+    calibration to produce monthly-appropriate survey weights.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -25,9 +24,9 @@ Depends:
     R (>= 4.0.0)
 Imports:
     data.table (>= 1.14.0),
-    checkmate (>= 2.0.0),
-    sidrar (>= 0.2.9)
+    checkmate (>= 2.0.0)
 Suggests:
+    sidrar (>= 0.2.9),
     dplyr,
     haven,
     testthat (>= 3.0.0),

@@ -1,7 +1,6 @@
 #' @title Date Utility Functions
-#' @description Internal helper functions for date calculations, designed to
-#'   match Stata's date handling conventions. Optimized with pre-computed
-#'   lookup tables for fast date creation (~20x faster than ISOdate).
+#' @description Internal helper functions for date calculations. Optimized with
+#'   pre-computed lookup tables for fast date creation (~20x faster than ISOdate).
 #' @name utils-dates
 #' @keywords internal
 NULL
@@ -27,9 +26,9 @@ NULL
 # Leap year (Feb has 29 days)
 .MONTH_OFFSET_LEAP <- c(0L, 31L, 60L, 91L, 121L, 152L, 182L, 213L, 244L, 274L, 305L, 335L)
 
-#' Day of Week (Stata-compatible)
+#' Day of Week
 #'
-#' Returns the day of week for a date, matching Stata's `dow()` function.
+#' Returns the day of week for a date.
 #' Uses fast integer arithmetic instead of format().
 #'
 #' @param date A Date object or vector of Dates
@@ -40,18 +39,6 @@ dow <- function(date) {
   # R's origin is 1970-01-01 which was a Thursday (dow=4)
   # Use modular arithmetic: (days_since_origin + 4) %% 7
   (as.integer(date) + 4L) %% 7L
-}
-
-#' First Day of Month
-#'
-#' Returns the first day of the month for a given date.
-#'
-#' @param date A Date object or vector of Dates
-#' @return Date vector with day set to 1
-#' @keywords internal
-#' @noRd
-first_of_month <- function(date) {
-  as.Date(paste(format(date, "%Y-%m"), "01", sep = "-"))
 }
 
 #' Create Date from Year, Month, Day (Optimized)
@@ -114,7 +101,6 @@ make_date <- function(year, month, day) {
 #' Handle February 29 Birthdays
 #'
 #' For leap year birthdays (Feb 29), returns March 1 in non-leap years.
-#' This matches the Stata code's handling of these edge cases.
 #'
 #' Note: With the optimized make_date(), Feb 29 on non-leap years
 #' automatically becomes March 1 via the lookup math, so this function
@@ -183,19 +169,6 @@ quarter_month_n <- function(quarter, n) {
   (quarter - 1L) * 3L + n
 }
 
-#' First Day of Quarter
-#'
-#' Returns the first day of a quarter.
-#'
-#' @param year Integer year
-#' @param quarter Integer quarter (1-4)
-#' @return Date
-#' @keywords internal
-#' @noRd
-first_of_quarter <- function(year, quarter) {
-  make_date(year, quarter_months(quarter)[1], 1L)
-}
-
 #' Create Year-Month Integer (YYYYMM format)
 #'
 #' Creates an integer in YYYYMM format from year and month.
@@ -207,20 +180,6 @@ first_of_quarter <- function(year, quarter) {
 #' @noRd
 yyyymm <- function(year, month) {
   as.integer(year * 100L + month)
-}
-
-#' Extract Year-Month from Date
-#'
-#' Extracts YYYYMM integer from a Date.
-#'
-#' @param date Date vector
-#' @return Integer vector in YYYYMM format
-#' @keywords internal
-#' @noRd
-date_to_yyyymm <- function(date) {
-  year <- fast_year(date)
-  month <- fast_month(date)
-  yyyymm(year, month)
 }
 
 #' Fast Year Extraction
@@ -338,14 +297,3 @@ month_in_quarter <- function(date) {
   ((month - 1L) %% 3L) + 1L
 }
 
-#' Quarter from Month
-#'
-#' Returns the quarter (1-4) for a given month.
-#'
-#' @param month Integer month (1-12)
-#' @return Integer quarter (1-4)
-#' @keywords internal
-#' @noRd
-month_to_quarter <- function(month) {
-  ((month - 1L) %/% 3L) + 1L
-}

@@ -16,7 +16,7 @@ The `mensalizePNADC` package identifies reference months in Brazil's quarterly P
 **Why mensalization?** PNADC quarterly statistics are actually moving averages of three months. Mensalization recovers the specific month each observation refers to, enabling true monthly labor market analysis.
 
 - **97% determination rate** on 28.4M observations (2012-2025)
-- **Identical results** to Stata implementation by Marcos Hecksher
+- **Validated methodology** based on Hecksher (2024)
 - **Fast**: ~1 minute for 28M rows
 
 ## Installation
@@ -57,7 +57,7 @@ For complete examples and required input columns, see the [Get Started guide](ht
 
 ## Authors
 
-- **Marcos Hecksher** - Original methodology and Stata implementation
+- **Marcos Hecksher** - Original methodology
 - **Rogerio Barbosa** - R package maintainer
 
 ## References

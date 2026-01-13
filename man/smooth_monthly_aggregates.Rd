@@ -66,5 +66,5 @@ smoothed <- smooth_monthly_aggregates(monthly_agg)
 
 }
 \seealso{
-\code{\link{calibrate_monthly_weights}}, \code{\link{calibrate_to_sidra}}
+\code{\link{calibrate_monthly_weights}}, \code{\link{mensalizePNADC}}
 }
