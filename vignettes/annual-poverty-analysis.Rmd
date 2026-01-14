@@ -544,27 +544,44 @@ monthly_poverty[, poverty_rate_smoothed :=
 
 ## Validation
 
-How do our monthly estimates compare to official statistics? We can aggregate monthly values to annual averages and compare:
+Does mensalization introduce systematic bias? We can check by comparing mensalized monthly estimates (aggregated to annual) against direct annual estimates computed from the same PNADC annual data using original survey weights:
 
 ```{r validation}
-# Aggregate monthly to annual
+# 1. Aggregate monthly estimates to annual
 annual_from_monthly <- monthly_poverty[, .(
   ano = ref_month_yyyymm %/% 100,
   poverty_rate_media
 )][, .(
   monthly_avg = mean(poverty_rate_media, na.rm = TRUE)
 ), by = ano]
+
+# 2. Compute direct annual estimates (no mensalization)
+d_annual_valid <- d[!is.na(rendaDom_mista_pc) &
+                    !is.na(v1032) &
+                    rendaDom_mista_pc >= 0]
+
+annual_direct <- d_annual_valid[, .(
+  direct_estimate = fgt(
+    x = rendaDom_mista_pc,
+    z = linhaPobreza_WB_media,
+    w = v1032,
+    alpha = 0
+  )
+), by = ano]
+
+# 3. Compare
+validation_data <- merge(annual_from_monthly, annual_direct, by = "ano")
 ```
 
-![Validation: Monthly Estimates vs Annual Averages](figures/annual-poverty-analysis/fig-validation.png){width=100%}
+![Validation: Mensalized vs Direct Annual Estimates](figures/annual-poverty-analysis/fig-validation.png){width=100%}
 
-Small discrepancies between our estimates and official IBGE statistics are expected due to:
+The high correlation and tight clustering around the diagonal confirm that mensalization preserves annual-level estimates while enabling monthly disaggregation. Small discrepancies are expected due to:
 
 - **Determination rate**: ~3% of observations lack determined reference months
 - **Weight calibration**: Monthly weights are recalibrated to external population totals
-- **Income variable construction**: Minor differences in how household income is aggregated
+- **Averaging method**: Monthly series averaged vs. single annual calculation
 
-For most research purposes, discrepancies of 1-2 percentage points are acceptable.
+For most research purposes, discrepancies under 2% relative difference are acceptable.
 
 ---
 

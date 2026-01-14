@@ -730,22 +730,42 @@ report raw estimates for specific months of interest.</p>
 <div class="section level2">
 <h2 id="validation">Validation<a class="anchor" aria-label="anchor" href="#validation"></a>
 </h2>
-<p>How do our monthly estimates compare to official statistics? We can
-aggregate monthly values to annual averages and compare:</p>
+<p>Does mensalization introduce systematic bias? We can check by
+comparing mensalized monthly estimates (aggregated to annual) against
+direct annual estimates computed from the same PNADC annual data using
+original survey weights:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Aggregate monthly to annual</span></span>
+<code class="sourceCode R"><span><span class="co"># 1. Aggregate monthly estimates to annual</span></span>
 <span><span class="va">annual_from_monthly</span> <span class="op">&lt;-</span> <span class="va">monthly_poverty</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
 <span>  ano <span class="op">=</span> <span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">100</span>,</span>
 <span>  <span class="va">poverty_rate_media</span></span>
 <span><span class="op">)</span><span class="op">]</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
 <span>  monthly_avg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">poverty_rate_media</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ano</span><span class="op">]</span></span></code></pre></div>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ano</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># 2. Compute direct annual estimates (no mensalization)</span></span>
+<span><span class="va">d_annual_valid</span> <span class="op">&lt;-</span> <span class="va">d</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">rendaDom_mista_pc</span><span class="op">)</span> <span class="op">&amp;</span></span>
+<span>                    <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">v1032</span><span class="op">)</span> <span class="op">&amp;</span></span>
+<span>                    <span class="va">rendaDom_mista_pc</span> <span class="op">&gt;=</span> <span class="fl">0</span><span class="op">]</span></span>
+<span></span>
+<span><span class="va">annual_direct</span> <span class="op">&lt;-</span> <span class="va">d_annual_valid</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  direct_estimate <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span></span>
+<span>    x <span class="op">=</span> <span class="va">rendaDom_mista_pc</span>,</span>
+<span>    z <span class="op">=</span> <span class="va">linhaPobreza_WB_media</span>,</span>
+<span>    w <span class="op">=</span> <span class="va">v1032</span>,</span>
+<span>    alpha <span class="op">=</span> <span class="fl">0</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ano</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># 3. Compare</span></span>
+<span><span class="va">validation_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">annual_from_monthly</span>, <span class="va">annual_direct</span>, by <span class="op">=</span> <span class="st">"ano"</span><span class="op">)</span></span></code></pre></div>
 <div class="float">
-<img src="figures/annual-poverty-analysis/fig-validation.png" style="width:100.0%" alt="Validation: Monthly Estimates vs Annual Averages"><div class="figcaption">Validation: Monthly Estimates vs Annual
-Averages</div>
+<img src="figures/annual-poverty-analysis/fig-validation.png" style="width:100.0%" alt="Validation: Mensalized vs Direct Annual Estimates"><div class="figcaption">Validation: Mensalized vs Direct Annual
+Estimates</div>
 </div>
-<p>Small discrepancies between our estimates and official IBGE
-statistics are expected due to:</p>
+<p>The high correlation and tight clustering around the diagonal confirm
+that mensalization preserves annual-level estimates while enabling
+monthly disaggregation. Small discrepancies are expected due to:</p>
 <ul>
 <li>
 <strong>Determination rate</strong>: ~3% of observations lack
@@ -754,11 +774,11 @@ determined reference months</li>
 <strong>Weight calibration</strong>: Monthly weights are
 recalibrated to external population totals</li>
 <li>
-<strong>Income variable construction</strong>: Minor differences in
-how household income is aggregated</li>
+<strong>Averaging method</strong>: Monthly series averaged
+vs. single annual calculation</li>
 </ul>
-<p>For most research purposes, discrepancies of 1-2 percentage points
-are acceptable.</p>
+<p>For most research purposes, discrepancies under 2% relative
+difference are acceptable.</p>
 <hr>
 </div>
 <div class="section level2">
