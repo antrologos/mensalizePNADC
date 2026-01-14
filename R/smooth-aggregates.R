@@ -104,6 +104,7 @@ smooth_monthly_aggregates <- function(monthly_aggregates,
 #' Smooth Single Variable
 #'
 #' Applies the moving average smoothing algorithm to a single indicator variable.
+#' OPTIMIZED: Uses vectorized operations instead of row-by-row loops.
 #'
 #' @param dt data.table with monthly aggregates
 #' @param z_var Name of input variable (z_ prefix)
@@ -130,23 +131,19 @@ smooth_single_variable <- function(dt, z_var, m_var, cal_start, cal_end) {
   # d3[t] = 3 * (value[t] - value[t-1])
   d3 <- c(NA_real_, 3 * diff(values))
 
-  # Step 2: Split by month position
+  # Steps 2-3: OPTIMIZED - Cumulative sum by month position using data.table
+  # Instead of split/lapply/reconstruct, use native grouped cumsum
   month_pos <- dt$month_pos
-  d3_by_pos <- split(d3, month_pos)
-
-  # Step 3: Cumulative sum within each position
-  cum_by_pos <- lapply(d3_by_pos, function(x) {
-    result <- cumsum(ifelse(is.na(x), 0, x))
-    result[is.na(x)] <- NA
-    result
-  })
-
-  # Reconstruct cumulative sum in original order
-  cum_values <- numeric(n)
-  for (pos in 1:3) {
-    idx <- which(month_pos == pos)
-    cum_values[idx] <- cum_by_pos[[as.character(pos)]]
-  }
+  dt_temp <- data.table::data.table(
+    d3 = d3,
+    month_pos = month_pos,
+    row_idx = seq_len(n)
+  )
+  dt_temp[, d3_filled := data.table::fifelse(is.na(d3), 0, d3)]
+  dt_temp[, cum_values := cumsum(d3_filled), by = month_pos]
+  dt_temp[is.na(d3), cum_values := NA_real_]
+  data.table::setorder(dt_temp, row_idx)
+  cum_values <- dt_temp$cum_values
 
   # Step 4: Calculate residual from intermediate series (during calibration period)
   # Scale factor: values are typically in thousands, we work in base units
@@ -158,53 +155,48 @@ smooth_single_variable <- function(dt, z_var, m_var, cal_start, cal_end) {
   e0 <- scaled_values - cum_values
   e0[!in_cal] <- NA
 
-  # Step 5: Calculate mean residual by month position (during calibration)
-  y0 <- numeric(n)
-  for (pos in 1:3) {
-    idx <- which(month_pos == pos)
-    mean_e0 <- mean(e0[idx], na.rm = TRUE)
-    y0[idx] <- ifelse(is.finite(mean_e0), mean_e0, 0)
-  }
+  # Step 5: OPTIMIZED - Calculate mean residual by month position using data.table
+  dt_temp[, e0 := e0]
+  dt_temp[, mean_e0 := mean(e0, na.rm = TRUE), by = month_pos]
+  dt_temp[!is.finite(mean_e0), mean_e0 := 0]
+  y0 <- dt_temp$mean_e0
 
   # Step 6: Adjusted values
   y <- y0 + cum_values
 
-  # Step 7: Moving average correction
-  # The correction ensures smooth series matches quarterly totals
-  m_values <- numeric(n)
+  # Step 7: OPTIMIZED - Moving average correction using vectorized shift operations
+  # Pre-compute shifted values
+  y_lead1 <- data.table::shift(y, n = 1L, type = "lead")
+  y_lead2 <- data.table::shift(y, n = 2L, type = "lead")
+  y_lag1 <- data.table::shift(y, n = 1L, type = "lag")
+  y_lag2 <- data.table::shift(y, n = 2L, type = "lag")
 
-  for (i in seq_len(n)) {
-    pos <- month_pos[i]
+  # Pre-compute quarterly averages for each position type (vectorized)
+  quarterly_avg_pos1 <- (y + y_lead1 + y_lead2) / 3  # pos 1: look forward 2
+  quarterly_avg_pos2 <- (y_lag1 + y + y_lead1) / 3   # pos 2: look back 1, forward 1
+  quarterly_avg_pos3 <- (y_lag2 + y_lag1 + y) / 3    # pos 3: look back 2
 
-    if (pos == 1L) {
-      # First month of quarter: look forward 2 months
-      if (i + 2 <= n) {
-        quarterly_ref <- values[i + 2] / scale
-        quarterly_avg <- mean(y[i:(i+2)], na.rm = TRUE)
-        m_values[i] <- y[i] + quarterly_ref - quarterly_avg
-      } else {
-        m_values[i] <- y[i]
-      }
-    } else if (pos == 2L) {
-      # Second month: look forward 1, back 1
-      if (i + 1 <= n && i - 1 >= 1) {
-        quarterly_ref <- values[i + 1] / scale
-        quarterly_avg <- mean(y[(i-1):(i+1)], na.rm = TRUE)
-        m_values[i] <- y[i] + quarterly_ref - quarterly_avg
-      } else {
-        m_values[i] <- y[i]
-      }
-    } else {
-      # Third month: look back 2 months
-      if (i - 2 >= 1) {
-        quarterly_ref <- values[i] / scale
-        quarterly_avg <- mean(y[(i-2):i], na.rm = TRUE)
-        m_values[i] <- y[i] + quarterly_ref - quarterly_avg
-      } else {
-        m_values[i] <- y[i]
-      }
-    }
-  }
+  # Pre-compute quarterly references (scaled values at appropriate positions)
+  values_lead2 <- data.table::shift(values, n = 2L, type = "lead")
+  values_lead1 <- data.table::shift(values, n = 1L, type = "lead")
+
+  # Vectorized conditional calculation using fcase
+  m_values <- data.table::fcase(
+    # Position 1: look forward 2 months
+    month_pos == 1L & !is.na(y_lead2),
+    y + values_lead2 / scale - quarterly_avg_pos1,
+
+    # Position 2: look forward 1, back 1
+    month_pos == 2L & !is.na(y_lead1) & !is.na(y_lag1),
+    y + values_lead1 / scale - quarterly_avg_pos2,
+
+    # Position 3: look back 2 months
+    month_pos == 3L & !is.na(y_lag2),
+    y + values / scale - quarterly_avg_pos3,
+
+    # Default: use y when conditions not met
+    default = y
+  )
 
   # Scale back
   dt[[m_var]] <- m_values * scale

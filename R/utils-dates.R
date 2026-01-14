@@ -11,12 +11,11 @@ NULL
 # ============================================================================
 
 # Days since 1970-01-01 for January 1st of each year (2000-2050)
+# OPTIMIZATION: Use plain integer vector with offset indexing instead of named lookup
+.YEAR_BASE_START <- 2000L
 .YEAR_BASE <- local({
   years <- 2000:2050
-  setNames(
-    sapply(years, function(y) as.integer(as.Date(paste0(y, "-01-01")))),
-    as.character(years)
-  )
+  sapply(years, function(y) as.integer(as.Date(paste0(y, "-01-01"))))
 })
 
 # Cumulative days at the start of each month (0-indexed from Jan 1)
@@ -78,8 +77,8 @@ make_date <- function(year, month, day) {
     m <- month[valid]
     d <- day[valid]
 
-    # Year base lookup (days since 1970-01-01 for Jan 1 of each year)
-    year_base <- .YEAR_BASE[as.character(y)]
+    # OPTIMIZATION: Use integer offset indexing instead of character lookup
+    year_base <- .YEAR_BASE[y - .YEAR_BASE_START + 1L]
 
     # Leap year check (vectorized)
     is_leap <- (y %% 4L == 0L & y %% 100L != 0L) | (y %% 400L == 0L)
@@ -185,41 +184,35 @@ yyyymm <- function(year, month) {
 #' Fast Year Extraction
 #'
 #' Extract year from Date using data.table's optimized function.
-#' Note: data.table is a package dependency, so no need to check availability.
+#' OPTIMIZATION: Direct alias to avoid function call overhead.
 #'
 #' @param date Date vector
 #' @return Integer vector of years
 #' @keywords internal
 #' @noRd
-fast_year <- function(date) {
-  data.table::year(date)
-}
+fast_year <- data.table::year
 
 #' Fast Month Extraction
 #'
 #' Extract month from Date using data.table's optimized function.
-#' Note: data.table is a package dependency, so no need to check availability.
+#' OPTIMIZATION: Direct alias to avoid function call overhead.
 #'
 #' @param date Date vector
 #' @return Integer vector of months
 #' @keywords internal
 #' @noRd
-fast_month <- function(date) {
-  data.table::month(date)
-}
+fast_month <- data.table::month
 
 #' Fast Day Extraction
 #'
 #' Extract day of month from Date using data.table's optimized function.
-#' Note: data.table is a package dependency, so no need to check availability.
+#' OPTIMIZATION: Direct alias to avoid function call overhead.
 #'
 #' @param date Date vector
 #' @return Integer vector of days
 #' @keywords internal
 #' @noRd
-fast_mday <- function(date) {
-  data.table::mday(date)
-}
+fast_mday <- data.table::mday
 
 #' First Saturday of Month (with minimum days constraint)
 #'

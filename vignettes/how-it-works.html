@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>How mensalizePNADC Works</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">How mensalizePNADC Works</h1>
+
+
+
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>This vignette explains <strong>how the mensalizePNADC algorithm
+works</strong>: the methodology behind identifying reference months and
+computing monthly weights. For practical usage examples, see the <a href="getting-started.html">Get Started</a> vignette.</p>
+<p>The <code>mensalizePNADC</code> package converts Brazil’s quarterly
+PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data
+into monthly time series. It provides two main capabilities:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Reference month identification</strong>: Determines which
+month within each quarter each survey observation refers to</li>
+<li><strong>Monthly weight computation</strong>: Adjusts survey weights
+for monthly (instead of quarterly) estimates</li>
+</ol>
+<hr />
+</div>
+<div id="quick-reference" class="section level2">
+<h2>Quick Reference</h2>
+<div id="required-input-variables" class="section level3">
+<h3>Required Input Variables</h3>
+<p><strong>Minimum (for reference month identification):</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Ano</code></td>
+<td>Survey year</td>
+</tr>
+<tr class="even">
+<td><code>Trimestre</code></td>
+<td>Quarter (1-4)</td>
+</tr>
+<tr class="odd">
+<td><code>UPA</code></td>
+<td>Primary Sampling Unit</td>
+</tr>
+<tr class="even">
+<td><code>V1014</code></td>
+<td>Panel identifier</td>
+</tr>
+<tr class="odd">
+<td><code>V1008</code></td>
+<td>Household identifier</td>
+</tr>
+<tr class="even">
+<td><code>V2003</code></td>
+<td>Person identifier</td>
+</tr>
+<tr class="odd">
+<td><code>V2008</code></td>
+<td>Birth day (1-31, or 99 for unknown)</td>
+</tr>
+<tr class="even">
+<td><code>V20081</code></td>
+<td>Birth month (1-12, or 99 for unknown)</td>
+</tr>
+<tr class="odd">
+<td><code>V20082</code></td>
+<td>Birth year (or 9999 for unknown)</td>
+</tr>
+<tr class="even">
+<td><code>V2009</code></td>
+<td>Age</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Additional (for
+<code>compute_weights = TRUE</code>):</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>V1028</code></td>
+<td>Original quarterly survey weight</td>
+</tr>
+<tr class="even">
+<td><code>UF</code></td>
+<td>State code</td>
+</tr>
+<tr class="odd">
+<td><code>posest</code></td>
+<td>Post-stratification cell</td>
+</tr>
+<tr class="even">
+<td><code>posest_sxi</code></td>
+<td>Post-stratification group</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="output-variables" class="section level3">
+<h3>Output Variables</h3>
+<table>
+<colgroup>
+<col width="34%" />
+<col width="20%" />
+<col width="44%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ref_month</code></td>
+<td>Date</td>
+<td>First day of reference month (e.g., “2023-01-01”)</td>
+</tr>
+<tr class="even">
+<td><code>ref_month_in_quarter</code></td>
+<td>Integer</td>
+<td>Position: 1, 2, 3, or NA if indeterminate</td>
+</tr>
+<tr class="odd">
+<td><code>ref_month_yyyymm</code></td>
+<td>Integer</td>
+<td>YYYYMM format (e.g., 202301)</td>
+</tr>
+<tr class="even">
+<td><code>weight_monthly</code></td>
+<td>Numeric</td>
+<td>Monthly weight (if <code>compute_weights = TRUE</code>); NA for
+indeterminate</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="functions" class="section level3">
+<h3>Functions</h3>
+<table>
+<colgroup>
+<col width="43%" />
+<col width="56%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mensalizePNADC()</code></td>
+<td>Main function: identify months + optional weights</td>
+</tr>
+<tr class="even">
+<td><code>identify_reference_month()</code></td>
+<td>Just reference month identification</td>
+</tr>
+<tr class="odd">
+<td><code>calibrate_monthly_weights()</code></td>
+<td>Rake weighting for monthly weights</td>
+</tr>
+<tr class="even">
+<td><code>smooth_monthly_aggregates()</code></td>
+<td>Remove quarterly artifacts from series</td>
+</tr>
+<tr class="odd">
+<td><code>fetch_monthly_population()</code></td>
+<td>Fetch population from SIDRA API</td>
+</tr>
+<tr class="even">
+<td><code>validate_pnadc()</code></td>
+<td>Input data validation</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="performance-summary" class="section level3">
+<h3>Performance Summary</h3>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Overall determination rate</td>
+<td><strong>97.0%</strong></td>
+</tr>
+<tr class="even">
+<td>Processing time (basic mode)</td>
+<td><strong>~1 minute</strong> for 28.4M rows (~450,000 rows/sec)</td>
+</tr>
+<tr class="odd">
+<td>Processing time (with weights)</td>
+<td><strong>~5 minutes</strong></td>
+</tr>
+<tr class="even">
+<td>Best period (2013-2019)</td>
+<td>96-99% determination</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</div>
+</div>
+<div id="why-stacked-data-matters" class="section level2">
+<h2>Why Stacked Data Matters</h2>
+<p>The algorithm achieves <strong>97.0% determination rate</strong> when
+processing <strong>stacked multi-quarter data</strong>. If you process
+quarters individually, you’ll only get ~65-75% determination.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Processing Mode</th>
+<th>Determination Rate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Per-quarter (single quarter)</td>
+<td>65-75%</td>
+</tr>
+<tr class="even">
+<td>Stacked (multi-quarter)</td>
+<td><strong>97.0%</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why?</strong> PNADC uses a <strong>rotating panel</strong>
+where each household (UPA + V1014) is interviewed for 5 consecutive
+quarters. Crucially, the same household is always interviewed in the
+<strong>same relative month position</strong> (always month 1, always
+month 2, or always month 3).</p>
+<p>This means birthday constraints from <strong>any quarter</strong> can
+determine the month for <strong>all quarters</strong>:</p>
+<pre><code>UPA=123456, V1014=1 appears in 5 quarters:
+
+  2023-Q1: month_min=1, month_max=2 (ambiguous: Jan or Feb)
+  2023-Q2: month_min=1, month_max=3 (ambiguous: Apr, May, or Jun)
+  2023-Q3: month_min=2, month_max=2 (DETERMINED: August)  ← Birthday constraint!
+  2023-Q4: month_min=1, month_max=2 (ambiguous: Oct or Nov)
+  2024-Q1: month_min=2, month_max=3 (ambiguous: Feb or Mar)
+
+Cross-quarter aggregation:
+  upa_month_min = max(1, 1, 2, 1, 2) = 2
+  upa_month_max = min(2, 3, 2, 2, 3) = 2
+
+Result: ALL 5 quarters → ref_month_in_quarter = 2</code></pre>
+<p><strong>Recommended</strong>: Stack at least 2 years of quarterly
+data before calling <code>mensalizePNADC()</code>.</p>
+<hr />
+</div>
+<div id="the-algorithm-explained" class="section level2">
+<h2>The Algorithm Explained</h2>
+<div id="overview-diagram" class="section level3">
+<h3>Overview Diagram</h3>
+<p>The reference month identification follows a 7-step pipeline:</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                    REFERENCE MONTH IDENTIFICATION PIPELINE                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+INPUTS (per observation):
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│     Year     │  │    Quarter   │  │    Birthday  │  │      Age     │
+│    (Ano)     │  │  (Trimestre) │  │  (V2008/1/2) │  │    (V2009)   │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+        │                │                  │                 │
+        ▼                ▼                  ▼                 ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1a: Calculate Valid Interview Weeks                                    │
+│          (IBGE &quot;Parada Tecnica&quot; Rules)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  IBGE Rule: A reference week belongs to a month only if it has at least     │
+│  4 days within the month.                                                   │
+│                                                                             │
+|  So, for finding the first reference week of IBGE interviews find the       |
+|  Saturday of that month and count how many days it has been since 1st day.  |
+│                                                                             │
+|  If ≥4 days, that is considered a valid reference week.                     |
+|  If less than 3 days, that short week will be considered a &quot;technical stop&quot; | 
+|  Then skip to the next (second) Saturday                                    |
+│                                                                             │
+│  Saturdays are the reference day of each reference week. They are the dates |
+|  the IBGE interviewers refer to in questions involving precise timing. So   │
+│  the first Saturday of each month is also the first valid interview date    │
+│  for that month                                                             │
+│                                                                             │
+│  OUTPUT: First reference day of Months 1, 2, and 3 of the quarter           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1b: Calculate the range of possible interview dates for each quarter   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Interviews (i.e. valid reference dates for interviews) within a quarter    │
+│  can only have happened from the first valid Saturday of Month 1 up to the  │
+│  last Saturday of Month 3 -- i.e. First Saturday of Month 3 + 21 days       │
+│  (since reference weeks end on Saturdays). This gives us date bounds.       │   
+│                                                                             │
+│  OUTPUT: date_min = First Saturday of Month 1                               │
+│          date_max = First Saturday of Month 3 + 21 days                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: Apply Birthday Constraints                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Compare (Survey_Year - Birth_Year) with Reported_Age to determine if       │
+│  interview was BEFORE or AFTER the person&#39;s birthday this year.             │
+│                                                                             │
+|  The goal is to Narrow the possible interview date window using each        |
+|  person’s birthday and calculated age (by IBGE on the reference date of     |
+|  the interview, which is the Saturday that ends the reference week).        |│                                                                             │
+│  If AFTER birthday  -&gt; date_min = max(date_min, Sat_after_birthday)         │
+│  If BEFORE birthday -&gt; date_max = min(date_max, Sat_before_birthday)        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Convert Date Ranges to Month Positions (1, 2, or 3)                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  month_min_pos = which month does date_min fall in?                         │
+│  month_max_pos = which month does date_max fall in?                         │
+│                                                                             │
+│  Special handling: Weeks in which Saturdays fall on the 1st to 3rd day of   │
+│  a month are assigned to the previous month.                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: Aggregate to UPA-Panel Level                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  All people in same (UPA, V1014) are interviewed in the SAME MONTH.         │
+│  Take intersection of all individual constraints:                           │
+│                                                                             │
+│    upa_month_min = max(all individual month_min_pos)                        │
+│    upa_month_max = min(all individual month_max_pos)                        │
+│                                                                             │
+│  If upa_month_min = upa_month_max -&gt; DETERMINED!                            │
+│  If upa_month_min &lt; upa_month_max -&gt; Still ambiguous, try Step 5            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: Cross-Quarter Aggregation                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PNADC uses ROTATING PANEL: same (UPA, V1014) interviewed in SAME MONTH     │
+│  POSITION across all quarterly visits (up to 5 consecutive quarters).       │
+│                                                                             │
+│  Combine constraints from ALL quarters -&gt; dramatically improves accuracy:   │
+│                                                                             │
+│    Per-quarter only:  ~65-75% determination                                 │
+│    Cross-quarter:     ~97.0% determination                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 6: Dynamic Exception Detection                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Algorithm DYNAMICALLY detects which quarters need relaxed timing rules:    │
+│                                                                             │
+│  1. Calculate positions using STANDARD rules (&gt;=4 days, day &lt;=3 threshold)  │
+│  2. Calculate positions using ALTERNATIVE rules (&gt;=3 days, day &lt;=2)         │
+│  3. Detect: if standard produces min&gt;max but alternative would work         │
+│  4. Propagate: if ANY UPA needs exception -&gt; apply to ALL in that quarter   │
+│                                                                             │
+│  Known exception quarters up to 2025q3 (detected automatically):            │
+│  2016q3, 2016q4, 2017q2, 2022q3, 2023q2, 2024q1.                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 7: Final Month Assignment                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  After applying exceptions and recalculating:                               │
+│  If upa_month_min == upa_month_max -&gt; Reference month DETERMINED            │
+│  Otherwise -&gt; remains NA (indeterminate, ~3% of observations)               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ OUTPUT                                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ref_month_in_quarter: 1, 2, 3, or NA (indeterminate)                       │
+│  ref_month:            Full date (e.g., 2023-02-01)                         │
+│  ref_month_yyyymm:     Integer format (e.g., 202302)                        │
+└─────────────────────────────────────────────────────────────────────────────┘</code></pre>
+<hr />
+</div>
+<div id="step-1-valid-interview-saturdays-ibge-rules" class="section level3">
+<h3>Step 1: Valid Interview Saturdays (IBGE Rules)</h3>
+<p>As previously stated, IBGE defines that a reference week belongs to a
+month only if it has at least <strong>4 days within that month</strong>.
+Since reference weeks end on Saturdays, we look at the Saturdays of each
+month to determine valid interview dates.</p>
+<p><strong>How we calculate the first valid Saturday:</strong></p>
+<pre><code>first_saturday_day = day of the first Saturday of the month
+if first_saturday_day &gt;= 4:
+    use this Saturday (it has enough days in the month)
+else:
+    use the second Saturday (first_saturday_day + 7)</code></pre>
+<p><strong>Example for Q1 2023:</strong></p>
+<pre><code>JANUARY 2023:
+  Sun  Mon  Tue  Wed  Thu  Fri  SAT
+   1    2    3    4    5    6   [7]  &lt;- First Saturday is day 7
+                                     7 &gt;= 4? YES -&gt; Valid! (7 days in January)
+
+FEBRUARY 2023:
+  Wed  Thu  Fri  SAT  ...
+   1    2    3   [4]              &lt;- First Saturday is day 4
+                                  4 &gt;= 4? YES -&gt; Valid! (4 days in February)
+
+APRIL 2023:
+  SAT  Sun  Mon  Tue  ...
+  [1]   2    3    4              &lt;- First Saturday is day 1
+                                  1 &gt;= 4? NO -&gt; Skip to second Saturday!
+  Fri  SAT  Sun  ...
+   7   [8]   9                   &lt;- Use day 8 instead</code></pre>
+<p>The valid Saturday calculation defines the <strong>possible interview
+date range</strong> for the quarter: - <code>date_min</code> = First
+valid Saturday of Month 1 - <code>date_max</code> = First valid Saturday
+of Month 3 + 21 days</p>
+<hr />
+</div>
+<div id="step-2-birthday-constraints" class="section level3">
+<h3>Step 2: Birthday Constraints</h3>
+<p>IBGE calculates age precisely using the precise birthdate and the
+interview reference date (and most persons inform birthdates). In other
+words, IBGE <strong>calculates age on the Saturday</strong> that ends
+the reference week of the interview.</p>
+<p>So, comparing the calculated age to the birth year, we can determine
+if the interview (i.e. the reference date) happened before or after the
+person’s birthday that year. This allows us to further narrow down the
+possible interview date window.</p>
+<pre><code>visit_before_birthday = (Survey_Year - Birth_Year) - Calculated_Age
+
+If = 0: Interview was AFTER birthday (person already celebrated this year)
+If = 1: Interview was BEFORE birthday (birthday hasn&#39;t happened yet)</code></pre>
+<p><strong>Example: Interview AFTER birthday</strong></p>
+<pre><code>Person: Born March 15, 1990
+Survey Year and quarter: 2023 Q1
+Calculated Age: 33
+
+Check age: 2023 - 1990 = 33
+           33 - 33 = 0  -&gt; Interview was AFTER March 15, 2023
+
+Check first Saturday on or after birthday:
+           first_Saturday_on_or_after(March 15) = March 18, 2023
+
+New date constraints: 
+            date_min = max(date_min, first_Saturday_on_or_after(March 15))                        
+            date_min = max(Jan 7, March 18) = March 18
+
+This person can only have been interviewed in MARCH (Month 3 of Q1).</code></pre>
+<p><strong>Example: Interview BEFORE birthday</strong></p>
+<pre><code>Person: Born February 17, 1990
+Survey Year and quarter: 2023 Q1
+Calculated Age: 32
+
+Check age: 2023 - 1990 = 33
+           33 - 32 = 1  -&gt; Interview was BEFORE February 17, 2023
+
+Check first Saturday on or after birthday:
+           first_Saturday_on_or_after(February 17) = February 18, 2023
+
+Constraint: date_max = min(date_max, Saturday_before(February 17))
+            date_max = min(March 25, February 18) = February 18
+
+This person can only have been interviewed in JANUARY or FEBRUARY.</code></pre>
+<p><strong>Unknown birthdays</strong>: When V2008=99, V20081=99, or
+V20082=9999, that person’s birthday cannot constrain the date. However,
+they may still be determined through aggregation by UPA-Panel level
+(Step 4) or cross-quarter aggregation (Step 5).</p>
+<hr />
+</div>
+<div id="step-3-date-to-month-position" class="section level3">
+<h3>Step 3: Date to Month Position</h3>
+<p>Transform the date window [date_min, date_max] into month-in-quarter
+positions (1, 2, or 3).</p>
+<p><strong>Boundary handling</strong>: Interviews on days 1-3 of a month
+typically belong to a reference week that started in the previous
+month:</p>
+<pre><code>For date_min: if day &lt;= 3 AND not in first month of quarter:
+              subtract 1 from month position
+
+For date_max: if day &lt;= 3:
+              use the month of (date - 3 days) instead</code></pre>
+<hr />
+</div>
+<div id="step-4-upa-panel-aggregation" class="section level3">
+<h3>Step 4: UPA-Panel Aggregation</h3>
+<p>All people in the same <strong>UPA + V1014</strong> are interviewed
+together in the <strong>same reference month</strong>. Take the
+intersection:</p>
+<pre><code>upa_month_min = MAX of all individual month_min_pos
+upa_month_max = MIN of all individual month_max_pos</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code>A household located at UPA=123456 and member of the Panel group V1014=1 has 3 members:
+
+Person A: month_min=1, month_max=2 (could be Jan or Feb)
+Person B: month_min=1, month_max=3 (could be Jan, Feb, or Mar)
+Person C: month_min=2, month_max=3 (could be Feb or Mar)
+
+Aggregation:
+  upa_month_min = max(1, 1, 2) = 2
+  upa_month_max = min(2, 3, 3) = 2
+
+Result: min=2, max=2 -&gt; Reference month is FEBRUARY!
+
+Visual:
+              Jan    Feb    Mar
+Person A:     [=========]
+Person B:     [============]
+Person C:            [========]
+Intersection:        [==]      &lt;- Only February satisfies all</code></pre>
+<hr />
+</div>
+<div id="step-5-cross-quarter-aggregation" class="section level3">
+<h3>Step 5: Cross-Quarter Aggregation</h3>
+<p>Since the relative month position is constant across quarters,
+constraints from <strong>any</strong> quarter apply to
+<strong>all</strong> quarters:</p>
+<pre><code>For each (UPA, V1014) group across ALL quarters:
+  upa_month_min = MAX of all month_min_pos from all quarters
+  upa_month_max = MIN of all month_max_pos from all quarters</code></pre>
+<p>This is why processing stacked data improves determination from ~70%
+to ~97%.</p>
+<hr />
+</div>
+<div id="step-6-dynamic-exception-detection" class="section level3">
+<h3>Step 6: Dynamic Exception Detection</h3>
+<p>In some quarters, the standard rule (first reference week with ≥4
+days) may produce impossible results. For instance,
+<code>upa_month_min &gt; upa_month_max</code>. Quarters in which this
+happens are flagged as needing an exception. We then implement an
+<strong>alternative rule</strong>: first reference week with ≥3 days</p>
+<p><strong>How dynamic detection works</strong>: The algorithm
+calculates month positions using both rules simultaneously:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Rule</th>
+<th>First reference week</th>
+<th>Day Threshold</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Standard</td>
+<td>&gt;=4 days in month</td>
+<td>day &lt;= 3</td>
+</tr>
+<tr class="even">
+<td>Alternative</td>
+<td>&gt;=3 days in month</td>
+<td>day &lt;= 2</td>
+</tr>
+</tbody>
+</table>
+<p>Exceptions are detected and applied at the month level within each
+quarter. For example, in 2016q3, only month 3 (September) needs the
+exception – months 1 and 2 use the standard rule. Here’s why: under the
+standard rule, September’s first valid Saturday would be September 10th
+(since September 3rd has only 3 days in the month). But some UPA-V1014
+groups have constraints that require September 3rd to be valid. The
+exception rule (≥3 days instead of ≥4) makes September 3rd valid for
+these groups, assigning the week of August 28th-September 3rd to
+September’s reference month rather than August’s.</p>
+<p>And the algorithm proceeds as follows:</p>
+<pre><code>For each UPA-V1014:
+  1. Calculate upa_month_min/max using STANDARD rules
+  2. Also calculate alt_upa_month_min/max using ALTERNATIVE rules
+  3. If standard produces min &gt; max (impossible) BUT alternative works:
+     → This quarter requires an exception
+  4. Determine WHICH month within the quarter needs the exception:
+     - requires_exc_m1: Exception needed for month 1
+     - requires_exc_m2: Exception needed for month 2
+     - requires_exc_m3: Exception needed for month 3
+  5. PROPAGATE: If ANY UPA in the quarter needs exception for a month,
+     apply that exception to ALL observations in that quarter</code></pre>
+<p>Known exception quarters up to 2025q3: 2016q3, 2016q4, 2017q2,
+2022q3, 2023q2, 2024q1.</p>
+<hr />
+</div>
+<div id="step-7-final-assignment" class="section level3">
+<h3>Step 7: Final Assignment</h3>
+<p>After applying exceptions: if
+<code>upa_month_min == upa_month_max</code>, the reference month is
+determined. Otherwise, it remains NA.</p>
+<p><strong>What makes observations indeterminate (~3%)?</strong></p>
+<p>This occurs when the available birth date information in a (UPA,
+V1014) group is insufficient to narrow down the possibilities to a
+single month. Several factors contribute:</p>
+<ul>
+<li><strong>Incomplete panel coverage</strong>: Some UPAs may have fewer
+than the expected 5 visits in the dataset. The first and last 4 quarters
+of any consecutive series will naturally have more UPAs with incomplete
+visit histories due to the rotating panel design.</li>
+<li><strong>Unit non-response</strong>: The survey targets 14 households
+per UPA each quarter, but non-response reduces this. Fewer responding
+households means fewer birthday constraints to narrow down the
+month.</li>
+<li><strong>Small household sizes</strong>: Households with fewer
+members provide fewer birthday constraints.</li>
+<li><strong>Missing birth dates</strong>: Not all respondents report
+their date of birth. Higher item non-response reduces the available
+constraints.</li>
+<li><strong>Uninformative birthdays</strong>: Some reported birth dates
+don’t help distinguish between months (e.g., birthdays outside the
+quarter’s interview window).</li>
+</ul>
+<p>Indeterminate observations are then removed from monthly analysis (if
+<code>keep_all = FALSE</code>) or assigned <code>month = NA</code> and
+<code>weight_monthly = NA</code> (if <code>keep_all = TRUE</code>).</p>
+<hr />
+</div>
+</div>
+<div id="monthly-weights" class="section level2">
+<h2>Monthly Weights</h2>
+<p>For monthly aggregate estimates, you need monthly-appropriate survey
+weights.</p>
+<div id="how-weight-calibration-works" class="section level3">
+<h3>How Weight Calibration Works</h3>
+<p>When <code>compute_weights = TRUE</code>, the package:</p>
+<p><strong>1. Fetches monthly population from SIDRA API</strong> (table
+6022)</p>
+<p>SIDRA provides <strong>moving-quarter</strong> population estimates,
+not exact monthly values:</p>
+<table>
+<thead>
+<tr class="header">
+<th>SIDRA Code</th>
+<th>3-Month Window</th>
+<th>Represents Population For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>201203</td>
+<td>Jan+Feb+Mar 2012</td>
+<td><strong>February 2012</strong></td>
+</tr>
+<tr class="even">
+<td>201204</td>
+<td>Feb+Mar+Apr 2012</td>
+<td><strong>March 2012</strong></td>
+</tr>
+<tr class="odd">
+<td>201205</td>
+<td>Mar+Apr+May 2012</td>
+<td><strong>April 2012</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The package shifts values to align with their center month. Boundary
+months (Jan 2012, latest month) are extrapolated via quadratic
+regression.</p>
+<p><strong>2. Applies hierarchical rake weighting</strong> across nested
+calibration cells:</p>
+<table>
+<colgroup>
+<col width="36%" />
+<col width="36%" />
+<col width="27%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Cell Level</th>
+<th>Definition</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>celula1</code></td>
+<td>Age groups: 0-13, 14-29, 30-59, 60+</td>
+<td>Demographic balance</td>
+</tr>
+<tr class="even">
+<td><code>celula2</code></td>
+<td>Post-stratum group + age</td>
+<td>Regional-demographic balance</td>
+</tr>
+<tr class="odd">
+<td><code>celula3</code></td>
+<td>State (UF) + celula2</td>
+<td>State-level balance</td>
+</tr>
+<tr class="even">
+<td><code>celula4</code></td>
+<td>Post-stratum (posest) + celula2</td>
+<td>Fine geographic balance</td>
+</tr>
+</tbody>
+</table>
+<p>At each level, weights are adjusted so monthly totals match quarterly
+totals proportionally.</p>
+<p><strong>3. Calibrates to monthly population totals</strong></p>
+<p>Final scaling ensures monthly weighted totals match SIDRA population
+(~206 million average).</p>
+</div>
+<div id="usage-example" class="section level3">
+<h3>Usage Example</h3>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Load full data with all required variables</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>pnadc_full <span class="ot">&lt;-</span> <span class="fu">fread</span>(<span class="st">&quot;pnadc_stacked_full.csv&quot;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co"># Run mensalization with weight computation</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>, <span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co"># Use weight_monthly for monthly estimates</span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>  <span class="at">population =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>), by <span class="ot">=</span> ref_month_yyyymm]</span></code></pre></div>
+</div>
+<div id="handling-indeterminate-observations" class="section level3">
+<h3>Handling Indeterminate Observations</h3>
+<p>By default (<code>keep_all = TRUE</code>), all input rows are
+returned, with <code>weight_monthly = NA</code> for indeterminate
+observations:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Default: returns all rows (indeterminate have weight_monthly = NA)</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">nrow</span>(result) <span class="sc">==</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE - all rows returned</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(result<span class="sc">$</span>weight_monthly))  <span class="co"># ~3% of rows have NA weights</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co"># Use na.rm = TRUE when aggregating</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(<span class="at">pop =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)), by <span class="ot">=</span> ref_month_yyyymm]</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a></span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="co"># Alternative: returns only determined rows</span></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>result_determined <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>, <span class="at">keep_all =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="fu">nrow</span>(result_determined) <span class="sc">&lt;</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE (~97% of rows)</span></span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="advanced-usage" class="section level2">
+<h2>Advanced Usage</h2>
+<div id="using-modular-functions" class="section level3">
+<h3>Using Modular Functions</h3>
+<p>For more control, use the individual functions:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># Step 1: Just identify reference months</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>months <span class="ot">&lt;-</span> <span class="fu">identify_reference_month</span>(pnadc)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co"># Step 2: Check determination rate by quarter</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>months[, .(</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  <span class="at">total =</span> .N,</span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>  <span class="at">determined =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)),</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  <span class="at">rate =</span> <span class="fu">round</span>(<span class="fu">mean</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)) <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>)</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>), by <span class="ot">=</span> .(Ano, Trimestre)]</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co"># Step 3: Validate input data</span></span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>validation <span class="ot">&lt;-</span> <span class="fu">validate_pnadc</span>(pnadc, <span class="at">stop_on_error =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a></span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="co"># Step 4: Fetch population data from SIDRA-IBGE manually</span></span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>pop_data <span class="ot">&lt;-</span> <span class="fu">fetch_monthly_population</span>(<span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a></span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="co"># Step 5: Calibrate weights separately</span></span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a>calibrated <span class="ot">&lt;-</span> <span class="fu">calibrate_monthly_weights</span>(merged_data, pop_data)</span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="performance" class="section level2">
+<h2>Performance</h2>
+<div id="benchmarks" class="section level3">
+<h3>Benchmarks</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Dataset Size</th>
+<th>Rows</th>
+<th>Time (basic)</th>
+<th>Throughput</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1 quarter</td>
+<td>~570K</td>
+<td>~1.5 sec</td>
+<td>~380K rows/sec</td>
+</tr>
+<tr class="even">
+<td>1 year</td>
+<td>~2.3M</td>
+<td>~5 sec</td>
+<td>~460K rows/sec</td>
+</tr>
+<tr class="odd">
+<td>14 years (2012-2025)</td>
+<td>28.4M</td>
+<td><strong>~1 minute</strong></td>
+<td>~450K rows/sec</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key optimization</strong>: The <code>make_date()</code>
+function uses pre-computed lookup tables instead of
+<code>ISOdate()</code>, achieving <strong>20x speedup</strong> on date
+operations.</p>
+</div>
+<div id="determination-rates-by-period" class="section level3">
+<h3>Determination Rates by Period</h3>
+<table style="width:100%;">
+<colgroup>
+<col width="18%" />
+<col width="22%" />
+<col width="43%" />
+<col width="15%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Period</th>
+<th>Quarters</th>
+<th>Determination Rate</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2012</td>
+<td>Q1-Q4</td>
+<td>91.8% - 98.9%</td>
+<td>First year, panel rotation effects</td>
+</tr>
+<tr class="even">
+<td>2013-2019</td>
+<td>28 quarters</td>
+<td>96.1% - 99.0%</td>
+<td>Best results, stable sampling</td>
+</tr>
+<tr class="odd">
+<td>2020-2021</td>
+<td>8 quarters</td>
+<td>93.0% - 97.5%</td>
+<td>Pandemic sample changes</td>
+</tr>
+<tr class="even">
+<td>2022-2024</td>
+<td>12 quarters</td>
+<td>91.3% - 95.6%</td>
+<td>Post-pandemic normalization</td>
+</tr>
+<tr class="odd">
+<td>2025</td>
+<td>Q1-Q3</td>
+<td>88.9% - 95.9%</td>
+<td>Most recent data</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why boundary quarters have lower rates</strong>: The first 4
+and last 4 quarters of any consecutive quarterly dataset will always
+include (UPA, V1014) groups with fewer than 5 visits in the data. This
+makes mensalization efficiency suboptimal at the boundaries. In a
+dataset with 9 consecutive quarters, for example, only the 5th quarter
+will have full utilization – because among people observed in the 5th
+quarter, all of them will have all their visits in the data, from those
+on their 1st visit in the 5th quarter to those on their 5th visit in the
+5th quarter. This is an inherent consequence of PNADC’s rotating panel
+design (5 visits over 5 quarters).</p>
+</div>
+<div id="optimization-tips" class="section level3">
+<h3>Optimization Tips</h3>
+<ul>
+<li>Use <code>data.table</code> directly (automatic conversion from
+<code>data.frame</code> adds overhead)</li>
+<li>Load only required columns when reading data</li>
+<li>Process multiple years together (cross-quarter aggregation improves
+accuracy)</li>
+</ul>
+<hr />
+</div>
+</div>
+<div id="tips-and-best-practices" class="section level2">
+<h2>Tips and Best Practices</h2>
+<ol style="list-style-type: decimal">
+<li><p><strong>Process multiple quarters together</strong>: Processing
+2012-2025 together gives ~97% determination vs ~70%
+per-quarter.</p></li>
+<li><p><strong>Start with reference month identification</strong>: You
+don’t always need monthly weights. Often just knowing the reference
+month is enough.</p></li>
+<li><p><strong>Check determination rates by year</strong>: Rates should
+be 96-99% for 2013-2019. Lower rates may indicate data issues.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>crosswalk[, .(<span class="at">rate =</span> <span class="fu">mean</span>(<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter))), by <span class="ot">=</span> .(Ano, Trimestre)]</span></code></pre></div></li>
+<li><p><strong>Handle indeterminate observations</strong>: Decide
+whether to exclude them or use quarterly-level analysis for those
+cases.</p></li>
+<li><p><strong>Use <code>weight_monthly</code> for general
+analysis</strong>: The rake-weighted output is appropriate for most
+purposes.</p></li>
+</ol>
+<hr />
+</div>
+<div id="further-reading" class="section level2">
+<h2>Further Reading</h2>
+<ul>
+<li><a href="applied-examples.html">Applied Examples</a> - See the
+algorithm in action with COVID, recession, and minimum wage
+validation</li>
+<li><a href="https://www.ibge.gov.br/estatisticas/sociais/trabalho/9171-pesquisa-nacional-por-amostra-de-domicilios-continua-mensal.html">IBGE
+PNADC Documentation</a></li>
+<li>Package function reference: <code>?mensalizePNADC</code>,
+<code>?identify_reference_month</code></li>
+<li>Source code: <a href="https://github.com/antrologos/mensalizePNADC">GitHub
+repository</a></li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

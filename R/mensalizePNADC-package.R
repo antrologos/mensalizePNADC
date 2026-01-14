@@ -34,6 +34,12 @@
 #' @keywords internal
 "_PACKAGE"
 
+# OPTIMIZATION: Enable data.table's internal parallelization
+# Uses all available cores for groupby, join, and := operations
+.onLoad <- function(libname, pkgname) {
+  data.table::setDTthreads(0L)  # 0 = use all available threads
+}
+
 # Prevent R CMD check notes about data.table syntax
 utils::globalVariables(c(
   # PNADC variables
@@ -63,6 +69,14 @@ utils::globalVariables(c(
   # Computed variables - smooth aggregates
   "month_pos", "weight_smoothed", "pop_current",
   "row_num", "row_num2", "d_pop", "quarter_yyyyq",
+  # Computed variables - smooth_single_variable optimization
+  "d3_filled", "cum_values", "row_idx", "e0", "mean_e0",
+  # data.table join prefix variables (i.* references right table columns)
+  "i.month1", "i.month2", "i.month3",
+  "i.first_sat_m1", "i.first_sat_m2", "i.first_sat_m3",
+  "i.alt_sat_m1", "i.alt_sat_m2", "i.alt_sat_m3",
+  "i.ref_month", "i.ref_month_in_quarter", "i.ref_month_yyyymm",
+  "i.m_populacao",
   # data.table special symbols and output column reference
   ".SD", ".N", ".I", "..output_cols", "."
 ))

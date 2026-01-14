@@ -199,22 +199,18 @@ create_calibration_cells <- function(dt) {
 #' @noRd
 reweight_at_cell_level <- function(dt, cell_var) {
 
-  # Calculate quarterly totals (sum of V1028)
-  dt[, pop_quarter := sum(V1028, na.rm = TRUE),
-     by = c(cell_var, "quarter_yyyyq")]
+  # OPTIMIZATION: Combine aggregations with same grouping keys (4 passes → 2 passes)
+  # Quarter-level aggregations
+  dt[, `:=`(
+    pop_quarter = sum(V1028, na.rm = TRUE),
+    n_cells_quarter = data.table::uniqueN(ref_month_yyyymm)
+  ), by = c(cell_var, "quarter_yyyyq")]
 
-  # Calculate monthly totals of current weight
-  dt[, pop_month := sum(weight_current, na.rm = TRUE),
-     by = c(cell_var, "ref_month_yyyymm")]
-
-  # Count cells in quarter vs month to detect instability
-  dt[, n_cells_quarter := data.table::uniqueN(.SD),
-     by = c(cell_var, "quarter_yyyyq"),
-     .SDcols = "ref_month_yyyymm"]
-
-  dt[, n_cells_month := data.table::uniqueN(.SD),
-     by = c(cell_var, "ref_month_yyyymm"),
-     .SDcols = "quarter_yyyyq"]
+  # Month-level aggregations
+  dt[, `:=`(
+    pop_month = sum(weight_current, na.rm = TRUE),
+    n_cells_month = data.table::uniqueN(quarter_yyyyq)
+  ), by = c(cell_var, "ref_month_yyyymm")]
 
   # Apply reweighting ratio, but only if cell structure is stable
   # (more quarterly cells than monthly cells indicates instability)
@@ -245,9 +241,8 @@ calibrate_to_monthly_totals <- function(dt, mt) {
   dt[, pop_current := sum(weight_current, na.rm = TRUE),
      by = ref_month_yyyymm]
 
-  # Merge with target population
-  dt <- merge(dt, mt[, .(ref_month_yyyymm, m_populacao)],
-              by = "ref_month_yyyymm", all.x = TRUE)
+  # OPTIMIZATION: Use data.table join instead of merge() for speed
+  dt[mt, on = .(ref_month_yyyymm), m_populacao := i.m_populacao]
 
   # Apply final calibration
   # m_populacao is in thousands, so multiply by 1000

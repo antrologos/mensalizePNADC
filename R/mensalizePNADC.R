@@ -178,6 +178,7 @@ mensalizePNADC <- function(data,
   # Step 1-8: Identify reference months
   # Pass our progress bar so it shows granular progress
   crosswalk <- identify_reference_month(data, verbose = FALSE, .pb = pb, .pb_offset = 0L)
+  gc()  # OPTIMIZATION: Free temporary objects from ref month identification
 
   det_rate <- attr(crosswalk, "determination_rate")
 
@@ -190,11 +191,16 @@ mensalizePNADC <- function(data,
     if (output == "crosswalk") {
       return(crosswalk)
     } else if (output == "microdata") {
-      # Merge crosswalk with original data
+      # OPTIMIZATION: Use data.table join instead of merge() for speed
       dt <- ensure_data_table(data, copy = TRUE)
       key_cols <- intersect(join_key_vars(), names(dt))
-      result <- merge(dt, crosswalk, by = key_cols, all.x = TRUE)
-      return(result)
+      data.table::setkeyv(crosswalk, key_cols)
+      data.table::setkeyv(dt, key_cols)
+      dt[crosswalk, on = key_cols,
+         `:=`(ref_month = i.ref_month,
+              ref_month_in_quarter = i.ref_month_in_quarter,
+              ref_month_yyyymm = i.ref_month_yyyymm)]
+      return(dt)
     } else {
       stop("output = 'aggregates' requires compute_weights = TRUE")
     }
@@ -215,10 +221,18 @@ mensalizePNADC <- function(data,
   if (is.character(dt$Trimestre)) dt[, Trimestre := as.integer(Trimestre)]
 
   key_cols <- intersect(join_key_vars(), names(dt))
-  dt <- merge(dt, crosswalk, by = key_cols, all.x = TRUE)
+  # OPTIMIZATION: Use data.table join instead of merge() for speed
+  crosswalk_cols <- c("ref_month", "ref_month_in_quarter", "ref_month_yyyymm")
+  data.table::setkeyv(crosswalk, key_cols)
+  data.table::setkeyv(dt, key_cols)
+  dt[crosswalk, on = key_cols,
+     `:=`(ref_month = i.ref_month,
+          ref_month_in_quarter = i.ref_month_in_quarter,
+          ref_month_yyyymm = i.ref_month_yyyymm)]
 
   # Calibrate weights using hierarchical rake weighting
   dt <- calibrate_monthly_weights(dt, monthly_totals, keep_all = keep_all, verbose = FALSE)
+  gc()  # OPTIMIZATION: Free temporary objects from weight calibration
 
   if (verbose) setTxtProgressBar(pb, 10)
 
@@ -280,9 +294,8 @@ smooth_calibrated_weights <- function(dt) {
   smoothed <- smooth_monthly_aggregates(monthly_totals)
 
   if ("m_populacao" %in% names(smoothed)) {
-    # Merge smoothed totals back
-    dt <- merge(dt, smoothed[, .(ref_month_yyyymm, m_populacao)],
-                by = "ref_month_yyyymm", all.x = TRUE)
+    # OPTIMIZATION: Use data.table join instead of merge() for speed
+    dt[smoothed, on = .(ref_month_yyyymm), m_populacao := i.m_populacao]
 
     # Compute monthly weight totals for calibration
     dt[, pop_month := sum(weight_calibrated, na.rm = TRUE), by = ref_month_yyyymm]

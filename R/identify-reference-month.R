@@ -123,13 +123,16 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # Convert to data.table (copy to avoid modifying original)
   dt <- ensure_data_table(data, copy = TRUE)
 
-  # Convert character columns to proper types (PNADC data often has character columns)
-  if (is.character(dt$Ano)) dt[, Ano := as.integer(Ano)]
-  if (is.character(dt$Trimestre)) dt[, Trimestre := as.integer(Trimestre)]
-  if (is.character(dt$V2008)) dt[, V2008 := as.integer(V2008)]
-  if (is.character(dt$V20081)) dt[, V20081 := as.integer(V20081)]
-  if (is.character(dt$V20082)) dt[, V20082 := as.integer(V20082)]
-  if (!is.numeric(dt$V2009)) dt[, V2009 := as.numeric(V2009)]
+  # OPTIMIZATION: Batch convert character columns using set() for efficiency
+  int_cols <- c("Ano", "Trimestre", "V2008", "V20081", "V20082")
+  for (col in int_cols) {
+    if (is.character(dt[[col]])) {
+      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
+    }
+  }
+  if (!is.numeric(dt$V2009)) {
+    data.table::set(dt, j = "V2009", value = as.numeric(dt$V2009))
+  }
 
   # Handle special codes for unknown values
   # V2008 = 99: unknown birth day
@@ -168,8 +171,15 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
     alt_sat_m3 = first_valid_saturday(Ano, month3, min_days = 3L)
   )]
 
-  # Merge pre-computed values back to main data
-  dt <- merge(dt, unique_quarters, by = c("Ano", "Trimestre"), all.x = TRUE)
+  # OPTIMIZATION: Use data.table join instead of merge() for speed
+  # Join pre-computed values back to main data
+  dt[unique_quarters,
+     on = .(Ano, Trimestre),
+     `:=`(month1 = i.month1, month2 = i.month2, month3 = i.month3,
+          first_sat_m1 = i.first_sat_m1, first_sat_m2 = i.first_sat_m2,
+          first_sat_m3 = i.first_sat_m3,
+          alt_sat_m1 = i.alt_sat_m1, alt_sat_m2 = i.alt_sat_m2,
+          alt_sat_m3 = i.alt_sat_m3)]
 
   update_pb(1)
 
@@ -194,8 +204,11 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # ============================================================================
 
   # Initialize date bounds using standard Saturday values
-  dt[, date_min := make_date(Ano, month1, first_sat_m1)]
-  dt[, date_max := make_date(Ano, month3, first_sat_m3) + 21L]
+  # OPTIMIZATION: Combined into single := call
+  dt[, `:=`(
+    date_min = make_date(Ano, month1, first_sat_m1),
+    date_max = make_date(Ano, month3, first_sat_m3) + 21L
+  )]
 
   # Apply birthday constraints
   dt[visit_before_birthday == 0L &
@@ -211,8 +224,15 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
      date_max := first_sat_after_birthday - 7L]
 
   # Convert date bounds to month-in-quarter positions using STANDARD thresholds (day <= 3)
-  dt[, month_min_pos := calculate_month_position_min(date_min, Ano, Trimestre, day_threshold = 3L)]
-  dt[, month_max_pos := calculate_month_position_max(date_max, Ano, Trimestre, day_threshold = 3L)]
+  # OPTIMIZATION: Combined into single := call
+  dt[, `:=`(
+    month_min_pos = calculate_month_position_min(date_min, Ano, Trimestre, day_threshold = 3L),
+    month_max_pos = calculate_month_position_max(date_max, Ano, Trimestre, day_threshold = 3L)
+  )]
+
+  # OPTIMIZATION: Remove birthday columns - no longer needed after Step 3
+  # (keep first_sat_after_birthday for exception handling in Step 6)
+  dt[, birthday := NULL]
 
   update_pb(3)
 
@@ -221,8 +241,11 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # ============================================================================
 
   # Initialize alternative date bounds using alternative Saturday values
-  dt[, alt_date_min := make_date(Ano, month1, alt_sat_m1)]
-  dt[, alt_date_max := make_date(Ano, month3, alt_sat_m3) + 21L]
+  # OPTIMIZATION: Combined into single := call
+  dt[, `:=`(
+    alt_date_min = make_date(Ano, month1, alt_sat_m1),
+    alt_date_max = make_date(Ano, month3, alt_sat_m3) + 21L
+  )]
 
   # Apply birthday constraints to alternative bounds
   dt[visit_before_birthday == 0L &
@@ -238,15 +261,22 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
      alt_date_max := first_sat_after_birthday - 7L]
 
   # Convert alternative date bounds to month positions using EXCEPTION thresholds (day <= 2)
-  dt[, alt_month_min_pos := calculate_month_position_min(alt_date_min, Ano, Trimestre, day_threshold = 2L)]
-  dt[, alt_month_max_pos := calculate_month_position_max(alt_date_max, Ano, Trimestre, day_threshold = 2L)]
+  # OPTIMIZATION: Combined into single := call
+  dt[, `:=`(
+    alt_month_min_pos = calculate_month_position_min(alt_date_min, Ano, Trimestre, day_threshold = 2L),
+    alt_month_max_pos = calculate_month_position_max(alt_date_max, Ano, Trimestre, day_threshold = 2L)
+  )]
 
   update_pb(4)
 
   # ============================================================================
   # STEP 4b: SINGLE aggregation pass for BOTH standard and alternative positions
   # (OPTIMIZATION: Combined from two separate aggregations)
+  # (OPTIMIZATION: setkey for faster groupby operations)
   # ============================================================================
+
+  # Set key for faster groupby on UPA, V1014 (used multiple times)
+  data.table::setkey(dt, UPA, V1014)
 
   dt[, `:=`(
     upa_month_min = max(month_min_pos, na.rm = TRUE),
@@ -254,6 +284,10 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
     alt_upa_month_min = max(alt_month_min_pos, na.rm = TRUE),
     alt_upa_month_max = min(alt_month_max_pos, na.rm = TRUE)
   ), by = .(UPA, V1014)]
+
+  # OPTIMIZATION: Remove date columns - no longer needed after aggregation
+  # (alternative positions are now aggregated into upa_month_* columns)
+  dt[, c("alt_date_min", "alt_date_max", "alt_month_min_pos", "alt_month_max_pos") := NULL]
 
   update_pb(5)
 
@@ -276,23 +310,23 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # requerexcecaomes1: need to relax month 1 rule (first month of quarter)
   # requerexcecaomes2: need to relax month 2 rule (second month of quarter)
   # requerexcecaomes3: need to relax month 3 rule (third month of quarter)
-  dt[, requires_exc_m1 := requires_exception & month_min_pos == 2L & alt_upa_month_min == 1L]
-  dt[, requires_exc_m2 := requires_exception & ((month_max_pos == 1L & alt_upa_month_max >= 2L) |
-                                                  (month_min_pos == 3L & alt_upa_month_min <= 2L))]
-  dt[, requires_exc_m3 := requires_exception & month_max_pos == 2L & alt_upa_month_max == 3L]
+  # OPTIMIZATION: Combined into single := call
+  dt[, `:=`(
+    requires_exc_m1 = requires_exception & month_min_pos == 2L & alt_upa_month_min == 1L,
+    requires_exc_m2 = requires_exception & ((month_max_pos == 1L & alt_upa_month_max >= 2L) |
+                                              (month_min_pos == 3L & alt_upa_month_min <= 2L)),
+    requires_exc_m3 = requires_exception & month_max_pos == 2L & alt_upa_month_max == 3L
+  )]
 
   # Propagate exception requirement to entire quarter (Ano, Trimestre)
-  # If ANY UPA in a quarter requires exception for a month, apply to ALL observations in that quarter
-  dt[, `:=`(
-    trim_exc_m1 = as.integer(max(requires_exc_m1, na.rm = TRUE)),
-    trim_exc_m2 = as.integer(max(requires_exc_m2, na.rm = TRUE)),
-    trim_exc_m3 = as.integer(max(requires_exc_m3, na.rm = TRUE))
-  ), by = .(Ano, Trimestre)]
+  # If ANY UPA in a quarter requires exception for a month, apply to ALL
+  # OPTIMIZATION: Use sum() > 0 instead of max() to avoid -Inf cleanup
 
-  # Replace -Inf with 0 (from max of all FALSE/NA)
-  dt[is.infinite(trim_exc_m1) | is.na(trim_exc_m1), trim_exc_m1 := 0L]
-  dt[is.infinite(trim_exc_m2) | is.na(trim_exc_m2), trim_exc_m2 := 0L]
-  dt[is.infinite(trim_exc_m3) | is.na(trim_exc_m3), trim_exc_m3 := 0L]
+  dt[, `:=`(
+    trim_exc_m1 = as.integer(sum(requires_exc_m1, na.rm = TRUE) > 0L),
+    trim_exc_m2 = as.integer(sum(requires_exc_m2, na.rm = TRUE) > 0L),
+    trim_exc_m3 = as.integer(sum(requires_exc_m3, na.rm = TRUE) > 0L)
+  ), by = .(Ano, Trimestre)]
 
   update_pb(6)
 
@@ -300,9 +334,10 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # STEP 6: Apply exception rules and recalculate (OPTIMIZED: conditional)
   # ============================================================================
 
-  # OPTIMIZATION: Only recalculate for quarters that actually need exceptions
+  # OPTIMIZATION: Compute exception condition once and reuse
   # Most quarters (~91%) don't need exceptions, so we skip recalculation for them
-  has_any_exception <- any(dt$trim_exc_m1 == 1L | dt$trim_exc_m2 == 1L | dt$trim_exc_m3 == 1L)
+  exc_condition <- (dt$trim_exc_m1 == 1L | dt$trim_exc_m2 == 1L | dt$trim_exc_m3 == 1L)
+  has_any_exception <- any(exc_condition)
 
   if (has_any_exception) {
     # Update first Saturday values where exceptions are needed
@@ -310,12 +345,12 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
     dt[trim_exc_m2 == 1L, first_sat_m2 := alt_sat_m2]
     dt[trim_exc_m3 == 1L, first_sat_m3 := alt_sat_m3]
 
-    # Create condition for exception rows
-    exc_condition <- (dt$trim_exc_m1 == 1L | dt$trim_exc_m2 == 1L | dt$trim_exc_m3 == 1L)
-
     # Recalculate date bounds ONLY for exception rows
-    dt[exc_condition, date_min := make_date(Ano, month1, first_sat_m1)]
-    dt[exc_condition, date_max := make_date(Ano, month3, first_sat_m3) + 21L]
+    # OPTIMIZATION: Combined into single := call
+    dt[exc_condition, `:=`(
+      date_min = make_date(Ano, month1, first_sat_m1),
+      date_max = make_date(Ano, month3, first_sat_m3) + 21L
+    )]
 
     # Re-apply birthday constraints ONLY for exception rows
     # Must combine exception condition with birthday conditions
@@ -334,20 +369,49 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
        date_max := first_sat_after_birthday - 7L]
 
     # Recalculate month positions ONLY for exception rows with dynamic thresholds
-    dt[exc_condition, month_min_pos := calculate_month_position_min_dynamic(
-      date_min, Ano, Trimestre, trim_exc_m1, trim_exc_m2, trim_exc_m3
-    )]
-    dt[exc_condition, month_max_pos := calculate_month_position_max_dynamic(
-      date_max, Ano, Trimestre, trim_exc_m1, trim_exc_m2, trim_exc_m3
+    # OPTIMIZATION: Combined into single := call
+    dt[exc_condition, `:=`(
+      month_min_pos = calculate_month_position_min_dynamic(
+        date_min, Ano, Trimestre, trim_exc_m1, trim_exc_m2, trim_exc_m3
+      ),
+      month_max_pos = calculate_month_position_max_dynamic(
+        date_max, Ano, Trimestre, trim_exc_m1, trim_exc_m2, trim_exc_m3
+      )
     )]
   }
 
   # Final aggregation to UPA-panel level ACROSS ALL QUARTERS
-  # (Must be done for all rows regardless of exceptions)
-  dt[, `:=`(
-    upa_month_min_final = max(month_min_pos, na.rm = TRUE),
-    upa_month_max_final = min(month_max_pos, na.rm = TRUE)
-  ), by = .(UPA, V1014)]
+  # OPTIMIZATION: Skip aggregation if no exceptions - reuse results from Step 4b
+  if (has_any_exception) {
+    # Re-aggregate only when exceptions modified some positions
+    dt[, `:=`(
+      upa_month_min_final = max(month_min_pos, na.rm = TRUE),
+      upa_month_max_final = min(month_max_pos, na.rm = TRUE)
+    ), by = .(UPA, V1014)]
+  } else {
+    # No exceptions - reuse aggregation from Step 4b (simple column copy)
+    dt[, `:=`(
+      upa_month_min_final = upa_month_min,
+      upa_month_max_final = upa_month_max
+    )]
+  }
+
+  # OPTIMIZATION: Remove intermediate columns no longer needed after Step 6
+  # This reduces memory footprint before final output selection
+  temp_cols <- c(
+    "month1", "month2", "month3",
+    "first_sat_m1", "first_sat_m2", "first_sat_m3",
+    "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
+    "first_sat_after_birthday", "visit_before_birthday",
+    "date_min", "date_max",
+    "month_min_pos", "month_max_pos",
+    "upa_month_min", "upa_month_max",
+    "alt_upa_month_min", "alt_upa_month_max",
+    "requires_exception", "requires_exc_m1", "requires_exc_m2", "requires_exc_m3",
+    "trim_exc_m1", "trim_exc_m2", "trim_exc_m3"
+  )
+  dt[, (intersect(temp_cols, names(dt))) := NULL]
+  gc()  # Free memory after major cleanup
 
   update_pb(7)
 
