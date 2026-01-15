@@ -1,6 +1,6 @@
-Package: mensalizePNADC
-Title: Convert Quarterly PNADC Survey Data to Monthly Time Series
-Version: 0.1.0
+Package: PNADCperiods
+Title: Identify Reference Periods in Brazil's PNADC Survey Data
+Version: 2.0.0
 Authors@R: c(
     person("Marcos", "Hecksher", email = "mdhecksher@gmail.com", role = c("aut"),
            comment = c(ORCID = "0000-0003-2992-1252")),
@@ -9,13 +9,15 @@ Authors@R: c(
     person("Claude", "AI", role = "ctb",
            comment = "R package implementation")
     )
-Description: Identifies reference months in Brazil's quarterly PNADC (Pesquisa
-    Nacional por Amostra de Domicilios Continua) survey data and optionally
-    computes monthly survey weights. The core algorithm uses IBGE's "Parada
-    Tecnica" (technical break) rules combined with respondent birthdates to
-    determine which month each survey observation refers to. For users needing
-    monthly aggregate estimates, the package also provides hierarchical weight
-    calibration to produce monthly-appropriate survey weights.
+Description: Identifies reference periods (months, fortnights, and weeks) in
+    Brazil's quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios
+    Continua) survey data and optionally computes calibrated weights for
+    sub-quarterly analysis. The core algorithm uses IBGE's "Parada Tecnica"
+    (technical break) rules combined with respondent birthdates to determine
+    which temporal period each survey observation refers to. Supports monthly,
+    fortnightly (quinzena), and weekly granularity. For users needing
+    sub-quarterly aggregate estimates, the package provides hierarchical weight
+    calibration to produce period-appropriate survey weights.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -37,6 +39,6 @@ Suggests:
     scales
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-URL: https://antrologos.github.io/mensalizePNADC/,
-    https://github.com/antrologos/mensalizePNADC
-BugReports: https://github.com/antrologos/mensalizePNADC/issues
+URL: https://antrologos.github.io/PNADCperiods/,
+    https://github.com/antrologos/PNADCperiods
+BugReports: https://github.com/antrologos/PNADCperiods/issues
