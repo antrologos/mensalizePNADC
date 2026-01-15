@@ -129,11 +129,10 @@ show us the month-by-month path of recovery.</p>
 <p>This vignette demonstrates a powerful technique: combining the
 mensalization algorithm with <strong>annual PNADC data</strong> to
 produce monthly poverty statistics. The annual PNADC releases contain
-detailed income breakdowns—itemized transfer income, work income by
-type, and other sources—that aren’t available in the quarterly releases.
-By merging a mensalization crosswalk (from quarterly data) with annual
-income data, we get the best of both worlds: monthly temporal precision
-with comprehensive income measurement.</p>
+comprehensive household income measures that aren’t available in the
+quarterly releases. By merging a mensalization crosswalk (from quarterly
+data) with annual income data, we get the best of both worlds: monthly
+temporal precision with comprehensive income measurement.</p>
 <div class="float">
 <img src="figures/annual-poverty-analysis/fig-workflow-diagram.png" style="width:100.0%" alt="Data Workflow: Monthly Poverty Analysis with Annual PNADC"><div class="figcaption">Data Workflow: Monthly Poverty Analysis with
 Annual PNADC</div>
@@ -174,15 +173,16 @@ period</li>
 here’s what monthly poverty analysis reveals:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load pre-computed monthly poverty estimates</span></span>
-<span><span class="va">monthly_poverty</span> <span class="op">&lt;-</span> <span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="st">"monthly_poverty_aggregates.fst"</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">monthly_poverty</span> <span class="op">&lt;-</span> <span class="fu">fst</span><span class="fu">::</span><span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="st">"monthly_poverty_aggregates.fst"</span>,</span>
+<span>                                  as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Monthly poverty rate for March 2020 (COVID onset)</span></span>
-<span><span class="va">monthly_poverty</span><span class="op">[</span><span class="va">ref_month_yyyymm</span> <span class="op">==</span> <span class="fl">202003</span>, <span class="va">poverty_rate_media</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 0.142  # ~14.2% below USD 4.20/day poverty line</span></span>
+<span><span class="va">monthly_poverty</span><span class="op">[</span><span class="va">ref_month_yyyymm</span> <span class="op">==</span> <span class="fl">202003</span>, <span class="va">poverty_rate</span><span class="op">]</span></span>
+<span><span class="co">#&gt; [1] 0.25  # ~25% below USD 8.30/day poverty line</span></span>
 <span></span>
 <span><span class="co"># Compare to December 2020 (after Auxílio Emergencial)</span></span>
-<span><span class="va">monthly_poverty</span><span class="op">[</span><span class="va">ref_month_yyyymm</span> <span class="op">==</span> <span class="fl">202012</span>, <span class="va">poverty_rate_media</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] 0.087  # ~8.7% - a dramatic reduction</span></span></code></pre></div>
+<span><span class="va">monthly_poverty</span><span class="op">[</span><span class="va">ref_month_yyyymm</span> <span class="op">==</span> <span class="fl">202012</span>, <span class="va">poverty_rate</span><span class="op">]</span></span>
+<span><span class="co">#&gt; [1] 0.19  # Reduced due to emergency transfers</span></span></code></pre></div>
 <p>The rest of this vignette explains how to produce these estimates
 from raw PNADC data.</p>
 <hr>
@@ -298,49 +298,9 @@ essentially random across the income distribution.</p>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td><code>vd4019</code></td>
-<td>Habitual work income</td>
-<td>Labor</td>
-</tr>
-<tr class="even">
-<td><code>vd4048</code></td>
-<td>Base household income</td>
-<td>Aggregate</td>
-</tr>
-<tr class="odd">
-<td><code>v5001a2</code></td>
-<td>BPC (continuous cash benefit)</td>
-<td>Transfer</td>
-</tr>
-<tr class="even">
-<td><code>v5002a2</code></td>
-<td>Bolsa Família</td>
-<td>Transfer</td>
-</tr>
-<tr class="odd">
-<td><code>v5003a2</code></td>
-<td>Other social programs (incl. Auxílio)</td>
-<td>Transfer</td>
-</tr>
-<tr class="even">
-<td><code>v5004a2</code></td>
-<td>Pensions</td>
-<td>Transfer</td>
-</tr>
-<tr class="odd">
-<td><code>v5005a2</code></td>
-<td>Unemployment insurance</td>
-<td>Transfer</td>
-</tr>
-<tr class="even">
-<td><code>v5006a2</code></td>
-<td>Donations received</td>
-<td>Other</td>
-</tr>
-<tr class="odd">
-<td><code>v5007a2</code></td>
-<td>Rental income</td>
-<td>Other</td>
+<td><code>vd5008</code></td>
+<td>Household per capita income</td>
+<td>Income</td>
 </tr>
 <tr class="even">
 <td><code>v2005</code></td>
@@ -348,12 +308,33 @@ essentially random across the income distribution.</p>
 <td>Filter</td>
 </tr>
 <tr class="odd">
+<td><code>v2009</code></td>
+<td>Age</td>
+<td>Demographics</td>
+</tr>
+<tr class="even">
 <td><code>v1032</code></td>
 <td>Survey weight</td>
 <td>Design</td>
 </tr>
+<tr class="odd">
+<td><code>uf</code></td>
+<td>State</td>
+<td>Geography</td>
+</tr>
+<tr class="even">
+<td><code>estrato</code></td>
+<td>Survey stratum</td>
+<td>Design</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Why VD5008?</strong> IBGE pre-calculates this variable to
+include all income sources (labor, transfers, pensions, other) and
+divides by household size. Using VD5008 directly ensures consistency
+with official IBGE statistics and simplifies the workflow.</p>
+</blockquote>
 <hr>
 </div>
 </div>
@@ -435,11 +416,8 @@ other years use visit 1:</p>
 <span>  <span class="st">"v2005"</span>, <span class="st">"v2007"</span>, <span class="st">"v2009"</span>, <span class="st">"v2010"</span>, <span class="st">"uf"</span>, <span class="st">"estrato"</span>,</span>
 <span>  <span class="co"># Weights</span></span>
 <span>  <span class="st">"v1032"</span>,</span>
-<span>  <span class="co"># Work income</span></span>
-<span>  <span class="st">"vd4019"</span>, <span class="st">"vd4020"</span>, <span class="st">"vd4047"</span>, <span class="st">"vd4048"</span>,</span>
-<span>  <span class="co"># Transfer income (post-2015 format)</span></span>
-<span>  <span class="st">"v5001a2"</span>, <span class="st">"v5002a2"</span>, <span class="st">"v5003a2"</span>, <span class="st">"v5004a2"</span>,</span>
-<span>  <span class="st">"v5005a2"</span>, <span class="st">"v5006a2"</span>, <span class="st">"v5007a2"</span>, <span class="st">"v5008a2"</span></span>
+<span>  <span class="co"># Household per capita income (IBGE pre-calculated)</span></span>
+<span>  <span class="st">"vd5008"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load and stack annual data</span></span>
@@ -484,46 +462,17 @@ other years use visit 1:</p>
 <div class="section level3">
 <h3 id="step-4-construct-per-capita-income">Step 4: Construct Per Capita Income<a class="anchor" aria-label="anchor" href="#step-4-construct-per-capita-income"></a>
 </h3>
-<p>Calculate household per capita income from the component sources:</p>
+<p>Use IBGE’s pre-calculated household per capita income variable:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Filter to household members only</span></span>
 <span><span class="va">d</span> <span class="op">&lt;-</span> <span class="va">d</span><span class="op">[</span><span class="va">v2005</span> <span class="op">&lt;=</span> <span class="fl">14</span> <span class="op">|</span> <span class="va">v2005</span> <span class="op">==</span> <span class="fl">16</span><span class="op">]</span></span>
 <span></span>
-<span><span class="co"># Set NA income values to 0</span></span>
-<span><span class="va">income_vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"vd4019"</span>, <span class="st">"vd4020"</span>, <span class="st">"vd4047"</span>, <span class="st">"vd4048"</span>,</span>
-<span>                 <span class="st">"v5001a2"</span>, <span class="st">"v5002a2"</span>, <span class="st">"v5003a2"</span>, <span class="st">"v5004a2"</span>,</span>
-<span>                 <span class="st">"v5005a2"</span>, <span class="st">"v5006a2"</span>, <span class="st">"v5007a2"</span>, <span class="st">"v5008a2"</span><span class="op">)</span></span>
-<span><span class="kw">for</span> <span class="op">(</span><span class="va">v</span> <span class="kw">in</span> <span class="va">income_vars</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="va">v</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span><span class="op">)</span> <span class="va">d</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/get.html" class="external-link">get</a></span><span class="op">(</span><span class="va">v</span><span class="op">)</span><span class="op">)</span>, <span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="op">:=</span> <span class="fl">0</span><span class="op">]</span></span>
-<span><span class="op">}</span></span>
-<span></span>
 <span><span class="co"># Create household ID</span></span>
 <span><span class="va">d</span><span class="op">[</span>, <span class="va">id_dom</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">upa</span>, <span class="va">v1008</span>, <span class="va">v1014</span>, sep <span class="op">=</span> <span class="st">"_"</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
-<span><span class="co"># Count household members</span></span>
-<span><span class="va">d</span><span class="op">[</span>, <span class="va">n_members</span> <span class="op">:=</span> <span class="va">.N</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">ano</span>, <span class="va">trimestre</span>, <span class="va">id_dom</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Rename and create per capita income variables</span></span>
-<span><span class="va">d</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  rendaTrab_ha_pc    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">vd4019</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaDom_base_pc   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">vd4048</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaBPC_pc        <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5001a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaBolsaFam_pc   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5002a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaOutProgs_pc   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5003a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,  <span class="co"># Includes Auxílio Emergencial</span></span>
-<span>  rendaPrevid_pc     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5004a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaSegDesemp_pc  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5005a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaDoacoes_pc    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5006a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span>,</span>
-<span>  rendaAlugueis_pc   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">v5007a2</span><span class="op">)</span> <span class="op">/</span> <span class="va">n_members</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">ano</span>, <span class="va">trimestre</span>, <span class="va">id_dom</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Main income measure: per capita household income</span></span>
-<span><span class="co"># NOTE: VD4048 already includes all income sources (work, transfers, other)</span></span>
-<span><span class="co"># so we use it directly rather than adding VD4019 which would double-count work income</span></span>
-<span><span class="va">d</span><span class="op">[</span>, <span class="va">rendaDom_mista_pc</span> <span class="op">:=</span> <span class="va">rendaDom_base_pc</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Counterfactual income (without emergency aid during 2020-2021)</span></span>
-<span><span class="co"># Subtracts "other programs" (v5003a2 - includes Auxílio Emergencial) and Bolsa Família</span></span>
-<span><span class="va">d</span><span class="op">[</span>, <span class="va">rendaDom_semAux_pc</span> <span class="op">:=</span> <span class="va">rendaDom_mista_pc</span> <span class="op">-</span> <span class="va">rendaOutProgs_pc</span> <span class="op">-</span> <span class="va">rendaBolsaFam_pc</span><span class="op">]</span></span></code></pre></div>
+<span><span class="co"># Use IBGE's pre-calculated per capita household income</span></span>
+<span><span class="co"># VD5008 already accounts for all income sources and household size</span></span>
+<span><span class="va">d</span><span class="op">[</span>, <span class="va">hhinc_pc_nominal</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">vd5008</span><span class="op">)</span>, <span class="fl">0</span>, <span class="va">vd5008</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="step-5-apply-deflation">Step 5: Apply Deflation<a class="anchor" aria-label="anchor" href="#step-5-apply-deflation"></a>
@@ -540,64 +489,45 @@ other years use visit 1:</p>
 <span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">d</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ano"</span>, <span class="st">"trimestre"</span>, <span class="st">"uf"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">d</span> <span class="op">&lt;-</span> <span class="va">deflator</span><span class="op">[</span><span class="va">d</span><span class="op">]</span></span>
 <span></span>
-<span><span class="co"># INPC adjustment factor to reference date (August 2025)</span></span>
+<span><span class="co"># INPC adjustment factor to reference date (December 2025)</span></span>
 <span><span class="va">inpc_factor</span> <span class="op">&lt;-</span> <span class="fu">deflateBR</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/deflateBR/man/inpc.html" class="external-link">inpc</a></span><span class="op">(</span><span class="fl">1</span>,</span>
-<span>                                nominal_dates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2024-07-01"</span><span class="op">)</span>,</span>
-<span>                                real_date <span class="op">=</span> <span class="st">"08/2025"</span><span class="op">)</span></span>
+<span>                               nominal_dates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2024-07-01"</span><span class="op">)</span>,</span>
+<span>                               real_date <span class="op">=</span> <span class="st">"12/2025"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Apply deflation</span></span>
-<span><span class="va">d</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>  rendaDom_mista_pc  <span class="op">=</span> <span class="va">rendaDom_mista_pc</span> <span class="op">*</span> <span class="va">CO2e</span> <span class="op">*</span> <span class="va">inpc_factor</span>,</span>
-<span>  rendaDom_semAux_pc <span class="op">=</span> <span class="va">rendaDom_semAux_pc</span> <span class="op">*</span> <span class="va">CO2e</span> <span class="op">*</span> <span class="va">inpc_factor</span></span>
-<span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<span><span class="va">d</span><span class="op">[</span>, <span class="va">hhinc_pc</span> <span class="op">:=</span> <span class="va">hhinc_pc_nominal</span> <span class="op">*</span> <span class="va">CO2</span> <span class="op">*</span> <span class="va">inpc_factor</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="step-6-define-poverty-lines">Step 6: Define Poverty Lines<a class="anchor" aria-label="anchor" href="#step-6-define-poverty-lines"></a>
+<h3 id="step-6-define-poverty-line">Step 6: Define Poverty Line<a class="anchor" aria-label="anchor" href="#step-6-define-poverty-line"></a>
 </h3>
-<p>Calculate World Bank PPP-based poverty thresholds:</p>
+<p>Calculate the World Bank PPP-based poverty threshold:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># World Bank poverty lines (2025 values)</span></span>
-<span><span class="va">usd_to_brl_ppp</span> <span class="op">&lt;-</span> <span class="fl">1.66</span>      <span class="co"># 2011 PPP conversion factor</span></span>
+<code class="sourceCode R"><span><span class="co"># World Bank poverty line: USD 8.30 PPP per day (upper-middle income threshold)</span></span>
+<span><span class="va">poverty_line_830_ppp_daily</span> <span class="op">&lt;-</span> <span class="fl">8.30</span></span>
+<span></span>
+<span><span class="co"># 2021 PPP conversion factor (World Bank)</span></span>
+<span><span class="co"># https://data.worldbank.org/indicator/PA.NUS.PRVT.PP?year=2021</span></span>
+<span><span class="va">usd_to_brl_ppp</span> <span class="op">&lt;-</span> <span class="fl">2.45</span></span>
 <span><span class="va">days_to_month</span> <span class="op">&lt;-</span> <span class="fl">365</span><span class="op">/</span><span class="fl">12</span></span>
 <span></span>
-<span><span class="co"># Three poverty lines (USD PPP per day)</span></span>
-<span><span class="va">linha_baixa_usd</span> <span class="op">&lt;-</span> <span class="fl">3.00</span>   <span class="co"># Extreme poverty</span></span>
-<span><span class="va">linha_media_usd</span> <span class="op">&lt;-</span> <span class="fl">4.20</span>   <span class="co"># Moderate poverty</span></span>
-<span><span class="va">linha_alta_usd</span>  <span class="op">&lt;-</span> <span class="fl">8.30</span>   <span class="co"># Upper poverty</span></span>
+<span><span class="co"># Monthly value in 2021 BRL</span></span>
+<span><span class="va">poverty_line_830_brl_monthly_2021</span> <span class="op">&lt;-</span> <span class="va">poverty_line_830_ppp_daily</span> <span class="op">*</span></span>
+<span>                                     <span class="va">usd_to_brl_ppp</span> <span class="op">*</span> <span class="va">days_to_month</span></span>
 <span></span>
-<span><span class="co"># Monthly values in 2011 BRL</span></span>
-<span><span class="va">linha_baixa_2011</span> <span class="op">&lt;-</span> <span class="va">linha_baixa_usd</span> <span class="op">*</span> <span class="va">usd_to_brl_ppp</span> <span class="op">*</span> <span class="va">days_to_month</span></span>
-<span><span class="va">linha_media_2011</span> <span class="op">&lt;-</span> <span class="va">linha_media_usd</span> <span class="op">*</span> <span class="va">usd_to_brl_ppp</span> <span class="op">*</span> <span class="va">days_to_month</span></span>
-<span><span class="va">linha_alta_2011</span>  <span class="op">&lt;-</span> <span class="va">linha_alta_usd</span> <span class="op">*</span> <span class="va">usd_to_brl_ppp</span> <span class="op">*</span> <span class="va">days_to_month</span></span>
+<span><span class="co"># Deflate to December 2025 reference</span></span>
+<span><span class="va">poverty_line_830_brl_monthly_2025</span> <span class="op">&lt;-</span> <span class="fu">deflateBR</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/deflateBR/man/inpc.html" class="external-link">inpc</a></span><span class="op">(</span></span>
+<span>  <span class="va">poverty_line_830_brl_monthly_2021</span>,</span>
+<span>  nominal_dates <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2021-07-01"</span><span class="op">)</span>,</span>
+<span>  real_date <span class="op">=</span> <span class="st">"12/2025"</span></span>
+<span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Deflate to reference period using state-specific CO3</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/exists.html" class="external-link">exists</a></span><span class="op">(</span><span class="st">"deflator"</span><span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="st">"CO3"</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">deflator</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">linha_ref</span> <span class="op">&lt;-</span> <span class="va">deflator</span><span class="op">[</span><span class="va">ano</span> <span class="op">==</span> <span class="fl">2011</span> <span class="op">&amp;</span> <span class="va">trimestre</span> <span class="op">==</span> <span class="fl">1</span>, <span class="fu">.</span><span class="op">(</span><span class="va">uf</span>, <span class="va">CO3</span><span class="op">)</span><span class="op">]</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">CO3</span><span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">linha_ref</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">linha_ref</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>      linhaPobreza_WB_baixa <span class="op">=</span> <span class="va">linha_baixa_2011</span> <span class="op">*</span> <span class="va">CO3</span> <span class="op">*</span> <span class="va">inpc_factor</span>,</span>
-<span>      linhaPobreza_WB_media <span class="op">=</span> <span class="va">linha_media_2011</span> <span class="op">*</span> <span class="va">CO3</span> <span class="op">*</span> <span class="va">inpc_factor</span>,</span>
-<span>      linhaPobreza_WB_alta  <span class="op">=</span> <span class="va">linha_alta_2011</span> <span class="op">*</span> <span class="va">CO3</span> <span class="op">*</span> <span class="va">inpc_factor</span></span>
-<span>    <span class="op">)</span><span class="op">]</span></span>
-<span></span>
-<span>    <span class="co"># Merge with data</span></span>
-<span>    <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">linha_ref</span>, <span class="st">"uf"</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">d</span>, <span class="st">"uf"</span><span class="op">)</span></span>
-<span>    <span class="va">d</span><span class="op">[</span><span class="va">linha_ref</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>      linhaPobreza_WB_baixa <span class="op">=</span> <span class="va">i.linhaPobreza_WB_baixa</span>,</span>
-<span>      linhaPobreza_WB_media <span class="op">=</span> <span class="va">i.linhaPobreza_WB_media</span>,</span>
-<span>      linhaPobreza_WB_alta  <span class="op">=</span> <span class="va">i.linhaPobreza_WB_alta</span></span>
-<span>    <span class="op">)</span><span class="op">]</span></span>
-<span>  <span class="op">}</span></span>
-<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>  <span class="co"># Use national average if deflators not available</span></span>
-<span>  <span class="va">d</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
-<span>    linhaPobreza_WB_baixa <span class="op">=</span> <span class="va">linha_baixa_2011</span> <span class="op">*</span> <span class="va">inpc_factor</span>,</span>
-<span>    linhaPobreza_WB_media <span class="op">=</span> <span class="va">linha_media_2011</span> <span class="op">*</span> <span class="va">inpc_factor</span>,</span>
-<span>    linhaPobreza_WB_alta  <span class="op">=</span> <span class="va">linha_alta_2011</span> <span class="op">*</span> <span class="va">inpc_factor</span></span>
-<span>  <span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">}</span></span></code></pre></div>
+<span><span class="va">d</span><span class="op">[</span>, <span class="va">poverty_line</span> <span class="op">:=</span> <span class="va">poverty_line_830_brl_monthly_2025</span><span class="op">]</span></span></code></pre></div>
+<blockquote>
+<p><strong>Why USD 8.30/day?</strong> This is the World Bank’s
+upper-middle income poverty threshold, appropriate for Brazil. We use
+the 2021 PPP conversion factor (2.45 BRL per USD) which is the most
+recent available.</p>
+</blockquote>
 <hr>
 </div>
 </div>
@@ -635,22 +565,22 @@ poverty indices:</p>
 <code class="sourceCode R"><span><span class="co"># Filter to determined observations</span></span>
 <span><span class="va">d_monthly</span> <span class="op">&lt;-</span> <span class="va">d</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_month_yyyymm</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
-<span><span class="co"># Use monthly weight where available, fall back to annual weight</span></span>
-<span><span class="va">d_monthly</span><span class="op">[</span>, <span class="va">peso</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span>, <span class="va">v1032</span>, <span class="va">weight_monthly</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co"># Use monthly weight</span></span>
+<span><span class="va">d_monthly</span><span class="op">[</span>, <span class="va">peso</span> <span class="op">:=</span> <span class="va">weight_monthly</span><span class="op">]</span></span>
 <span></span>
 <span><span class="co"># Compute monthly poverty statistics</span></span>
 <span><span class="va">monthly_poverty</span> <span class="op">&lt;-</span> <span class="va">d_monthly</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
 <span>  <span class="co"># FGT-0 (Headcount ratio)</span></span>
-<span>  poverty_rate_baixa <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">rendaDom_mista_pc</span>, <span class="va">linhaPobreza_WB_baixa</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
-<span>  poverty_rate_media <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">rendaDom_mista_pc</span>, <span class="va">linhaPobreza_WB_media</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
-<span>  poverty_rate_alta  <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">rendaDom_mista_pc</span>, <span class="va">linhaPobreza_WB_alta</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
+<span>  poverty_rate <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">hhinc_pc</span>, <span class="va">poverty_line</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>,</span>
 <span></span>
 <span>  <span class="co"># FGT-1 (Poverty gap)</span></span>
-<span>  poverty_gap_baixa <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">rendaDom_mista_pc</span>, <span class="va">linhaPobreza_WB_baixa</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
-<span>  poverty_gap_media <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">rendaDom_mista_pc</span>, <span class="va">linhaPobreza_WB_media</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
+<span>  poverty_gap <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">hhinc_pc</span>, <span class="va">poverty_line</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span>
 <span></span>
-<span>  <span class="co"># Counterfactual (without emergency aid)</span></span>
-<span>  poverty_rate_baixa_semAux <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span><span class="va">rendaDom_semAux_pc</span>, <span class="va">linhaPobreza_WB_baixa</span>, <span class="va">peso</span>, alpha <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span>  <span class="co"># Mean income</span></span>
+<span>  mean_income <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/Hmisc/man/wtd.stats.html" class="external-link">wtd.mean</a></span><span class="op">(</span><span class="va">hhinc_pc</span>, <span class="va">peso</span><span class="op">)</span>,</span>
+<span></span>
+<span>  <span class="co"># Sample size</span></span>
+<span>  n_obs <span class="op">=</span> <span class="va">.N</span></span>
 <span></span>
 <span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span>
 <span></span>
@@ -668,8 +598,8 @@ poverty indices:</p>
 <li><p><strong>Pre-COVID baseline</strong>: Poverty rates were gradually
 declining from 2015-2019, recovering from the 2015-2016
 recession.</p></li>
-<li><p><strong>COVID-19 spike (March-April 2020)</strong>: All three
-poverty lines show a sharp increase in early 2020.</p></li>
+<li><p><strong>COVID-19 spike (March-April 2020)</strong>: The poverty
+rate shows a sharp increase in early 2020.</p></li>
 <li><p><strong>Auxílio Emergencial effect (May-December 2020)</strong>:
 Emergency cash transfers dramatically reduced poverty below pre-pandemic
 levels.</p></li>
@@ -698,7 +628,7 @@ weights:</p>
 <span></span>
 <span><span class="co"># Poverty rate with confidence interval</span></span>
 <span><span class="va">poverty_estimate</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survey/man/surveysummary.html" class="external-link">svymean</a></span><span class="op">(</span></span>
-<span>  <span class="op">~</span><span class="fu"><a href="https://rdrr.io/r/base/AsIs.html" class="external-link">I</a></span><span class="op">(</span><span class="va">rendaDom_mista_pc</span> <span class="op">&lt;</span> <span class="va">linhaPobreza_WB_media</span><span class="op">)</span>,</span>
+<span>  <span class="op">~</span><span class="fu"><a href="https://rdrr.io/r/base/AsIs.html" class="external-link">I</a></span><span class="op">(</span><span class="va">hhinc_pc</span> <span class="op">&lt;</span> <span class="va">poverty_line</span><span class="op">)</span>,</span>
 <span>  <span class="va">design</span>,</span>
 <span>  na.rm <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
@@ -717,7 +647,7 @@ function can help remove these patterns:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Three-month centered rolling average</span></span>
 <span><span class="va">monthly_poverty</span><span class="op">[</span>, <span class="va">poverty_rate_smoothed</span> <span class="op">:=</span></span>
-<span>                  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/froll.html" class="external-link">frollmean</a></span><span class="op">(</span><span class="va">poverty_rate_media</span>, <span class="fl">3</span>, align <span class="op">=</span> <span class="st">"center"</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<span>                  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/froll.html" class="external-link">frollmean</a></span><span class="op">(</span><span class="va">poverty_rate</span>, <span class="fl">3</span>, align <span class="op">=</span> <span class="st">"center"</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 <div class="float">
 <img src="figures/annual-poverty-analysis/fig-smoothing-comparison.png" style="width:100.0%" alt="Raw vs Smoothed Monthly Poverty Rate"><div class="figcaption">Raw vs Smoothed Monthly Poverty Rate</div>
 </div>
@@ -726,60 +656,6 @@ real month-to-month dynamics. Use smoothing for trend visualization, but
 report raw estimates for specific months of interest.</p>
 <hr>
 </div>
-</div>
-<div class="section level2">
-<h2 id="validation">Validation<a class="anchor" aria-label="anchor" href="#validation"></a>
-</h2>
-<p>Does mensalization introduce systematic bias? We can check by
-comparing mensalized monthly estimates (aggregated to annual) against
-direct annual estimates computed from the same PNADC annual data using
-original survey weights:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># 1. Aggregate monthly estimates to annual</span></span>
-<span><span class="va">annual_from_monthly</span> <span class="op">&lt;-</span> <span class="va">monthly_poverty</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  ano <span class="op">=</span> <span class="va">ref_month_yyyymm</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">100</span>,</span>
-<span>  <span class="va">poverty_rate_media</span></span>
-<span><span class="op">)</span><span class="op">]</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  monthly_avg <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">poverty_rate_media</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ano</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># 2. Compute direct annual estimates (no mensalization)</span></span>
-<span><span class="va">d_annual_valid</span> <span class="op">&lt;-</span> <span class="va">d</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">rendaDom_mista_pc</span><span class="op">)</span> <span class="op">&amp;</span></span>
-<span>                    <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">v1032</span><span class="op">)</span> <span class="op">&amp;</span></span>
-<span>                    <span class="va">rendaDom_mista_pc</span> <span class="op">&gt;=</span> <span class="fl">0</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">annual_direct</span> <span class="op">&lt;-</span> <span class="va">d_annual_valid</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  direct_estimate <span class="op">=</span> <span class="fu">fgt</span><span class="op">(</span></span>
-<span>    x <span class="op">=</span> <span class="va">rendaDom_mista_pc</span>,</span>
-<span>    z <span class="op">=</span> <span class="va">linhaPobreza_WB_media</span>,</span>
-<span>    w <span class="op">=</span> <span class="va">v1032</span>,</span>
-<span>    alpha <span class="op">=</span> <span class="fl">0</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ano</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># 3. Compare</span></span>
-<span><span class="va">validation_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">annual_from_monthly</span>, <span class="va">annual_direct</span>, by <span class="op">=</span> <span class="st">"ano"</span><span class="op">)</span></span></code></pre></div>
-<div class="float">
-<img src="figures/annual-poverty-analysis/fig-validation.png" style="width:100.0%" alt="Validation: Mensalized vs Direct Annual Estimates"><div class="figcaption">Validation: Mensalized vs Direct Annual
-Estimates</div>
-</div>
-<p>The high correlation and tight clustering around the diagonal confirm
-that mensalization preserves annual-level estimates while enabling
-monthly disaggregation. Small discrepancies are expected due to:</p>
-<ul>
-<li>
-<strong>Determination rate</strong>: ~3% of observations lack
-determined reference months</li>
-<li>
-<strong>Weight calibration</strong>: Monthly weights are
-recalibrated to external population totals</li>
-<li>
-<strong>Averaging method</strong>: Monthly series averaged
-vs. single annual calculation</li>
-</ul>
-<p>For most research purposes, discrepancies under 2% relative
-difference are acceptable.</p>
-<hr>
 </div>
 <div class="section level2">
 <h2 id="summary">Summary<a class="anchor" aria-label="anchor" href="#summary"></a>

@@ -70,7 +70,7 @@ When exactly did poverty spike during COVID-19? Official annual statistics tell 
 
 **Monthly data can.**
 
-This vignette demonstrates a powerful technique: combining the mensalization algorithm with **annual PNADC data** to produce monthly poverty statistics. The annual PNADC releases contain detailed income breakdowns---itemized transfer income, work income by type, and other sources---that aren't available in the quarterly releases. By merging a mensalization crosswalk (from quarterly data) with annual income data, we get the best of both worlds: monthly temporal precision with comprehensive income measurement.
+This vignette demonstrates a powerful technique: combining the mensalization algorithm with **annual PNADC data** to produce monthly poverty statistics. The annual PNADC releases contain comprehensive household income measures that aren't available in the quarterly releases. By merging a mensalization crosswalk (from quarterly data) with annual income data, we get the best of both worlds: monthly temporal precision with comprehensive income measurement.
 
 ![Data Workflow: Monthly Poverty Analysis with Annual PNADC](figures/annual-poverty-analysis/fig-workflow-diagram.png){width=100%}
 
@@ -97,15 +97,16 @@ If you want to see the end result before diving into the methodology, here's wha
 
 ```{r quick-preview, eval=FALSE}
 # Load pre-computed monthly poverty estimates
-monthly_poverty <- fst::read_fst("monthly_poverty_aggregates.fst", as.data.table = TRUE)
+monthly_poverty <- fst::read_fst("monthly_poverty_aggregates.fst",
+                                  as.data.table = TRUE)
 
 # Monthly poverty rate for March 2020 (COVID onset)
-monthly_poverty[ref_month_yyyymm == 202003, poverty_rate_media]
-#> [1] 0.142  # ~14.2% below USD 4.20/day poverty line
+monthly_poverty[ref_month_yyyymm == 202003, poverty_rate]
+#> [1] 0.25  # ~25% below USD 8.30/day poverty line
 
 # Compare to December 2020 (after Auxílio Emergencial)
-monthly_poverty[ref_month_yyyymm == 202012, poverty_rate_media]
-#> [1] 0.087  # ~8.7% - a dramatic reduction
+monthly_poverty[ref_month_yyyymm == 202012, poverty_rate]
+#> [1] 0.19  # Reduced due to emergency transfers
 ```
 
 The rest of this vignette explains how to produce these estimates from raw PNADC data.
@@ -165,17 +166,17 @@ For poverty analysis, we recommend **dropping observations without determined re
 
 | Variable | Description | Category |
 |----------|-------------|----------|
-| `vd4019` | Habitual work income | Labor |
-| `vd4048` | Base household income | Aggregate |
-| `v5001a2` | BPC (continuous cash benefit) | Transfer |
-| `v5002a2` | Bolsa Família | Transfer |
-| `v5003a2` | Other social programs (incl. Auxílio) | Transfer |
-| `v5004a2` | Pensions | Transfer |
-| `v5005a2` | Unemployment insurance | Transfer |
-| `v5006a2` | Donations received | Other |
-| `v5007a2` | Rental income | Other |
+| `vd5008` | Household per capita income | Income |
 | `v2005` | Position in household | Filter |
+| `v2009` | Age | Demographics |
 | `v1032` | Survey weight | Design |
+| `uf` | State | Geography |
+| `estrato` | Survey stratum | Design |
+
+> **Why VD5008?** IBGE pre-calculates this variable to include all income sources
+> (labor, transfers, pensions, other) and divides by household size. Using VD5008
+> directly ensures consistency with official IBGE statistics and simplifies the
+> workflow.
 
 ---
 
@@ -254,11 +255,8 @@ annual_vars <- c(
   "v2005", "v2007", "v2009", "v2010", "uf", "estrato",
   # Weights
   "v1032",
-  # Work income
-  "vd4019", "vd4020", "vd4047", "vd4048",
-  # Transfer income (post-2015 format)
-  "v5001a2", "v5002a2", "v5003a2", "v5004a2",
-  "v5005a2", "v5006a2", "v5007a2", "v5008a2"
+  # Household per capita income (IBGE pre-calculated)
+  "vd5008"
 )
 
 # Load and stack annual data
@@ -304,47 +302,18 @@ mean(!is.na(d$ref_month_in_quarter))
 
 ### Step 4: Construct Per Capita Income
 
-Calculate household per capita income from the component sources:
+Use IBGE's pre-calculated household per capita income variable:
 
 ```{r construct-income}
 # Filter to household members only
 d <- d[v2005 <= 14 | v2005 == 16]
 
-# Set NA income values to 0
-income_vars <- c("vd4019", "vd4020", "vd4047", "vd4048",
-                 "v5001a2", "v5002a2", "v5003a2", "v5004a2",
-                 "v5005a2", "v5006a2", "v5007a2", "v5008a2")
-for (v in income_vars) {
-  if (v %in% names(d)) d[is.na(get(v)), (v) := 0]
-}
-
 # Create household ID
 d[, id_dom := paste(upa, v1008, v1014, sep = "_")]
 
-# Count household members
-d[, n_members := .N, by = .(ano, trimestre, id_dom)]
-
-# Rename and create per capita income variables
-d[, `:=`(
-  rendaTrab_ha_pc    = sum(vd4019) / n_members,
-  rendaDom_base_pc   = sum(vd4048) / n_members,
-  rendaBPC_pc        = sum(v5001a2) / n_members,
-  rendaBolsaFam_pc   = sum(v5002a2) / n_members,
-  rendaOutProgs_pc   = sum(v5003a2) / n_members,  # Includes Auxílio Emergencial
-  rendaPrevid_pc     = sum(v5004a2) / n_members,
-  rendaSegDesemp_pc  = sum(v5005a2) / n_members,
-  rendaDoacoes_pc    = sum(v5006a2) / n_members,
-  rendaAlugueis_pc   = sum(v5007a2) / n_members
-), by = .(ano, trimestre, id_dom)]
-
-# Main income measure: per capita household income
-# NOTE: VD4048 already includes all income sources (work, transfers, other)
-# so we use it directly rather than adding VD4019 which would double-count work income
-d[, rendaDom_mista_pc := rendaDom_base_pc]
-
-# Counterfactual income (without emergency aid during 2020-2021)
-# Subtracts "other programs" (v5003a2 - includes Auxílio Emergencial) and Bolsa Família
-d[, rendaDom_semAux_pc := rendaDom_mista_pc - rendaOutProgs_pc - rendaBolsaFam_pc]
+# Use IBGE's pre-calculated per capita household income
+# VD5008 already accounts for all income sources and household size
+d[, hhinc_pc_nominal := fifelse(is.na(vd5008), 0, vd5008)]
 ```
 
 ### Step 5: Apply Deflation
@@ -362,66 +331,45 @@ setkeyv(deflator, c("ano", "trimestre", "uf"))
 setkeyv(d, c("ano", "trimestre", "uf"))
 d <- deflator[d]
 
-# INPC adjustment factor to reference date (August 2025)
+# INPC adjustment factor to reference date (December 2025)
 inpc_factor <- deflateBR::inpc(1,
-                                nominal_dates = as.Date("2024-07-01"),
-                                real_date = "08/2025")
+                               nominal_dates = as.Date("2024-07-01"),
+                               real_date = "12/2025")
 
 # Apply deflation
-d[, `:=`(
-  rendaDom_mista_pc  = rendaDom_mista_pc * CO2e * inpc_factor,
-  rendaDom_semAux_pc = rendaDom_semAux_pc * CO2e * inpc_factor
-)]
+d[, hhinc_pc := hhinc_pc_nominal * CO2 * inpc_factor]
 ```
 
-### Step 6: Define Poverty Lines
+### Step 6: Define Poverty Line
 
-Calculate World Bank PPP-based poverty thresholds:
+Calculate the World Bank PPP-based poverty threshold:
 
 ```{r define-poverty-lines}
-# World Bank poverty lines (2025 values)
-usd_to_brl_ppp <- 1.66      # 2011 PPP conversion factor
+# World Bank poverty line: USD 8.30 PPP per day (upper-middle income threshold)
+poverty_line_830_ppp_daily <- 8.30
+
+# 2021 PPP conversion factor (World Bank)
+# https://data.worldbank.org/indicator/PA.NUS.PRVT.PP?year=2021
+usd_to_brl_ppp <- 2.45
 days_to_month <- 365/12
 
-# Three poverty lines (USD PPP per day)
-linha_baixa_usd <- 3.00   # Extreme poverty
-linha_media_usd <- 4.20   # Moderate poverty
-linha_alta_usd  <- 8.30   # Upper poverty
+# Monthly value in 2021 BRL
+poverty_line_830_brl_monthly_2021 <- poverty_line_830_ppp_daily *
+                                     usd_to_brl_ppp * days_to_month
 
-# Monthly values in 2011 BRL
-linha_baixa_2011 <- linha_baixa_usd * usd_to_brl_ppp * days_to_month
-linha_media_2011 <- linha_media_usd * usd_to_brl_ppp * days_to_month
-linha_alta_2011  <- linha_alta_usd * usd_to_brl_ppp * days_to_month
+# Deflate to December 2025 reference
+poverty_line_830_brl_monthly_2025 <- deflateBR::inpc(
+  poverty_line_830_brl_monthly_2021,
+  nominal_dates = as.Date("2021-07-01"),
+  real_date = "12/2025"
+)
 
-# Deflate to reference period using state-specific CO3
-if (exists("deflator") && "CO3" %in% names(deflator)) {
-  linha_ref <- deflator[ano == 2011 & trimestre == 1, .(uf, CO3)][!is.na(CO3)]
-
-  if (nrow(linha_ref) > 0) {
-    linha_ref[, `:=`(
-      linhaPobreza_WB_baixa = linha_baixa_2011 * CO3 * inpc_factor,
-      linhaPobreza_WB_media = linha_media_2011 * CO3 * inpc_factor,
-      linhaPobreza_WB_alta  = linha_alta_2011 * CO3 * inpc_factor
-    )]
-
-    # Merge with data
-    setkeyv(linha_ref, "uf")
-    setkeyv(d, "uf")
-    d[linha_ref, `:=`(
-      linhaPobreza_WB_baixa = i.linhaPobreza_WB_baixa,
-      linhaPobreza_WB_media = i.linhaPobreza_WB_media,
-      linhaPobreza_WB_alta  = i.linhaPobreza_WB_alta
-    )]
-  }
-} else {
-  # Use national average if deflators not available
-  d[, `:=`(
-    linhaPobreza_WB_baixa = linha_baixa_2011 * inpc_factor,
-    linhaPobreza_WB_media = linha_media_2011 * inpc_factor,
-    linhaPobreza_WB_alta  = linha_alta_2011 * inpc_factor
-  )]
-}
+d[, poverty_line := poverty_line_830_brl_monthly_2025]
 ```
+
+> **Why USD 8.30/day?** This is the World Bank's upper-middle income poverty
+> threshold, appropriate for Brazil. We use the 2021 PPP conversion factor
+> (2.45 BRL per USD) which is the most recent available.
 
 ---
 
@@ -458,22 +406,22 @@ Calculate monthly poverty rates using the FGT family:
 # Filter to determined observations
 d_monthly <- d[!is.na(ref_month_yyyymm)]
 
-# Use monthly weight where available, fall back to annual weight
-d_monthly[, peso := fifelse(is.na(weight_monthly), v1032, weight_monthly)]
+# Use monthly weight
+d_monthly[, peso := weight_monthly]
 
 # Compute monthly poverty statistics
 monthly_poverty <- d_monthly[, .(
   # FGT-0 (Headcount ratio)
-  poverty_rate_baixa = fgt(rendaDom_mista_pc, linhaPobreza_WB_baixa, peso, alpha = 0),
-  poverty_rate_media = fgt(rendaDom_mista_pc, linhaPobreza_WB_media, peso, alpha = 0),
-  poverty_rate_alta  = fgt(rendaDom_mista_pc, linhaPobreza_WB_alta, peso, alpha = 0),
+  poverty_rate = fgt(hhinc_pc, poverty_line, peso, alpha = 0),
 
   # FGT-1 (Poverty gap)
-  poverty_gap_baixa = fgt(rendaDom_mista_pc, linhaPobreza_WB_baixa, peso, alpha = 1),
-  poverty_gap_media = fgt(rendaDom_mista_pc, linhaPobreza_WB_media, peso, alpha = 1),
+  poverty_gap = fgt(hhinc_pc, poverty_line, peso, alpha = 1),
 
-  # Counterfactual (without emergency aid)
-  poverty_rate_baixa_semAux = fgt(rendaDom_semAux_pc, linhaPobreza_WB_baixa, peso, alpha = 0)
+  # Mean income
+  mean_income = wtd.mean(hhinc_pc, peso),
+
+  # Sample size
+  n_obs = .N
 
 ), by = ref_month_yyyymm]
 
@@ -490,7 +438,7 @@ The figure reveals several key dynamics:
 
 1. **Pre-COVID baseline**: Poverty rates were gradually declining from 2015-2019, recovering from the 2015-2016 recession.
 
-2. **COVID-19 spike (March-April 2020)**: All three poverty lines show a sharp increase in early 2020.
+2. **COVID-19 spike (March-April 2020)**: The poverty rate shows a sharp increase in early 2020.
 
 3. **Auxílio Emergencial effect (May-December 2020)**: Emergency cash transfers dramatically reduced poverty below pre-pandemic levels.
 
@@ -516,7 +464,7 @@ design <- svydesign(
 
 # Poverty rate with confidence interval
 poverty_estimate <- svymean(
-  ~I(rendaDom_mista_pc < linhaPobreza_WB_media),
+  ~I(hhinc_pc < poverty_line),
   design,
   na.rm = TRUE
 )
@@ -533,55 +481,12 @@ The raw monthly series may show quarterly artifacts from IBGE's rotating panel d
 ```{r example-smoothing}
 # Three-month centered rolling average
 monthly_poverty[, poverty_rate_smoothed :=
-                  frollmean(poverty_rate_media, 3, align = "center")]
+                  frollmean(poverty_rate, 3, align = "center")]
 ```
 
 ![Raw vs Smoothed Monthly Poverty Rate](figures/annual-poverty-analysis/fig-smoothing-comparison.png){width=100%}
 
 **Caution**: Smoothing removes noise but may also mask real month-to-month dynamics. Use smoothing for trend visualization, but report raw estimates for specific months of interest.
-
----
-
-## Validation
-
-Does mensalization introduce systematic bias? We can check by comparing mensalized monthly estimates (aggregated to annual) against direct annual estimates computed from the same PNADC annual data using original survey weights:
-
-```{r validation}
-# 1. Aggregate monthly estimates to annual
-annual_from_monthly <- monthly_poverty[, .(
-  ano = ref_month_yyyymm %/% 100,
-  poverty_rate_media
-)][, .(
-  monthly_avg = mean(poverty_rate_media, na.rm = TRUE)
-), by = ano]
-
-# 2. Compute direct annual estimates (no mensalization)
-d_annual_valid <- d[!is.na(rendaDom_mista_pc) &
-                    !is.na(v1032) &
-                    rendaDom_mista_pc >= 0]
-
-annual_direct <- d_annual_valid[, .(
-  direct_estimate = fgt(
-    x = rendaDom_mista_pc,
-    z = linhaPobreza_WB_media,
-    w = v1032,
-    alpha = 0
-  )
-), by = ano]
-
-# 3. Compare
-validation_data <- merge(annual_from_monthly, annual_direct, by = "ano")
-```
-
-![Validation: Mensalized vs Direct Annual Estimates](figures/annual-poverty-analysis/fig-validation.png){width=100%}
-
-The high correlation and tight clustering around the diagonal confirm that mensalization preserves annual-level estimates while enabling monthly disaggregation. Small discrepancies are expected due to:
-
-- **Determination rate**: ~3% of observations lack determined reference months
-- **Weight calibration**: Monthly weights are recalibrated to external population totals
-- **Averaging method**: Monthly series averaged vs. single annual calculation
-
-For most research purposes, discrepancies under 2% relative difference are acceptable.
 
 ---
 
