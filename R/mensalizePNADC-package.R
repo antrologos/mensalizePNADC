@@ -59,11 +59,17 @@ utils::globalVariables(c(
   "upa_month_min_final", "upa_month_max_final",
   "requires_exception", "requires_exc_m1", "requires_exc_m2", "requires_exc_m3",
   "trim_exc_m1", "trim_exc_m2", "trim_exc_m3",
-  # Computed variables - weight calibration
+  # Computed variables - reference week identification
+  "ref_week", "ref_week_in_quarter", "ref_week_iso_yyyyww",
+  "week_min_yyyyww", "week_max_yyyyww", "week_min_pos", "week_max_pos",
+  "alt_week_min_yyyyww", "alt_week_max_yyyyww",
+  "hh_week_min", "hh_week_max", "alt_hh_week_min", "alt_hh_week_max",
+  "trim_has_exception",
+  # Computed variables - weight calibration (monthly and weekly)
   "celula1", "celula2", "celula3", "celula4",
-  "weight_current", "weight_calibrated", "weight_monthly",
-  "pop_quarter", "pop_month", "n_cells_quarter", "n_cells_month",
-  "m_populacao", "z_populacao",
+  "weight_current", "weight_calibrated", "weight_monthly", "weight_weekly",
+  "pop_quarter", "pop_month", "pop_week", "n_cells_quarter", "n_cells_month", "n_cells_week",
+  "m_populacao", "z_populacao", "w_populacao",
   # Computed variables - SIDRA population fetch
   "Valor", "anomesexato", "anomesfinaltrimmovel", "populacao",
   # Computed variables - smooth aggregates
@@ -71,12 +77,15 @@ utils::globalVariables(c(
   "row_num", "row_num2", "d_pop", "quarter_yyyyq",
   # Computed variables - smooth_single_variable optimization
   "d3_filled", "cum_values", "row_idx", "e0", "mean_e0",
+  # Computed variables - monthly to weekly targets
+  "yyyyww", "yyyymm", "n_days",
   # data.table join prefix variables (i.* references right table columns)
   "i.month1", "i.month2", "i.month3",
   "i.first_sat_m1", "i.first_sat_m2", "i.first_sat_m3",
   "i.alt_sat_m1", "i.alt_sat_m2", "i.alt_sat_m3",
   "i.ref_month", "i.ref_month_in_quarter", "i.ref_month_yyyymm",
-  "i.m_populacao",
+  "i.ref_week", "i.ref_week_in_quarter", "i.ref_week_iso_yyyyww",
+  "i.m_populacao", "i.w_populacao",
   # data.table special symbols and output column reference
   ".SD", ".N", ".I", "..output_cols", ".",
   # Annual data calibration variables

@@ -290,3 +290,211 @@ month_in_quarter <- function(date) {
   ((month - 1L) %% 3L) + 1L
 }
 
+# ============================================================================
+# ISO 8601 Week Utilities
+# ISO week 1 is the week containing January 4th (equivalently, the first week
+# with at least 4 days in the new year). Weeks start on Monday.
+# ============================================================================
+
+#' ISO Week Number
+#'
+#' Returns the ISO 8601 week number for a date. Week 1 is the week containing
+#' January 4th (equivalently, the first week with at least 4 days in January).
+#'
+#' @param date Date vector
+#' @return Integer vector of ISO week numbers (1-53)
+#' @keywords internal
+#' @noRd
+iso_week <- function(date) {
+  data.table::isoweek(date)
+}
+
+#' ISO Week-Year
+#'
+#' Returns the ISO 8601 week-year for a date. This may differ from the calendar
+#' year for dates near year boundaries (e.g., Dec 31 may be in week 1 of the
+#' next year, and Jan 1-3 may be in week 52/53 of the previous year).
+#'
+#' @param date Date vector
+#' @return Integer vector of ISO week-years
+#' @keywords internal
+#' @noRd
+iso_year <- function(date) {
+  # ISO year: the year of the Thursday in that week
+
+  # Thursday of the week = date + (4 - ISO weekday)
+  # ISO weekday: Mon=1, ..., Sun=7
+  # data.table::wday returns 1=Sun, 2=Mon, ..., 7=Sat
+  # Convert: ISO weekday = ((wday + 5) %% 7) + 1
+  wday_dt <- data.table::wday(date)
+  iso_wday <- ((wday_dt + 5L) %% 7L) + 1L
+  thursday <- date + (4L - iso_wday)
+  data.table::year(thursday)
+}
+
+#' Create ISO Week Integer (YYYYWW format)
+#'
+#' Creates an integer in YYYYWW format from ISO year and week.
+#'
+#' @param iso_yr Integer ISO week-year
+#' @param iso_wk Integer ISO week number (1-53)
+#' @return Integer in YYYYWW format (e.g., 202301 for week 1 of 2023)
+#' @keywords internal
+#' @noRd
+yyyyww <- function(iso_yr, iso_wk) {
+  as.integer(iso_yr * 100L + iso_wk)
+}
+
+#' Convert Date to YYYYWW Format
+#'
+#' @param date Date vector
+#' @return Integer vector in YYYYWW format
+#' @keywords internal
+#' @noRd
+date_to_yyyyww <- function(date) {
+  yyyyww(iso_year(date), iso_week(date))
+}
+
+#' Monday of ISO Week
+#'
+#' Returns the Monday (first day) of the ISO week containing the given date.
+#'
+#' @param date Date vector
+#' @return Date vector of Mondays
+#' @keywords internal
+#' @noRd
+iso_week_monday <- function(date) {
+  # data.table::wday returns 1=Sun, 2=Mon, ..., 7=Sat
+  # Convert to ISO weekday: Mon=1, Tue=2, ..., Sun=7
+  wday_dt <- data.table::wday(date)
+  iso_wday <- ((wday_dt + 5L) %% 7L) + 1L
+  date - (iso_wday - 1L)
+}
+
+#' Number of ISO Weeks in Year
+#'
+#' Returns 52 or 53 depending on the year's structure.
+#' A year has 53 weeks if:
+#' - January 1 is a Thursday, OR
+#' - January 1 is a Wednesday and it's a leap year
+#'
+#' @param year Integer year vector
+#' @return Integer vector (52 or 53)
+#' @keywords internal
+#' @noRd
+iso_weeks_in_year <- function(year) {
+  jan1 <- make_date(year, 1L, 1L)
+  jan1_dow <- dow(jan1)  # 0=Sun, 1=Mon, ..., 6=Sat
+
+  # Thursday = dow 4, Wednesday = dow 3
+  is_thursday <- (jan1_dow == 4L)
+  is_wednesday <- (jan1_dow == 3L)
+  is_leap <- is_leap_year(year)
+
+  data.table::fifelse(is_thursday | (is_wednesday & is_leap), 53L, 52L)
+}
+
+#' Week Position in Quarter
+#'
+#' Returns which week within the quarter (1-14 typically) a date falls in.
+#' The position is calculated relative to the first Monday of the quarter.
+#'
+#' @param date Date vector
+#' @param quarter Integer vector of quarters (1-4)
+#' @param year Integer vector of years
+#' @return Integer vector (1-14, or NA if date is before quarter start)
+#' @keywords internal
+#' @noRd
+week_in_quarter <- function(date, quarter, year) {
+  # Get first day of the quarter
+  first_month <- quarter_first_month(quarter)
+  quarter_start <- make_date(year, first_month, 1L)
+
+  # Find the Monday of the week containing quarter_start
+  quarter_start_monday <- iso_week_monday(quarter_start)
+
+  # If that Monday is before the quarter starts, use the next Monday
+  # This ensures week 1 is the first full or partial week IN the quarter
+  first_monday <- data.table::fifelse(
+    quarter_start_monday < quarter_start,
+    quarter_start_monday + 7L,
+    quarter_start_monday
+  )
+
+  # Get Monday of the target date's week
+  date_monday <- iso_week_monday(date)
+
+  # Calculate week position (1-indexed)
+  week_pos <- as.integer((as.integer(date_monday) - as.integer(first_monday)) / 7L) + 1L
+
+  # Return NA for dates before the first Monday of the quarter
+  data.table::fifelse(date_monday < first_monday, NA_integer_, week_pos)
+}
+
+#' Convert YYYYWW to Date (Monday of that week)
+#'
+#' @param yyyyww Integer in YYYYWW format
+#' @return Date vector (Monday of the specified ISO week)
+#' @keywords internal
+#' @noRd
+yyyyww_to_date <- function(yyyyww) {
+  iso_yr <- yyyyww %/% 100L
+  iso_wk <- yyyyww %% 100L
+
+
+  # Find January 4 of the ISO year (always in week 1)
+  jan4 <- make_date(iso_yr, 1L, 4L)
+
+  # Find Monday of week 1
+  week1_monday <- iso_week_monday(jan4)
+
+  # Add weeks to get target Monday
+  week1_monday + (iso_wk - 1L) * 7L
+}
+
+#' Count Weeks in Month
+#'
+#' Returns the number of ISO weeks that have at least one day in a given month.
+#' Used for distributing monthly population to weekly targets.
+#'
+#' @param year Integer year
+#' @param month Integer month (1-12)
+#' @return Integer count of weeks touching this month
+#' @keywords internal
+#' @noRd
+weeks_in_month <- function(year, month) {
+  # First and last day of month
+  first_day <- make_date(year, month, 1L)
+
+  # Calculate last day of month
+  days_in_month <- c(31L, 28L, 31L, 30L, 31L, 30L, 31L, 31L, 30L, 31L, 30L, 31L)
+  last_day_num <- days_in_month[month]
+  # Adjust for leap year February
+  last_day_num <- data.table::fifelse(
+    month == 2L & is_leap_year(year),
+    29L,
+    last_day_num
+  )
+  last_day <- make_date(year, month, last_day_num)
+
+  # Get ISO weeks of first and last day
+  first_week <- date_to_yyyyww(first_day)
+  last_week <- date_to_yyyyww(last_day)
+
+  # Handle year boundary (e.g., Dec having weeks in next ISO year)
+  # We need to count distinct weeks, accounting for year wrap
+  first_yr <- first_week %/% 100L
+  first_wk <- first_week %% 100L
+  last_yr <- last_week %/% 100L
+  last_wk <- last_week %% 100L
+
+  # If same ISO year, simple subtraction
+  # If different years (Dec spanning into next year's week 1), adjust
+  data.table::fifelse(
+    first_yr == last_yr,
+    last_wk - first_wk + 1L,
+    # Different years: weeks from first to end of first_yr, plus weeks 1 to last_wk
+    (iso_weeks_in_year(first_yr) - first_wk + 1L) + last_wk
+  )
+}
+

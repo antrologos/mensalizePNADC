@@ -237,6 +237,71 @@ validate_monthly_totals <- function(monthly_totals, stop_on_error = TRUE) {
   invisible(length(issues) == 0)
 }
 
+#' Required Variables for Reference Week Identification
+#'
+#' Returns the minimum required column names for identifying reference weeks.
+#' Same as monthly, but V1008 (household) is essential for aggregation.
+#'
+#' @return Character vector of required column names
+#' @keywords internal
+#' @noRd
+required_vars_ref_week <- function() {
+  c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2008", "V20081", "V20082", "V2009")
+}
+
+#' Required Variables for Weekly Totals
+#'
+#' Returns the required column names for the weekly population totals data.
+#'
+#' @return Character vector of required column names
+#' @keywords internal
+#' @noRd
+required_vars_weekly_totals <- function() {
+  c("ref_week_iso_yyyyww", "w_populacao")
+}
+
+#' Validate Weekly Totals Data
+#'
+#' Checks that weekly totals data has required structure.
+#'
+#' @param weekly_totals A data.frame with weekly population totals
+#' @param stop_on_error Logical. If TRUE, stops with an error.
+#'
+#' @return Validation result or stops with error
+#' @keywords internal
+#' @noRd
+validate_weekly_totals <- function(weekly_totals, stop_on_error = TRUE) {
+  checkmate::assert_data_frame(weekly_totals, min.rows = 1)
+
+  issues <- list()
+
+  # Check for required columns
+  has_yyyyww <- "ref_week_iso_yyyyww" %in% names(weekly_totals)
+  if (!has_yyyyww) {
+    issues$missing_date <- "Need 'ref_week_iso_yyyyww' column"
+  }
+
+  has_pop <- "w_populacao" %in% names(weekly_totals)
+  if (!has_pop) {
+    issues$missing_population <- "Need 'w_populacao' column with weekly population totals"
+  }
+
+  if (stop_on_error && length(issues) > 0) {
+    msg <- paste0(
+      "Weekly totals validation failed:\n",
+      paste(
+        vapply(names(issues), function(nm) {
+          paste0("  - ", nm, ": ", issues[[nm]])
+        }, character(1)),
+        collapse = "\n"
+      )
+    )
+    stop(msg, call. = FALSE)
+  }
+
+  invisible(length(issues) == 0)
+}
+
 #' Check for Data.table
 #'
 #' Ensures data is a data.table, converting if necessary.
