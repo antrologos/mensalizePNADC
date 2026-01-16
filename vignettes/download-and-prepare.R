@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 # library(PNADcIBGE)
 # library(tidyverse)
 # library(fst)
-# library(mensalizePNADC)
+# library(PNADCperiods)
 
 ## ----setup-dir----------------------------------------------------------------
 # # Set your data directory (adjust path as needed)
@@ -109,16 +109,22 @@ knitr::opts_chunk$set(
 # cat("Total observations:", format(nrow(pnadc_stacked), big.mark = ","), "\n")
 
 ## ----mensalize----------------------------------------------------------------
-# # Apply mensalization with monthly weight computation
-# result <- mensalizePNADC(
-#   data = pnadc_stacked,
-#   compute_weights = TRUE,
-#   verbose = TRUE
-# )
+# # Step 1: Build crosswalk (identify reference periods)
+# crosswalk <- pnadc_identify_periods(pnadc_stacked, verbose = TRUE)
 # 
 # # Check the determination rate
 # cat("Determination rate:",
-#     sprintf("%.1f%%", attr(result, "determination_rate") * 100), "\n")
+#     sprintf("%.1f%%", attr(crosswalk, "determination_rates")$month * 100), "\n")
+# 
+# # Step 2: Apply crosswalk and calibrate weights
+# result <- pnadc_apply_periods(
+#   data = pnadc_stacked,
+#   crosswalk = crosswalk,
+#   weight_var = "V1028",
+#   anchor = "quarter",
+#   calibrate = TRUE,
+#   verbose = TRUE
+# )
 
 ## ----explore------------------------------------------------------------------
 # # View the result structure

@@ -9,8 +9,15 @@ knitr::opts_chunk$set(
 # # Load full data with all required variables
 # pnadc_full <- fread("pnadc_stacked_full.csv")
 # 
-# # Run mensalization with weight computation
-# result <- mensalizePNADC(pnadc_full, compute_weights = TRUE, verbose = TRUE)
+# # Step 1: Build crosswalk
+# crosswalk <- pnadc_identify_periods(pnadc_full, verbose = TRUE)
+# 
+# # Step 2: Apply crosswalk and calibrate weights
+# result <- pnadc_apply_periods(pnadc_full, crosswalk,
+#                                weight_var = "V1028",
+#                                anchor = "quarter",
+#                                calibrate = TRUE,
+#                                verbose = TRUE)
 # 
 # # Use weight_monthly for monthly estimates
 # monthly_pop <- result[, .(
@@ -18,32 +25,37 @@ knitr::opts_chunk$set(
 # ), by = ref_month_yyyymm]
 
 ## ----keep-all-example---------------------------------------------------------
-# # Default: returns all rows (indeterminate have weight_monthly = NA)
-# result <- mensalizePNADC(pnadc_full, compute_weights = TRUE)
+# # Build crosswalk and apply (returns all rows by default)
+# crosswalk <- pnadc_identify_periods(pnadc_full)
+# result <- pnadc_apply_periods(pnadc_full, crosswalk,
+#                                weight_var = "V1028",
+#                                anchor = "quarter")
+# 
 # nrow(result) == nrow(pnadc_full)  # TRUE - all rows returned
 # sum(is.na(result$weight_monthly))  # ~3% of rows have NA weights
 # 
 # # Use na.rm = TRUE when aggregating
 # monthly_pop <- result[, .(pop = sum(weight_monthly, na.rm = TRUE)), by = ref_month_yyyymm]
 # 
-# # Alternative: returns only determined rows
-# result_determined <- mensalizePNADC(pnadc_full, compute_weights = TRUE, keep_all = FALSE)
+# # Filter to determined rows for analysis
+# result_determined <- result[!is.na(ref_month_in_quarter)]
 # nrow(result_determined) < nrow(pnadc_full)  # TRUE (~97% of rows)
 
 ## ----annual-workflow----------------------------------------------------------
 # # Step 1: Create crosswalk from quarterly data
 # # (birthday variables are in quarterly data, not annual)
 # quarterly_data <- fread("pnadc_quarterly_stacked.csv")
-# crosswalk <- mensalizePNADC(quarterly_data, compute_weights = TRUE)
+# crosswalk <- pnadc_identify_periods(quarterly_data)
 # 
 # # Step 2: Load annual data with income variables
 # annual_data <- fread("pnadc_annual_visit1_stacked.csv")
 # 
 # # Step 3: Apply crosswalk and calibrate annual weights
-# result <- mensalize_annual_pnadc(
-#   annual_data = annual_data,
-#   crosswalk = crosswalk,
-#   calibrate_weights = TRUE,  # Use V1032 → weight_monthly
+# result <- pnadc_apply_periods(
+#   annual_data, crosswalk,
+#   weight_var = "V1032",
+#   anchor = "year",
+#   calibrate = TRUE,
 #   verbose = TRUE
 # )
 # 

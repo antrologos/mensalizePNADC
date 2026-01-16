@@ -12,7 +12,7 @@
 
 
 
-<title>How mensalizePNADC Works</title>
+<title>How PNADCperiods Works</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -337,16 +337,16 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">How mensalizePNADC Works</h1>
+<h1 class="title toc-ignore">How PNADCperiods Works</h1>
 
 
 
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
-<p>This vignette explains <strong>how the mensalizePNADC algorithm
+<p>This vignette explains <strong>how the PNADCperiods algorithm
 works</strong>: the methodology behind identifying reference months and
 computing monthly weights. For practical usage examples, see the <a href="getting-started.html">Get Started</a> vignette.</p>
-<p>The <code>mensalizePNADC</code> package converts Brazil’s quarterly
+<p>The <code>PNADCperiods</code> package converts Brazil’s quarterly
 PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data
 into monthly time series. It provides two main capabilities:</p>
 <ol style="list-style-type: decimal">
@@ -412,8 +412,8 @@ for monthly (instead of quarterly) estimates</li>
 </tr>
 </tbody>
 </table>
-<p><strong>Additional (for
-<code>compute_weights = TRUE</code>):</strong></p>
+<p><strong>Additional (for <code>calibrate = TRUE</code> in
+<code>pnadc_apply_periods()</code>):</strong></p>
 <table>
 <thead>
 <tr class="header">
@@ -500,16 +500,24 @@ indeterminate</td>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>mensalizePNADC()</code></td>
-<td>Main function: identify months + optional weights</td>
+<td><code>pnadc_identify_periods()</code></td>
+<td>Main function: build crosswalk with months/fortnights/weeks</td>
 </tr>
 <tr class="even">
-<td><code>mensalize_annual_pnadc()</code></td>
-<td>Merge crosswalk with annual data + calibrate V1032 weights</td>
+<td><code>pnadc_apply_periods()</code></td>
+<td>Apply crosswalk + calibrate weights (quarterly or annual)</td>
 </tr>
 <tr class="odd">
 <td><code>identify_reference_month()</code></td>
 <td>Just reference month identification</td>
+</tr>
+<tr class="even">
+<td><code>identify_reference_fortnight()</code></td>
+<td>Fortnight (quinzena) identification</td>
+</tr>
+<tr class="odd">
+<td><code>identify_reference_week()</code></td>
+<td>Week identification</td>
 </tr>
 <tr class="even">
 <td><code>calibrate_monthly_weights()</code></td>
@@ -610,8 +618,8 @@ approaches:</p>
 </tr>
 <tr class="even">
 <td><strong>Function</strong></td>
-<td><code>mensalizePNADC()</code></td>
-<td><code>mensalize_annual_pnadc()</code></td>
+<td><code>pnadc_apply_periods(..., anchor=&quot;quarter&quot;)</code></td>
+<td><code>pnadc_apply_periods(..., anchor=&quot;year&quot;)</code></td>
 </tr>
 </tbody>
 </table>
@@ -678,14 +686,14 @@ Cross-quarter aggregation:
 
 Result: ALL 5 quarters → ref_month_in_quarter = 2</code></pre>
 <p><strong>Recommended</strong>: Stack at least 2 years of quarterly
-data before calling <code>mensalizePNADC()</code>.</p>
+data before calling <code>pnadc_identify_periods()</code>.</p>
 <hr />
 </div>
 <div id="the-algorithm-explained" class="section level2">
 <h2>The Algorithm Explained</h2>
 <div id="overview-diagram" class="section level3">
 <h3>Overview Diagram</h3>
-<p>The reference month identification follows a 7-step pipeline:</p>
+<p>The reference month identification follows an 8-step pipeline:</p>
 <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
 │                    REFERENCE MONTH IDENTIFICATION PIPELINE                  │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -796,8 +804,8 @@ INPUTS (per observation):
 │  3. Detect: if standard produces min&gt;max but alternative would work         │
 │  4. Propagate: if ANY UPA needs exception -&gt; apply to ALL in that quarter   │
 │                                                                             │
-│  Known exception quarters up to 2025q3 (detected automatically):            │
-│  2016q3, 2016q4, 2017q2, 2022q3, 2023q2, 2024q1.                            │
+│  Exception quarters are detected AUTOMATICALLY by the algorithm.            │
+│  Examples found in 2012-2025: 2016q3, 2016q4, 2017q2, 2022q3, 2023q2, etc.  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
@@ -893,12 +901,13 @@ Check age: 2023 - 1990 = 33
            33 - 32 = 1  -&gt; Interview was BEFORE February 17, 2023
 
 Check first Saturday on or after birthday:
-           first_Saturday_on_or_after(February 17) = February 18, 2023
+           first_Saturday_on_or_after(February 17) = February 18, 2023 (Sat)
+           Saturday_before = February 18 - 7 = February 11, 2023
 
-Constraint: date_max = min(date_max, Saturday_before(February 17))
-            date_max = min(March 25, February 18) = February 18
+Constraint: date_max = min(date_max, Saturday_before(birthday))
+            date_max = min(March 25, February 11) = February 11
 
-This person can only have been interviewed in JANUARY or FEBRUARY.</code></pre>
+This person can only have been interviewed in JANUARY or early FEBRUARY.</code></pre>
 <p><strong>Unknown birthdays</strong>: When V2008=99, V20081=99, or
 V20082=9999, that person’s birthday cannot constrain the date. However,
 they may still be determined through aggregation by UPA-Panel level
@@ -1002,16 +1011,20 @@ September’s reference month rather than August’s.</p>
 <pre><code>For each UPA-V1014:
   1. Calculate upa_month_min/max using STANDARD rules
   2. Also calculate alt_upa_month_min/max using ALTERNATIVE rules
-  3. If standard produces min &gt; max (impossible) BUT alternative works:
-     → This quarter requires an exception
+  3. Check if exception is needed. ALL conditions must be true:
+     a) Standard produces impossible result: upa_month_min &gt; upa_month_max
+     b) Alternative would work: alt_upa_month_min &lt;= alt_upa_month_max
+     c) Individual&#39;s constraint is the binding one that could be relaxed
+        (the individual&#39;s bound equals the UPA bound that would change)
   4. Determine WHICH month within the quarter needs the exception:
      - requires_exc_m1: Exception needed for month 1
      - requires_exc_m2: Exception needed for month 2
      - requires_exc_m3: Exception needed for month 3
   5. PROPAGATE: If ANY UPA in the quarter needs exception for a month,
      apply that exception to ALL observations in that quarter</code></pre>
-<p>Known exception quarters up to 2025q3: 2016q3, 2016q4, 2017q2,
-2022q3, 2023q2, 2024q1.</p>
+<p>Exception quarters are detected automatically. Examples found in
+2012-2025 data: 2016q3, 2016q4, 2017q2, 2022q3, 2023q2, 2024q1. The
+algorithm will detect any new exceptions in future data.</p>
 <hr />
 </div>
 <div id="step-7-final-assignment" class="section level3">
@@ -1053,7 +1066,8 @@ quarter’s interview window).</li>
 weights.</p>
 <div id="how-weight-calibration-works" class="section level3">
 <h3>How Weight Calibration Works</h3>
-<p>When <code>compute_weights = TRUE</code>, the package:</p>
+<p>When <code>calibrate = TRUE</code> in
+<code>pnadc_apply_periods()</code>, the package:</p>
 <p><strong>1. Fetches monthly population from SIDRA API</strong> (table
 6022)</p>
 <p>SIDRA provides <strong>moving-quarter</strong> population estimates,
@@ -1136,30 +1150,41 @@ totals proportionally.</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Load full data with all required variables</span></span>
 <span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>pnadc_full <span class="ot">&lt;-</span> <span class="fu">fread</span>(<span class="st">&quot;pnadc_stacked_full.csv&quot;</span>)</span>
 <span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co"># Run mensalization with weight computation</span></span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>, <span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co"># Step 1: Build crosswalk</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">pnadc_identify_periods</span>(pnadc_full, <span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a></span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co"># Use weight_monthly for monthly estimates</span></span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(</span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>  <span class="at">population =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>), by <span class="ot">=</span> ref_month_yyyymm]</span></code></pre></div>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co"># Step 2: Apply crosswalk and calibrate weights</span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">pnadc_apply_periods</span>(pnadc_full, crosswalk,</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>                               <span class="at">weight_var =</span> <span class="st">&quot;V1028&quot;</span>,</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>                               <span class="at">anchor =</span> <span class="st">&quot;quarter&quot;</span>,</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>                               <span class="at">calibrate =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>                               <span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a></span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a><span class="co"># Use weight_monthly for monthly estimates</span></span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(</span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a>  <span class="at">population =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a>), by <span class="ot">=</span> ref_month_yyyymm]</span></code></pre></div>
 </div>
 <div id="handling-indeterminate-observations" class="section level3">
 <h3>Handling Indeterminate Observations</h3>
 <p>By default (<code>keep_all = TRUE</code>), all input rows are
 returned, with <code>weight_monthly = NA</code> for indeterminate
 observations:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Default: returns all rows (indeterminate have weight_monthly = NA)</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">nrow</span>(result) <span class="sc">==</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE - all rows returned</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(result<span class="sc">$</span>weight_monthly))  <span class="co"># ~3% of rows have NA weights</span></span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a></span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co"># Use na.rm = TRUE when aggregating</span></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(<span class="at">pop =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)), by <span class="ot">=</span> ref_month_yyyymm]</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a></span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="co"># Alternative: returns only determined rows</span></span>
-<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>result_determined <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(pnadc_full, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>, <span class="at">keep_all =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="fu">nrow</span>(result_determined) <span class="sc">&lt;</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE (~97% of rows)</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Build crosswalk and apply (returns all rows by default)</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">pnadc_identify_periods</span>(pnadc_full)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">pnadc_apply_periods</span>(pnadc_full, crosswalk,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>                               <span class="at">weight_var =</span> <span class="st">&quot;V1028&quot;</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>                               <span class="at">anchor =</span> <span class="st">&quot;quarter&quot;</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="fu">nrow</span>(result) <span class="sc">==</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE - all rows returned</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(result<span class="sc">$</span>weight_monthly))  <span class="co"># ~3% of rows have NA weights</span></span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a><span class="co"># Use na.rm = TRUE when aggregating</span></span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>monthly_pop <span class="ot">&lt;-</span> result[, .(<span class="at">pop =</span> <span class="fu">sum</span>(weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)), by <span class="ot">=</span> ref_month_yyyymm]</span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a></span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="co"># Filter to determined rows for analysis</span></span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>result_determined <span class="ot">&lt;-</span> result[<span class="sc">!</span><span class="fu">is.na</span>(ref_month_in_quarter)]</span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a><span class="fu">nrow</span>(result_determined) <span class="sc">&lt;</span> <span class="fu">nrow</span>(pnadc_full)  <span class="co"># TRUE (~97% of rows)</span></span></code></pre></div>
 <hr />
 </div>
 </div>
@@ -1212,8 +1237,8 @@ population.</p>
 </div>
 <div id="how-annual-weight-calibration-works" class="section level3">
 <h3>How Annual Weight Calibration Works</h3>
-<p>The <code>mensalize_annual_pnadc()</code> function follows this
-algorithm:</p>
+<p>For annual data, <code>pnadc_apply_periods()</code> with
+<code>anchor = &quot;year&quot;</code> follows this algorithm:</p>
 <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
 │                 ANNUAL WEIGHT CALIBRATION PIPELINE                          │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -1295,23 +1320,24 @@ months where that cell appears, then calibrate to SIDRA totals.</p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># Step 1: Create crosswalk from quarterly data</span></span>
 <span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co"># (birthday variables are in quarterly data, not annual)</span></span>
 <span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>quarterly_data <span class="ot">&lt;-</span> <span class="fu">fread</span>(<span class="st">&quot;pnadc_quarterly_stacked.csv&quot;</span>)</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(quarterly_data, <span class="at">compute_weights =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">pnadc_identify_periods</span>(quarterly_data)</span>
 <span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a></span>
 <span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co"># Step 2: Load annual data with income variables</span></span>
 <span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>annual_data <span class="ot">&lt;-</span> <span class="fu">fread</span>(<span class="st">&quot;pnadc_annual_visit1_stacked.csv&quot;</span>)</span>
 <span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a></span>
 <span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co"># Step 3: Apply crosswalk and calibrate annual weights</span></span>
-<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalize_annual_pnadc</span>(</span>
-<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>  <span class="at">annual_data =</span> annual_data,</span>
-<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>  <span class="at">crosswalk =</span> crosswalk,</span>
-<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>  <span class="at">calibrate_weights =</span> <span class="cn">TRUE</span>,  <span class="co"># Use V1032 → weight_monthly</span></span>
-<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>)</span>
-<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a></span>
-<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a><span class="co"># Step 4: Use weight_monthly for monthly income/poverty analysis</span></span>
-<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a>monthly_income <span class="ot">&lt;-</span> result[, .(</span>
-<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a>  <span class="at">mean_income =</span> <span class="fu">weighted.mean</span>(vd5008, weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a>), by <span class="ot">=</span> ref_month_yyyymm]</span></code></pre></div>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">pnadc_apply_periods</span>(</span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>  annual_data, crosswalk,</span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>  <span class="at">weight_var =</span> <span class="st">&quot;V1032&quot;</span>,</span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>  <span class="at">anchor =</span> <span class="st">&quot;year&quot;</span>,</span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="at">calibrate =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a>)</span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a></span>
+<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a><span class="co"># Step 4: Use weight_monthly for monthly income/poverty analysis</span></span>
+<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a>monthly_income <span class="ot">&lt;-</span> result[, .(</span>
+<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a>  <span class="at">mean_income =</span> <span class="fu">weighted.mean</span>(vd5008, weight_monthly, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb16-21"><a href="#cb16-21" tabindex="-1"></a>), by <span class="ot">=</span> ref_month_yyyymm]</span></code></pre></div>
 </div>
 <div id="covid-era-visit-selection" class="section level3">
 <h3>COVID-Era Visit Selection</h3>
@@ -1518,8 +1544,8 @@ validation</li>
 Monthly poverty analysis with annual PNADC income data</li>
 <li><a href="https://www.ibge.gov.br/estatisticas/sociais/trabalho/9171-pesquisa-nacional-por-amostra-de-domicilios-continua-mensal.html">IBGE
 PNADC Documentation</a></li>
-<li>Package function reference: <code>?mensalizePNADC</code>,
-<code>?mensalize_annual_pnadc</code></li>
+<li>Package function reference: <code>?pnadc_identify_periods</code>,
+<code>?pnadc_apply_periods</code></li>
 <li>Source code: <a href="https://github.com/antrologos/mensalizePNADC">GitHub
 repository</a></li>
 </ul>

@@ -385,7 +385,7 @@ Works</a>.</p>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="fu">library</span>(PNADcIBGE)</span>
 <span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
 <span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">library</span>(fst)</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="fu">library</span>(mensalizePNADC)</span></code></pre></div>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="fu">library</span>(PNADCperiods)</span></code></pre></div>
 </div>
 <div id="system-requirements" class="section level3">
 <h3>System Requirements</h3>
@@ -540,30 +540,41 @@ Total observations: 10,847,562</code></pre>
 </div>
 <div id="step-5-apply-mensalization" class="section level2">
 <h2>Step 5: Apply Mensalization</h2>
-<p>Now apply the mensalization algorithm. Setting
-<code>compute_weights = TRUE</code> also generates monthly survey
-weights:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Apply mensalization with monthly weight computation</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">mensalizePNADC</span>(</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">data =</span> pnadc_stacked,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">compute_weights =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>)</span>
+<p>Now apply the period identification algorithm and optionally compute
+calibrated weights:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Step 1: Build crosswalk (identify reference periods)</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">pnadc_identify_periods</span>(pnadc_stacked, <span class="at">verbose =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># Check the determination rate</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Determination rate:&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="fu">sprintf</span>(<span class="st">&quot;%.1f%%&quot;</span>, <span class="fu">attr</span>(crosswalk, <span class="st">&quot;determination_rates&quot;</span>)<span class="sc">$</span>month <span class="sc">*</span> <span class="dv">100</span>), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
 <span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># Check the determination rate</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Determination rate:&quot;</span>,</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>    <span class="fu">sprintf</span>(<span class="st">&quot;%.1f%%&quot;</span>, <span class="fu">attr</span>(result, <span class="st">&quot;determination_rate&quot;</span>) <span class="sc">*</span> <span class="dv">100</span>), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># Step 2: Apply crosswalk and calibrate weights</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">pnadc_apply_periods</span>(</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="at">data =</span> pnadc_stacked,</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  <span class="at">crosswalk =</span> crosswalk,</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="at">weight_var =</span> <span class="st">&quot;V1028&quot;</span>,</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="at">anchor =</span> <span class="st">&quot;quarter&quot;</span>,</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="at">calibrate =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>)</span></code></pre></div>
 <p>Expected output:</p>
-<pre><code>Validating input data...
-Identifying reference months...
-Computing monthly weights...
-Fetching monthly population from SIDRA...
-Calibrating weights...
+<pre><code>Building reference period crosswalk...
+  Step 1/3: Identifying reference months...
+    -&gt; Month determination rate: 97.0%
+  Step 2/3: Identifying reference fortnights...
+    -&gt; Fortnight determination rate: 88.2%
+  Step 3/3: Identifying reference weeks...
+    -&gt; Week determination rate: 62.1%
 
-Determination rate: 97.0%</code></pre>
+Crosswalk complete:
+  - 10,523,189 unique household-quarter observations
+  - Month determination: 97.0%
+  - Fortnight determination: 88.2%
+  - Week determination: 62.1%</code></pre>
 <p>The determination rate tells you what percentage of observations have
-their reference month identified. With 19 quarters stacked, you should
-achieve approximately 97%.</p>
+their reference period identified. With 19 quarters stacked, you should
+achieve approximately 97% for months.</p>
 </div>
 <div id="step-6-explore-the-results" class="section level2">
 <h2>Step 6: Explore the Results</h2>
@@ -743,7 +754,8 @@ for more resources</li>
 (visit-specific microdata with comprehensive income variables) requires
 a different workflow. See <a href="annual-poverty-analysis.html">Monthly
 Poverty Analysis with Annual PNADC Data</a> for details on using
-<code>mensalize_annual_pnadc()</code>.</p>
+<code>pnadc_apply_periods()</code> with
+<code>anchor = &quot;year&quot;</code>.</p>
 </blockquote>
 <p>For questions or issues, please open an issue on <a href="https://github.com/antrologos/mensalizePNADC/issues">GitHub</a>.</p>
 </div>

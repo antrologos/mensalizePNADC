@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
 
 ## ----prerequisites------------------------------------------------------------
 # # Core packages
-# library(mensalizePNADC)
+# library(PNADCperiods)
 # library(data.table)
 # library(fst)
 # 
@@ -55,7 +55,7 @@ knitr::opts_chunk$set(
 # # v2003:     Person order within household
 
 ## ----create-crosswalk---------------------------------------------------------
-# library(mensalizePNADC)
+# library(PNADCperiods)
 # library(data.table)
 # library(fst)
 # 
@@ -84,11 +84,9 @@ knitr::opts_chunk$set(
 #   fill = TRUE
 # )
 # 
-# # Run mensalization with weight computation
-# crosswalk <- mensalizePNADC(
+# # Build the crosswalk (identifies reference periods)
+# crosswalk <- pnadc_identify_periods(
 #   quarterly_data,
-#   compute_weights = TRUE,
-#   keep_all = FALSE,
 #   verbose = TRUE
 # )
 # 
@@ -136,14 +134,16 @@ knitr::opts_chunk$set(
 # )
 
 ## ----merge-crosswalk----------------------------------------------------------
-# # Merge crosswalk with annual data and calibrate V1032 weights
-# d <- mensalize_annual_pnadc(
-#   annual_data = annual_data,
-#   crosswalk = crosswalk,
-#   calibrate_weights = TRUE,
+# # Apply crosswalk to annual data and calibrate V1032 weights
+# d <- pnadc_apply_periods(
+#   annual_data,
+#   crosswalk,
+#   weight_var = "V1032",
+#   anchor = "year",
+#   calibrate = TRUE,
 #   verbose = TRUE
 # )
-# #> Merging crosswalk with annual data...
+# #> Applying crosswalk...
 # #> Match rate: 97.0%
 # #> Calibrating weights...
 # #>   Fetching monthly population from SIDRA...
