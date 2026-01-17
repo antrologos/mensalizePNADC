@@ -28,9 +28,11 @@
 #'   One of \code{"month"} (default), \code{"fortnight"}, or \code{"week"}.
 #' @param target_totals Optional data.table with population targets. If NULL
 #'   (default), fetches monthly population from SIDRA and derives targets for
-#'   fortnight/week.
+#'   fortnight/week. Each time period (month, fortnight, or week) is calibrated
+#'   to the FULL Brazilian population from SIDRA.
 #' @param smooth Logical. If TRUE (default), smooth calibrated weights to
-#'   remove quarterly artifacts.
+#'   remove quarterly artifacts. Smoothing is adapted per time period:
+#'   monthly (3-period window), fortnight (7-period window), weekly (no smoothing).
 #' @param keep_all Logical. If TRUE (default), keep all observations including
 #'   those with undetermined reference periods. If FALSE, drop undetermined rows.
 #' @param verbose Logical. If TRUE (default), print progress messages.
@@ -51,8 +53,29 @@
 #' \enumerate{
 #'   \item Groups observations by nested demographic/geographic cells
 #'   \item Iteratively adjusts weights so sub-period totals match anchor-period totals
-#'   \item Calibrates final weights against external population totals
+#'   \item Calibrates final weights against external population totals (FULL Brazilian population)
 #'   \item Optionally smooths weights to remove quarterly artifacts
+#' }
+#'
+#' ## Population Targets
+#'
+#' All time periods (months, fortnights, and weeks) are calibrated to the FULL
+
+#' Brazilian population from SIDRA. This means:
+#' \itemize{
+#'   \item Monthly weights sum to the Brazilian population for that month
+#'   \item Fortnight weights sum to the Brazilian population for the containing month
+#'   \item Weekly weights sum to the Brazilian population for the containing month
+#' }
+#'
+#' ## Hierarchical Raking Levels
+#'
+#' The number of hierarchical cell levels is automatically adjusted based on the
+#' calibration unit to avoid sparse cell issues:
+#' \itemize{
+#'   \item \code{"month"}: 4 levels (age, region, state, post-stratum) - full hierarchy
+#'   \item \code{"fortnight"}: 2 levels (age, region) - simplified for lower sample size
+#'   \item \code{"week"}: 1 level (age groups only) - minimal hierarchy for sparse data
 #' }
 #'
 #' ## Anchor Period
@@ -298,12 +321,21 @@ pnadc_apply_periods <- function(data,
 #' Internal Unified Calibration Function
 #'
 #' Performs hierarchical rake weighting for any anchor/unit combination.
+#' The number of hierarchical cell levels is automatically adjusted based on
+#' the time period granularity to avoid sparse cell issues.
 #'
 #' @param dt data.table with PNADC data and reference period columns
 #' @param weight_var Name of input weight column
 #' @param ref_var Name of reference period column (ref_month_yyyymm, etc.)
 #' @param anchor "quarter" or "year"
 #' @param target_totals Population targets data.table
+#' @param n_cells Integer (1-4) or NULL. Number of hierarchical cell levels.
+#'   If NULL (default), auto-selects based on ref_var:
+#'   - month: 4 levels (full hierarchy)
+#'   - fortnight: 2 levels (age + region)
+#'   - week: 1 level (age only)
+#' @param min_cell_size Minimum observations per cell. Levels with smaller
+#'   cells are skipped. Default 10.
 #' @param smooth Apply smoothing?
 #' @param keep_all Keep undetermined observations?
 #' @param verbose Print progress?
@@ -315,6 +347,8 @@ calibrate_weights_internal <- function(dt,
                                        ref_var,
                                        anchor,
                                        target_totals,
+                                       n_cells = NULL,
+                                       min_cell_size = 10L,
                                        smooth = TRUE,
                                        keep_all = TRUE,
                                        verbose = FALSE) {
@@ -346,23 +380,63 @@ calibrate_weights_internal <- function(dt,
     return(dt)
   }
 
+  # Auto-select number of cell levels based on time period granularity
+  # Weeks and fortnights have much fewer observations, so use fewer cell levels
+  # to avoid sparse cells that cause unstable weight adjustments
+  if (is.null(n_cells)) {
+    n_cells <- if (grepl("week", ref_var, ignore.case = TRUE)) {
+      1L  # Weekly: use age groups only (celula1)
+    } else if (grepl("fortnight", ref_var, ignore.case = TRUE)) {
+      2L  # Fortnight: use age + region (celula1, celula2)
+    } else {
+      4L  # Monthly: use full hierarchy (celula1-4)
+    }
+    if (verbose) {
+      cat(sprintf("    Auto-selected %d cell level(s) for %s calibration\n",
+                  n_cells, ref_var))
+    }
+  } else {
+    # Validate user-provided n_cells
+    if (!n_cells %in% 1L:4L) {
+      stop("'n_cells' must be an integer between 1 and 4")
+    }
+  }
+
   # Initialize working weight
   dt[, weight_current := get(weight_var)]
 
   # Step 1: Create calibration cells
   dt <- create_calibration_cells_unified(dt)
 
-  # Step 2: Iterative hierarchical reweighting
-  n_cells <- 4L
+  # Step 2: Iterative hierarchical reweighting with cell size checking
+  levels_applied <- 0L
   for (level in seq_len(n_cells)) {
     cell_var <- paste0("celula", level)
+
+    # Check minimum cell size before applying this level
+    cell_sizes <- dt[, .N, by = c(cell_var, ref_var)]
+    min_size <- min(cell_sizes$N)
+
+    if (min_size < min_cell_size) {
+      if (verbose) {
+        cat(sprintf("    Skipping %s: min cell size %d < threshold %d\n",
+                    cell_var, min_size, min_cell_size))
+      }
+      break  # Stop at this level, don't apply finer cells
+    }
+
     dt <- reweight_at_cell_level_unified(dt, cell_var, anchor_vars, ref_var, weight_var)
+    levels_applied <- levels_applied + 1L
+  }
+
+  if (verbose && levels_applied > 0) {
+    cat(sprintf("    Applied %d hierarchical cell level(s)\n", levels_applied))
   }
 
   # Step 3: Final calibration to external totals
   dt <- calibrate_to_external_totals(dt, target_totals, ref_var)
 
-  # Step 4: Smooth weights (if requested)
+  # Step 4: Smooth weights (if requested and appropriate for the time period)
   if (smooth) {
     dt <- smooth_calibrated_weights(dt, ref_var)
   }
@@ -552,10 +626,15 @@ calibrate_to_external_totals <- function(dt, target_totals, ref_var) {
 #' Applies a moving average adjustment to calibrated weights to remove
 #' quarterly artifacts that arise from the survey's quarterly design.
 #'
-#' The smoothing algorithm:
+#' The smoothing algorithm adapts to the time period granularity:
+#' - Monthly: 3-period moving average using celula4 (finest hierarchy)
+#' - Fortnight: 6-period moving average using celula2 (coarser hierarchy)
+#' - Weekly: No smoothing (too few observations per cell for stable smoothing)
+#'
+#' The algorithm:
 #' 1. Groups observations by calibration cell and reference period
 #' 2. Computes period-specific adjustment factors based on neighboring periods
-#' 3. Applies a 3-period moving average to smooth the adjustment factors
+#' 3. Applies an N-period moving average to smooth the adjustment factors
 #' 4. Adjusts weights to preserve total population within each anchor period
 #'
 #' @param dt data.table with calibrated weights
@@ -565,9 +644,37 @@ calibrate_to_external_totals <- function(dt, target_totals, ref_var) {
 #' @noRd
 smooth_calibrated_weights <- function(dt, ref_var) {
 
+  # Determine smoothing parameters based on time period granularity
+  # Weekly data has too few observations for stable cell-level smoothing
+  if (grepl("week", ref_var, ignore.case = TRUE)) {
+    # Skip smoothing for weekly data - insufficient observations per cell
+    return(dt)
+  }
+
+  # For fortnights: use 7-period rolling window (spans ~1 quarter) with celula2
+  # For months: use 3-period rolling window (spans 1 quarter) with celula4
+  if (grepl("fortnight", ref_var, ignore.case = TRUE)) {
+    window_size <- 7L  # 7-period rolling mean for fortnights (~1 quarter)
+    cell_var <- "celula2"  # Use coarser cells for fortnights
+  } else {
+    window_size <- 3L  # 3-period rolling mean for months (1 quarter)
+    cell_var <- "celula4"  # Use finest cells for months
+  }
+
+  # Check if the required cell variable exists
+  if (!cell_var %in% names(dt)) {
+    # Fall back to coarser cell level if finer not available
+    cell_var <- if ("celula2" %in% names(dt)) "celula2" else
+                if ("celula1" %in% names(dt)) "celula1" else NULL
+    if (is.null(cell_var)) {
+      return(dt)  # No cell variables available, skip smoothing
+    }
+  }
+
   # Skip if insufficient periods for smoothing
   n_periods <- data.table::uniqueN(dt[[ref_var]])
-  if (n_periods < 3L) {
+  min_periods <- 2 * window_size + 1
+  if (n_periods < min_periods) {
     return(dt)
   }
 
@@ -575,8 +682,7 @@ smooth_calibrated_weights <- function(dt, ref_var) {
   original_pop <- dt[, .(pop_orig = sum(weight_current, na.rm = TRUE)), by = ref_var]
 
   # Calculate adjustment factors by cell and period
-  # Weight ratio: cell weight / total cell weight across all periods
-  dt[, pop_current := sum(weight_current, na.rm = TRUE), by = c("celula4", ref_var)]
+  dt[, pop_current := sum(weight_current, na.rm = TRUE), by = c(cell_var, ref_var)]
 
   # Get unique periods sorted
   periods <- sort(unique(dt[[ref_var]]))
@@ -592,25 +698,22 @@ smooth_calibrated_weights <- function(dt, ref_var) {
   # Join position to data
   dt[period_lookup, on = ref_var, period_pos := i.pos]
 
-  # Compute smoothed population by cell-period using 3-period moving average
+  # Compute smoothed population by cell-period using proper rolling mean
   cell_period_pop <- dt[, .(cell_pop = sum(weight_current, na.rm = TRUE)),
-                         by = c("celula4", "period_pos")]
-  data.table::setkey(cell_period_pop, celula4, period_pos)
+                         by = c(cell_var, "period_pos")]
+  data.table::setkeyv(cell_period_pop, c(cell_var, "period_pos"))
 
-  # For each cell, compute moving average
-  cell_period_pop[, `:=`(
-    pop_lag = data.table::shift(cell_pop, 1L, type = "lag"),
-    pop_lead = data.table::shift(cell_pop, 1L, type = "lead")
-  ), by = celula4]
+  # For each cell, compute centered rolling mean with appropriate window
+  # Using data.table::frollmean for proper rolling average
+  cell_period_pop[, pop_smoothed := data.table::frollmean(
+    cell_pop,
+    n = window_size,
+    align = "center",
+    na.rm = TRUE
+  ), by = c(cell_var)]
 
-  # Moving average: (lag + current + lead) / 3
-  # At boundaries, use available values
-  cell_period_pop[, pop_smoothed := data.table::fcase(
-    !is.na(pop_lag) & !is.na(pop_lead), (pop_lag + cell_pop + pop_lead) / 3,
-    !is.na(pop_lag), (pop_lag + cell_pop) / 2,
-    !is.na(pop_lead), (cell_pop + pop_lead) / 2,
-    default = cell_pop
-  )]
+  # For boundary periods where rolling mean produces NA, use original values
+  cell_period_pop[is.na(pop_smoothed), pop_smoothed := cell_pop]
 
   # Calculate smoothing factor for each cell-period
   # Avoid division issues: both cell_pop and pop_smoothed must be positive
@@ -618,7 +721,7 @@ smooth_calibrated_weights <- function(dt, ref_var) {
   cell_period_pop[cell_pop <= 0 | pop_smoothed <= 0 | is.na(smooth_factor), smooth_factor := 1]
 
   # Join smoothing factor back to main data
-  dt[cell_period_pop, on = c("celula4", "period_pos"), smooth_factor := i.smooth_factor]
+  dt[cell_period_pop, on = c(cell_var, "period_pos"), smooth_factor := i.smooth_factor]
 
   # Apply smoothing factor
   dt[!is.na(smooth_factor) & !is.na(weight_current),
@@ -643,6 +746,10 @@ smooth_calibrated_weights <- function(dt, ref_var) {
 
 #' Derive Fortnight Population from Monthly
 #'
+#' Each fortnight within a month receives the FULL month's population as its
+#' calibration target. This ensures that weights for each fortnight sum to the
+#' actual Brazilian population, consistent with the monthly calibration approach.
+#'
 #' @keywords internal
 #' @noRd
 derive_fortnight_population <- function(monthly_pop) {
@@ -654,13 +761,14 @@ derive_fortnight_population <- function(monthly_pop) {
     mt[, ref_month_yyyymm := anomesexato]
   }
 
-  # Each month has 2 fortnights, split population equally
+  # Each fortnight gets the FULL month's population (not divided)
+  # This ensures fortnight weights sum to the Brazilian population
   fortnights <- mt[, .(
     ref_fortnight_yyyyff = c(
       ref_month_yyyymm %/% 100 * 100 + ((ref_month_yyyymm %% 100) - 1) * 2 + 1,
       ref_month_yyyymm %/% 100 * 100 + ((ref_month_yyyymm %% 100) - 1) * 2 + 2
     ),
-    f_populacao = m_populacao / 2
+    f_populacao = m_populacao  # FULL population, not divided
   ), by = ref_month_yyyymm]
 
   fortnights[, ref_month_yyyymm := NULL]
@@ -670,6 +778,11 @@ derive_fortnight_population <- function(monthly_pop) {
 
 
 #' Derive Weekly Population from Monthly
+#'
+#' Each week receives the FULL month's population as its calibration target.
+#' For weeks that span two months, the population from the month with the
+#' majority of days is used. This ensures that weights for each week sum to
+#' the actual Brazilian population, consistent with the monthly calibration approach.
 #'
 #' @keywords internal
 #' @noRd
@@ -682,7 +795,7 @@ derive_weekly_population <- function(monthly_pop) {
     mt[, ref_month_yyyymm := anomesexato]
   }
 
-  # Generate weeks for each month and distribute population
+  # Generate weeks for each month with FULL population
   weeks_list <- lapply(seq_len(nrow(mt)), function(i) {
     yyyymm <- mt$ref_month_yyyymm[i]
     pop <- mt$m_populacao[i]
@@ -701,23 +814,30 @@ derive_weekly_population <- function(monthly_pop) {
     days <- seq(first_day, last_day, by = 1)
     weeks <- unique(date_to_yyyyww(days))
 
-    # Count days per week in this month
+    # Count days per week in this month (for determining majority month later)
     days_per_week <- sapply(weeks, function(wk) {
       wk_days <- days[date_to_yyyyww(days) == wk]
       length(wk_days)
     })
 
-    # Distribute population proportionally
+    # Each week gets FULL population and days count for majority selection
     data.table(
       ref_week_yyyyww = weeks,
-      w_populacao = pop * days_per_week / sum(days_per_week)
+      ref_month_yyyymm = yyyymm,
+      days_in_month = days_per_week,
+      w_populacao = pop  # FULL population for each week
     )
   })
 
   weeks <- rbindlist(weeks_list)
 
-  # Aggregate weeks that span multiple months
-  weeks <- weeks[, .(w_populacao = sum(w_populacao)), by = ref_week_yyyyww]
+  # For weeks spanning multiple months, keep the population from the month
+
+  # with the majority of days (this handles boundary weeks correctly)
+  weeks <- weeks[weeks[, .I[which.max(days_in_month)], by = ref_week_yyyyww]$V1]
+
+  # Clean up - keep only needed columns
+  weeks <- weeks[, .(ref_week_yyyyww, w_populacao)]
 
   weeks
 }

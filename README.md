@@ -15,9 +15,9 @@ The `PNADCperiods` package identifies reference periods (months, fortnights, wee
 
 **Why sub-quarterly analysis?** PNADC quarterly statistics are actually moving averages of three months. This package recovers the specific period each observation refers to, enabling true monthly (or finer) labor market analysis.
 
-- **97.0% monthly determination rate** on 28.4M observations (2012-2025)
-- **~88% fortnightly determination rate**
-- **~62% weekly determination rate**
+- **~97% monthly determination rate** when using stacked multi-quarter data
+- **~2-5% fortnightly determination rate** (within-quarter constraints only)
+- **~1-2% weekly determination rate** (within-quarter constraints only)
 - **Validated methodology** based on Hecksher (2024)
 - **Fast**: ~1 minute for 28M rows
 
@@ -32,7 +32,6 @@ The `PNADCperiods` package identifies reference periods (months, fortnights, wee
 | `identify_reference_week()` | Reference week identification only |
 | `calibrate_monthly_weights()` | Hierarchical rake weighting for monthly weights |
 | `fetch_monthly_population()` | Fetch population totals from IBGE SIDRA API |
-| `smooth_monthly_aggregates()` | Remove quarterly artifacts from monthly series |
 | `validate_pnadc()` | Validate input data has required columns |
 
 ## Installation
@@ -68,6 +67,13 @@ result[, .(n = .N), by = ref_month_yyyymm]
 - `anchor`: Calibration anchor (`"quarter"` or `"year"`)
 - `calibrate = TRUE`: Compute calibrated weights (default: TRUE)
 - `calibration_unit`: Granularity for calibration (`"month"`, `"fortnight"`, or `"week"`)
+
+**Calibration strategy:**
+- All time periods (month, fortnight, week) calibrate to the **full Brazilian population** from SIDRA
+- Hierarchical raking is automatically simplified for finer granularities:
+  - Monthly: 4 cell levels (full demographic/geographic hierarchy)
+  - Fortnight: 2 cell levels (age + region)
+  - Weekly: 1 cell level (age groups only)
 
 **Crosswalk output columns:**
 - `ref_month`, `ref_month_in_quarter`, `ref_month_yyyymm`, `determined_month`

@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Monthly Poverty Analysis with Annual PNADC Data • mensalizePNADC</title>
+<title>Monthly Poverty Analysis with Annual PNADC Data • PNADCperiods</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
@@ -18,9 +18,9 @@
 
     <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
 
-    <a class="navbar-brand me-2" href="../index.html">mensalizePNADC</a>
+    <a class="navbar-brand me-2" href="../index.html">PNADCperiods</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,7 +38,7 @@
     <li><a class="dropdown-item" href="../articles/applied-examples.html">Applied Examples</a></li>
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
-    <li><a class="dropdown-item" href="../articles/how-it-works.html">How mensalizePNADC Works</a></li>
+    <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
   </ul>
 </li>
       </ul>
@@ -86,7 +86,7 @@ Run code/check_vignette_sync.R to verify synchronization before release.
 <p>This vignette requires the following packages:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Core packages</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://www.fstpackage.org" class="external-link">fst</a></span><span class="op">)</span></span>
 <span></span>
@@ -357,7 +357,7 @@ with official IBGE statistics and simplifies the workflow.</p>
 <p>First, load stacked quarterly PNADC data and run the mensalization
 algorithm:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://www.fstpackage.org" class="external-link">fst</a></span><span class="op">)</span></span>
 <span></span>
@@ -386,11 +386,9 @@ algorithm:</p>
 <span>  fill <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Run mensalization with weight computation</span></span>
-<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span></span>
+<span><span class="co"># Build the crosswalk (identifies reference periods)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span></span>
 <span>  <span class="va">quarterly_data</span>,</span>
-<span>  compute_weights <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  keep_all <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -457,14 +455,16 @@ income analysis during this period.</p>
 <p>Now merge the mensalization results with the annual income data and
 calibrate weights:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Merge crosswalk with annual data and calibrate V1032 weights</span></span>
-<span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc</a></span><span class="op">(</span></span>
-<span>  annual_data <span class="op">=</span> <span class="va">annual_data</span>,</span>
-<span>  crosswalk <span class="op">=</span> <span class="va">crosswalk</span>,</span>
-<span>  calibrate_weights <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<code class="sourceCode R"><span><span class="co"># Apply crosswalk to annual data and calibrate V1032 weights</span></span>
+<span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">annual_data</span>,</span>
+<span>  <span class="va">crosswalk</span>,</span>
+<span>  weight_var <span class="op">=</span> <span class="st">"V1032"</span>,</span>
+<span>  anchor <span class="op">=</span> <span class="st">"year"</span>,</span>
+<span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Merging crosswalk with annual data...</span></span>
+<span><span class="co">#&gt; Applying crosswalk...</span></span>
 <span><span class="co">#&gt; Match rate: 97.0%</span></span>
 <span><span class="co">#&gt; Calibrating weights...</span></span>
 <span><span class="co">#&gt;   Fetching monthly population from SIDRA...</span></span>
@@ -474,8 +474,9 @@ calibrate weights:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">d</span><span class="op">$</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.97</span></span></code></pre></div>
 <blockquote>
-<p><strong>Why use <code><a href="../reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc()</a></code> instead of
-manual merge?</strong></p>
+<p><strong>Why use
+<code>pnadc_apply_periods(..., anchor = "year")</code> instead of manual
+merge?</strong></p>
 <p>The quarterly crosswalk produces <code>weight_monthly</code> by
 calibrating the quarterly weight <strong>V1028</strong>, which assumes
 all 5 rotation groups are present in each quarter (~20% of observations
@@ -484,9 +485,10 @@ from each panel visit).</p>
 (e.g., visit 1 or visit 5), so using V1028-based weights would severely
 misrepresent the population—each observation would be weighted as if it
 represents only 1/5 of its demographic cell.</p>
-<p><code><a href="../reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc()</a></code> properly calibrates the
-<strong>annual weight V1032</strong> to monthly SIDRA population totals
-using hierarchical rake weighting. This ensures that:</p>
+<p><code><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods()</a></code> with <code>anchor = "year"</code>
+properly calibrates the <strong>annual weight V1032</strong> to monthly
+SIDRA population totals using hierarchical rake weighting. This ensures
+that:</p>
 <ul>
 <li>Weights sum to correct monthly population totals</li>
 <li>Demographic cells are balanced within each year</li>
@@ -677,13 +679,14 @@ including the replication weights approach, see the <a href="complex-survey-desi
 vignette.</p>
 </div>
 <div class="section level3">
-<h3 id="example-3-smoothing">Example 3: Smoothing<a class="anchor" aria-label="anchor" href="#example-3-smoothing"></a>
+<h3 id="example-3-post-hoc-smoothing-of-aggregates">Example 3: Post-hoc Smoothing of Aggregates<a class="anchor" aria-label="anchor" href="#example-3-post-hoc-smoothing-of-aggregates"></a>
 </h3>
 <p>The raw monthly series may show quarterly artifacts from IBGE’s
-rotating panel design. The <code><a href="../reference/smooth_monthly_aggregates.html">smooth_monthly_aggregates()</a></code>
-function can help remove these patterns:</p>
+rotating panel design. If artifacts persist after weight calibration
+(which applies smoothing by default), you can apply additional post-hoc
+smoothing to your aggregated estimates:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Three-month centered rolling average</span></span>
+<code class="sourceCode R"><span><span class="co"># Three-month centered rolling average (using data.table::frollmean)</span></span>
 <span><span class="va">monthly_poverty</span><span class="op">[</span>, <span class="va">poverty_rate_smoothed</span> <span class="op">:=</span></span>
 <span>                  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/froll.html" class="external-link">frollmean</a></span><span class="op">(</span><span class="va">poverty_rate</span>, <span class="fl">3</span>, align <span class="op">=</span> <span class="st">"center"</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 <div class="float">

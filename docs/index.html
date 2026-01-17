@@ -5,14 +5,14 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Convert Quarterly PNADC Survey Data to Monthly Time Series • mensalizePNADC</title>
+<title>Identify Reference Periods in Brazil's PNADC Survey Data • PNADCperiods</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Convert Quarterly PNADC Survey Data to Monthly Time Series">
-<meta name="description" content='Identifies reference months in Brazils quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data and optionally computes monthly survey weights. The core algorithm uses IBGEs "Parada Tecnica" (technical break) rules combined with respondent birthdates to determine which month each survey observation refers to. For users needing monthly aggregate estimates, the package also provides hierarchical weight calibration to produce monthly-appropriate survey weights.'>
-<meta property="og:description" content='Identifies reference months in Brazils quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data and optionally computes monthly survey weights. The core algorithm uses IBGEs "Parada Tecnica" (technical break) rules combined with respondent birthdates to determine which month each survey observation refers to. For users needing monthly aggregate estimates, the package also provides hierarchical weight calibration to produce monthly-appropriate survey weights.'>
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Identify Reference Periods in Brazil's PNADC Survey Data">
+<meta name="description" content='Identifies reference periods (months, fortnights, and weeks) in Brazils quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data and optionally computes calibrated weights for sub-quarterly analysis. The core algorithm uses IBGEs "Parada Tecnica" (technical break) rules combined with respondent birthdates to determine which temporal period each survey observation refers to. Achieves ~97% monthly determination rate when using stacked multi-quarter data. Fortnight and week determination rates are lower (~2-5% and ~1-2% respectively) as they cannot leverage cross-quarter panel aggregation. For users needing sub-quarterly aggregate estimates, the package provides hierarchical weight calibration to produce period-appropriate survey weights.'>
+<meta property="og:description" content='Identifies reference periods (months, fortnights, and weeks) in Brazils quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data and optionally computes calibrated weights for sub-quarterly analysis. The core algorithm uses IBGEs "Parada Tecnica" (technical break) rules combined with respondent birthdates to determine which temporal period each survey observation refers to. Achieves ~97% monthly determination rate when using stacked multi-quarter data. Fortnight and week determination rates are lower (~2-5% and ~1-2% respectively) as they cannot leverage cross-quarter panel aggregation. For users needing sub-quarterly aggregate estimates, the package provides hierarchical weight calibration to produce period-appropriate survey weights.'>
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -20,9 +20,9 @@
 
     <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
 
-    <a class="navbar-brand me-2" href="index.html">mensalizePNADC</a>
+    <a class="navbar-brand me-2" href="index.html">PNADCperiods</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -40,7 +40,7 @@
     <li><a class="dropdown-item" href="articles/applied-examples.html">Applied Examples</a></li>
     <li><a class="dropdown-item" href="articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="articles/complex-survey-design.html">Complex Survey Design</a></li>
-    <li><a class="dropdown-item" href="articles/how-it-works.html">How mensalizePNADC Works</a></li>
+    <li><a class="dropdown-item" href="articles/how-it-works.html">How PNADCperiods Works</a></li>
   </ul>
 </li>
       </ul>
@@ -57,19 +57,23 @@
 </nav><div class="container template-home">
 <div class="row">
   <main id="main" class="col-md-9"><div class="section level1">
-<div class="page-header"><h1 id="mensalizepnadc">mensalizePNADC<a class="anchor" aria-label="anchor" href="#mensalizepnadc"></a>
+<div class="page-header"><h1 id="pnadcperiods">PNADCperiods<a class="anchor" aria-label="anchor" href="#pnadcperiods"></a>
 </h1></div>
 <!-- badges: start -->
 
-<p>Convert Brazil’s quarterly PNADC survey data into monthly time series.</p>
+<p>Convert Brazil’s quarterly PNADC survey data into sub-quarterly time series (monthly, fortnightly, weekly).</p>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>The <code>mensalizePNADC</code> package identifies reference months in Brazil’s quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) microdata and optionally computes monthly survey weights.</p>
-<p><strong>Why mensalization?</strong> PNADC quarterly statistics are actually moving averages of three months. Mensalization recovers the specific month each observation refers to, enabling true monthly labor market analysis.</p>
+<p>The <code>PNADCperiods</code> package identifies reference periods (months, fortnights, weeks) in Brazil’s quarterly PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) microdata and optionally computes calibrated survey weights.</p>
+<p><strong>Why sub-quarterly analysis?</strong> PNADC quarterly statistics are actually moving averages of three months. This package recovers the specific period each observation refers to, enabling true monthly (or finer) labor market analysis.</p>
 <ul>
 <li>
-<strong>97.0% determination rate</strong> on 28.4M observations (2012-2025)</li>
+<strong>~97% monthly determination rate</strong> when using stacked multi-quarter data</li>
+<li>
+<strong>~2-5% fortnightly determination rate</strong> (within-quarter constraints only)</li>
+<li>
+<strong>~1-2% weekly determination rate</strong> (within-quarter constraints only)</li>
 <li>
 <strong>Validated methodology</strong> based on Hecksher (2024)</li>
 <li>
@@ -90,16 +94,24 @@
 </tr></thead>
 <tbody>
 <tr>
-<td><code><a href="reference/mensalizePNADC.html">mensalizePNADC()</a></code></td>
-<td>Main function: identify reference months + optional weight calibration</td>
+<td><code><a href="reference/pnadc_identify_periods.html">pnadc_identify_periods()</a></code></td>
+<td>Build crosswalk: identify reference months, fortnights, and weeks</td>
+</tr>
+<tr>
+<td><code><a href="reference/pnadc_apply_periods.html">pnadc_apply_periods()</a></code></td>
+<td>Apply crosswalk to data + optional weight calibration</td>
 </tr>
 <tr>
 <td><code><a href="reference/identify_reference_month.html">identify_reference_month()</a></code></td>
 <td>Reference month identification only</td>
 </tr>
 <tr>
-<td><code><a href="reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc()</a></code></td>
-<td>Process annual PNADC data with mensalization crosswalk</td>
+<td><code><a href="reference/identify_reference_fortnight.html">identify_reference_fortnight()</a></code></td>
+<td>Reference fortnight identification only</td>
+</tr>
+<tr>
+<td><code><a href="reference/identify_reference_week.html">identify_reference_week()</a></code></td>
+<td>Reference week identification only</td>
 </tr>
 <tr>
 <td><code><a href="reference/calibrate_monthly_weights.html">calibrate_monthly_weights()</a></code></td>
@@ -108,10 +120,6 @@
 <tr>
 <td><code><a href="reference/fetch_monthly_population.html">fetch_monthly_population()</a></code></td>
 <td>Fetch population totals from IBGE SIDRA API</td>
-</tr>
-<tr>
-<td><code><a href="reference/smooth_monthly_aggregates.html">smooth_monthly_aggregates()</a></code></td>
-<td>Remove quarterly artifacts from monthly series</td>
 </tr>
 <tr>
 <td><code><a href="reference/validate_pnadc.html">validate_pnadc()</a></code></td>
@@ -131,23 +139,26 @@
 <h2 id="quick-example">Quick Example<a class="anchor" aria-label="anchor" href="#quick-example"></a>
 </h2>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load stacked PNADC data (2+ years recommended for best determination rate)</span></span>
 <span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Identify reference months only</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span>
+<span><span class="co"># Step 1: Build crosswalk (identify reference periods)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># With monthly weight calibration (requires sidrar package)</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co"># Step 2: Apply to data (with optional weight calibration)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk</span>,</span>
+<span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>                               anchor <span class="op">=</span> <span class="st">"quarter"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Use in analysis</span></span>
 <span><span class="va">result</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span>n <span class="op">=</span> <span class="va">.N</span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span></code></pre></div>
-<p><strong>Key parameters:</strong> - <code>compute_weights = TRUE</code>: Compute calibrated monthly weights (default: FALSE) - <code>output</code>: Return type - <code>"crosswalk"</code> (default), <code>"microdata"</code>, or <code>"aggregates"</code></p>
-<p><strong>Output columns:</strong> - <code>ref_month</code>: Reference month as Date - <code>ref_month_in_quarter</code>: Position in quarter (1, 2, 3) or NA if undetermined - <code>ref_month_yyyymm</code>: Month in YYYYMM integer format - <code>weight_monthly</code>: Calibrated monthly weight (if <code>compute_weights = TRUE</code>)</p>
-<p><strong>Required input columns:</strong> - Reference month: <code>Ano</code>, <code>Trimestre</code>, <code>UPA</code>, <code>V1014</code>, <code>V2008</code>, <code>V20081</code>, <code>V20082</code>, <code>V2009</code> - Join keys: <code>V1008</code>, <code>V2003</code> - For weights: add <code>V1028</code>, <code>UF</code>, <code>posest</code>, <code>posest_sxi</code></p>
+<p><strong>Key parameters for <code><a href="reference/pnadc_apply_periods.html">pnadc_apply_periods()</a></code>:</strong> - <code>weight_var</code>: Which weight column to use (<code>"V1028"</code> for quarterly, <code>"V1032"</code> for annual) - <code>anchor</code>: Calibration anchor (<code>"quarter"</code> or <code>"year"</code>) - <code>calibrate = TRUE</code>: Compute calibrated weights (default: TRUE) - <code>calibration_unit</code>: Granularity for calibration (<code>"month"</code>, <code>"fortnight"</code>, or <code>"week"</code>)</p>
+<p><strong>Calibration strategy:</strong> - All time periods (month, fortnight, week) calibrate to the <strong>full Brazilian population</strong> from SIDRA - Hierarchical raking is automatically simplified for finer granularities: - Monthly: 4 cell levels (full demographic/geographic hierarchy) - Fortnight: 2 cell levels (age + region) - Weekly: 1 cell level (age groups only)</p>
+<p><strong>Crosswalk output columns:</strong> - <code>ref_month</code>, <code>ref_month_in_quarter</code>, <code>ref_month_yyyymm</code>, <code>determined_month</code> - <code>ref_fortnight</code>, <code>ref_fortnight_in_quarter</code>, <code>ref_fortnight_yyyyff</code>, <code>determined_fortnight</code> - <code>ref_week</code>, <code>ref_week_in_quarter</code>, <code>ref_week_yyyyww</code>, <code>determined_week</code></p>
+<p><strong>Required input columns:</strong> - For identification: <code>Ano</code>, <code>Trimestre</code>, <code>UPA</code>, <code>V1008</code>, <code>V1014</code>, <code>V2008</code>, <code>V20081</code>, <code>V20082</code>, <code>V2009</code> - For weights: add <code>V1028</code> (or <code>V1032</code>), <code>UF</code>, <code>posest</code>, <code>posest_sxi</code></p>
 <p>For complete examples, see the <a href="https://antrologos.github.io/mensalizePNADC/articles/getting-started.html">Get Started guide</a>.</p>
 </div>
 <div class="section level2">
@@ -232,7 +243,7 @@
 <div class="citation">
 <h2 data-toc-skip>Citation</h2>
 <ul class="list-unstyled">
-<li><a href="authors.html#citation">Citing mensalizePNADC</a></li>
+<li><a href="authors.html#citation">Citing PNADCperiods</a></li>
 </ul>
 </div>
 

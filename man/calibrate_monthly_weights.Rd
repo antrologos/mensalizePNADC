@@ -81,15 +81,21 @@ use \code{\link{pnadc_apply_periods}} with \code{anchor = "year"} instead.
 }
 \examples{
 \dontrun{
-# First identify reference months
-crosswalk <- identify_reference_month(pnadc_data)
-merged <- merge(pnadc_data, crosswalk, by = join_keys)
+# Recommended workflow using main API:
+crosswalk <- pnadc_identify_periods(pnadc_stacked)
+result <- pnadc_apply_periods(pnadc_2023, crosswalk,
+                              weight_var = "V1028",
+                              anchor = "quarter")
 
-# Then calibrate weights
+# Alternative: manual workflow with this function
+crosswalk <- pnadc_identify_periods(pnadc_stacked)
+merged <- merge(pnadc_data, crosswalk, by = c("Ano", "Trimestre", "UPA", "V1008", "V1014"))
+monthly_pop <- fetch_monthly_population()
 result <- calibrate_monthly_weights(merged, monthly_pop)
 }
 
 }
 \seealso{
-\code{\link{identify_reference_month}}, \code{\link{pnadc_apply_periods}}
+\code{\link{pnadc_apply_periods}} for the recommended unified workflow,
+\code{\link{pnadc_identify_periods}} to build crosswalks
 }

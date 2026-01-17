@@ -57,10 +57,9 @@ reference:
   - identify_reference_week
 
 - title: Weight Calibration
-  desc: Functions for weight calibration and smoothing
+  desc: Functions for weight calibration
   contents:
   - calibrate_monthly_weights
-  - smooth_monthly_aggregates
 
 - title: Data Fetching
   desc: Functions for fetching external data

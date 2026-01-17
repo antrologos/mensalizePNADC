@@ -1,374 +1,149 @@
-# PNADC Temporal Crosswalk - Architecture Reorganization Plan
+# PNADCperiods - Architecture Documentation
 
-## Design Decisions (Confirmed)
+This document describes the implemented architecture of the PNADCperiods package (v2.0.0).
 
-1. **Crosswalk contains BOTH month and week** - computed together
-2. **No backwards compatibility** - old functions will be removed entirely
-3. **Main function returns only crosswalk** - pure identification
-4. **Calibration happens inside `apply_crosswalk()`** - by default, with option to disable
-5. **Package name needs to change** - "mensalize" is too narrow
+## Package Overview
 
----
+**Package name:** `PNADCperiods`
+**Purpose:** Identify reference periods (months, fortnights, weeks) in Brazil's PNADC survey data and optionally calibrate weights for sub-quarterly analysis.
 
-## Package Renaming Options
+## API Design
 
-Since the crosswalk now contains both months AND weeks, "mensalizePNADC" no longer fits. Options:
+### Two Main Functions
 
-| Option | Pros | Cons |
-|--------|------|------|
-| `pnadcTemporal` | Clear, neutral | Generic |
-| `crosswalkPNADC` | Describes what it does | "Crosswalk" is jargon |
-| `timePNADC` | Simple, clear | Maybe too simple |
-| `pnadcTime` | Follows tidyverse style | - |
-| `temporalizePNADC` | Keeps verb structure | Invented word |
+| Function | Purpose |
+|----------|---------|
+| `pnadc_identify_periods()` | Build crosswalk with month/fortnight/week identification |
+| `pnadc_apply_periods()` | Apply crosswalk to data + optional weight calibration |
 
-**Recommendation:** `pnadcTemporal` or keep `mensalizePNADC` (monthly is still the primary use case, and the name is established)
+### Supporting Functions (Exported)
 
----
+| Function | Purpose |
+|----------|---------|
+| `identify_reference_month()` | Standalone month identification |
+| `identify_reference_fortnight()` | Standalone fortnight identification |
+| `identify_reference_week()` | Standalone week identification |
+| `fetch_monthly_population()` | Fetch population from SIDRA API |
+| `validate_pnadc()` | Input validation |
+| `calibrate_monthly_weights()` | Legacy monthly calibration (use `pnadc_apply_periods()` instead) |
 
-## New Architecture: Two Functions Only
+## Crosswalk Structure
 
-The entire user-facing API reduces to **two functions**:
+The crosswalk is a `data.table` at household-quarter level:
 
-### Function 1: `build_crosswalk()`
+| Column | Type | Description |
+|--------|------|-------------|
+| `Ano` | integer | Survey year |
+| `Trimestre` | integer | Quarter (1-4) |
+| `UPA` | integer | Primary sampling unit |
+| `V1008` | integer | Household sequence |
+| `V1014` | integer | Panel group (1-8) |
+| `ref_month` | Date | Reference month (1st of month) |
+| `ref_month_in_quarter` | integer | Position in quarter (1, 2, 3) or NA |
+| `ref_month_yyyymm` | integer | YYYYMM format |
+| `determined_month` | logical | TRUE if month was determined |
+| `ref_fortnight` | Date | Reference fortnight (1st or 16th) |
+| `ref_fortnight_in_quarter` | integer | Position in quarter (1-6) or NA |
+| `ref_fortnight_yyyyff` | integer | YYYYFF format (1-24 per year) |
+| `determined_fortnight` | logical | TRUE if fortnight was determined |
+| `ref_week` | Date | Reference week (Monday) |
+| `ref_week_in_quarter` | integer | Position in quarter (1-14) or NA |
+| `ref_week_yyyyww` | integer | ISO YYYYWW format |
+| `determined_week` | logical | TRUE if week was determined |
 
-```r
-build_crosswalk(
+**Join keys:** `Ano`, `Trimestre`, `UPA`, `V1008`, `V1014`
 
-  pnadc_stacked,
-  verbose = FALSE
-)
-```
+## Determination Rates
 
-**Purpose:** Pure identification algorithm. Returns universal crosswalk with BOTH month and week.
+| Period | Rate | Reason |
+|--------|------|--------|
+| Month | ~97% | Aggregates at UPA-V1014 level across ALL quarters (panel design) |
+| Fortnight | ~2-5% | Cannot aggregate across quarters; within-quarter constraints only |
+| Week | ~1-2% | Cannot aggregate across quarters; within-quarter constraints only |
 
-**Returns:**
-```r
-# Crosswalk data.table with columns:
-# - UPA, V1014 (join keys)
-# - ref_month (Date)
-# - ref_month_in_quarter (1, 2, 3, or NA)
-# - ref_month_yyyymm (integer)
-# - ref_week (Date - Monday of week)
-# - ref_week_in_quarter (1-14, or NA)
-# - ref_week_yyyyww (integer, ISO 8601)
-# - determined (logical - TRUE if month/week was determined)
-```
-
-**Notes:**
-- Requires stacked multi-quarter data for high determination rate
-- No weights, no external data, no side effects
-- Pure function: same input → same output
-
-### Function 2: `apply_crosswalk()`
-
-```r
-apply_crosswalk(
-  data,
-  crosswalk,
-  weight_var = "V1028",           # "V1028" for quarterly, "V1032" for annual
-  calibrate = TRUE,               # Calibrate weights by default
-  calibration_unit = "month",     # "month" or "week"
-  anchor = "quarter",             # "quarter" or "year" (for annual data)
-  target_totals = NULL,           # NULL = auto-fetch from SIDRA
-  smooth = TRUE,                  # Smooth calibrated weights
-  verbose = FALSE
-)
-```
-
-**Purpose:** Apply crosswalk to ANY PNADC dataset and optionally calibrate weights.
-
-**Returns:** The input `data` with added columns:
-- `ref_month`, `ref_month_in_quarter`, `ref_month_yyyymm`
-- `ref_week`, `ref_week_in_quarter`, `ref_week_yyyyww`
-- `weight_monthly` (if `calibrate = TRUE` and `calibration_unit = "month"`)
-- `weight_weekly` (if `calibrate = TRUE` and `calibration_unit = "week"`)
-
-**Internal pipeline (when `calibrate = TRUE`):**
-1. Join data with crosswalk
-2. Fetch population targets from SIDRA (if `target_totals = NULL`)
-3. Create hierarchical calibration cells
-4. Iterative reweighting (4 levels)
-5. Calibrate to external totals
-6. Smooth weights (if `smooth = TRUE`)
-
----
-
-## Workflow Examples
-
-### Workflow 1: Standard Monthly Analysis (Quarterly Data)
-```r
-library(pnadcTemporal)  # or mensalizePNADC
-
-# Step 1: Build crosswalk from stacked data
-crosswalk <- build_crosswalk(pnadc_stacked)
-
-# Step 2: Apply to your dataset (calibration happens automatically)
-result <- apply_crosswalk(pnadc_2023, crosswalk)
-
-# Result has: ref_month, ref_week, weight_monthly
-```
-
-### Workflow 2: Annual Data
-```r
-# Same crosswalk works for annual data!
-crosswalk <- build_crosswalk(pnadc_stacked)
-
-# Apply with annual weight and yearly anchor
-result <- apply_crosswalk(
-  pnadc_annual,
-  crosswalk,
-  weight_var = "V1032",
-  anchor = "year"
-)
-```
-
-### Workflow 3: Weekly Analysis
-```r
-crosswalk <- build_crosswalk(pnadc_stacked)
-
-result <- apply_crosswalk(
-  pnadc_2023,
-  crosswalk,
-  calibration_unit = "week"
-)
-# Result has: ref_week, weight_weekly
-```
-
-### Workflow 4: Crosswalk Only (No Calibration)
-```r
-crosswalk <- build_crosswalk(pnadc_stacked)
-
-result <- apply_crosswalk(
-  pnadc_2023,
-  crosswalk,
-  calibrate = FALSE
-)
-# Result has: ref_month, ref_week (no weight columns)
-```
-
-### Workflow 5: Custom Population Targets
-```r
-crosswalk <- build_crosswalk(pnadc_stacked)
-
-# User provides their own targets
-my_targets <- data.table(
-  ref_month_yyyymm = c(202301, 202302, ...),
-  population = c(215000000, 215100000, ...)
-)
-
-result <- apply_crosswalk(
-  pnadc_2023,
-  crosswalk,
-  target_totals = my_targets
-)
-```
-
----
-
-## Internal Functions (Not Exported)
-
-These exist but are not part of the public API:
-
-### Identification Layer
-- `identify_reference_month()` - Core monthly algorithm (8 steps)
-- `identify_reference_week()` - Core weekly algorithm (derives from monthly)
-
-### Calibration Layer
-- `create_calibration_cells()` - Hierarchical cell creation
-- `reweight_at_cell_level()` - Single level reweighting
-- `calibrate_to_totals()` - Final calibration to external targets
-
-### Population Layer
-- `fetch_monthly_population()` - SIDRA API for monthly
-- `derive_weekly_population()` - Distribute monthly to weeks
-
-### Smoothing Layer
-- `smooth_weights()` - Remove quarterly artifacts
-
-### Utilities
-- `validate_pnadc()` - Input validation
-- Date utilities in `utils-dates.R`
-
----
+**Key insight:** Only month identification benefits from stacking data across quarters. Fortnights and weeks are determined solely from birthday constraints within a single quarter.
 
 ## File Structure
 
 ```
 R/
-├── build-crosswalk.R          # Main entry: build_crosswalk()
-├── apply-crosswalk.R          # Main entry: apply_crosswalk()
-├── identify-reference-month.R # Internal: monthly algorithm
-├── identify-reference-week.R  # Internal: weekly algorithm
-├── calibrate-weights.R        # Internal: unified calibration
-├── fetch-population.R         # Internal: SIDRA + weekly derivation
-├── smooth-weights.R           # Internal: smoothing algorithm
-├── utils-dates.R              # Internal: date utilities
-├── utils-validation.R         # Internal: validation
-└── zzz.R                       # Package startup
+├── pnadc-identify-periods.R      # Main: pnadc_identify_periods()
+├── pnadc-apply-periods.R         # Main: pnadc_apply_periods()
+├── identify-reference-month.R    # Core month algorithm
+├── identify-reference-fortnight.R # Core fortnight algorithm
+├── identify-reference-week.R     # Core week algorithm
+├── calibrate-weights.R           # Legacy calibration
+├── fetch-sidra-population.R      # SIDRA API for population
+├── smooth-aggregates.R           # Smoothing algorithm
+├── utils-dates.R                 # Fast date utilities
+├── utils-validation.R            # Input validation
+└── PNADCperiods-package.R        # Package docs + globalVariables
 ```
 
-**Removed files:**
-- `mensalizePNADC.R` - replaced by `build-crosswalk.R`
-- `semanalizePNADC.R` - absorbed into `build-crosswalk.R`
-- `mensalize-annual.R` - absorbed into `apply-crosswalk.R`
-- `calibrate-weekly-weights.R` - merged into `calibrate-weights.R`
-- `smooth-aggregates.R` - kept but maybe renamed
+## Algorithm Summary
 
----
+### Month Identification (High Rate)
 
-## NAMESPACE (Exports)
+1. Calculate valid interview Saturdays using IBGE timing rules
+2. Apply birthday constraints to narrow date range per person
+3. Convert dates to month positions (1, 2, 3 in quarter)
+4. **Aggregate at UPA-V1014 level ACROSS ALL QUARTERS** (key optimization)
+5. Dynamic exception detection for edge cases
+6. Determine: if min_position == max_position → determined
 
+### Fortnight/Week Identification (Low Rate)
+
+1. Same steps 1-3 as month
+2. **Aggregate at household level WITHIN QUARTER ONLY**
+3. No cross-quarter aggregation (positions not consistent across visits)
+4. Determine: if min_position == max_position → determined
+
+## Calibration Pipeline
+
+When `pnadc_apply_periods(..., calibrate = TRUE)`:
+
+1. Join data with crosswalk
+2. Fetch population targets from SIDRA (or use provided targets)
+3. Create hierarchical calibration cells (4 levels)
+4. Iterative reweighting within anchor period (quarter or year)
+5. Calibrate to external population totals
+6. Smooth weights (optional)
+
+**Anchor types:**
+- `anchor = "quarter"`: Preserve quarterly totals, redistribute to sub-periods
+- `anchor = "year"`: Preserve annual totals (for annual PNADC data)
+
+## Dependencies
+
+**Required:**
+- `data.table` (>= 1.14.0) - Core data manipulation
+- `checkmate` (>= 2.0.0) - Input validation
+
+**Suggested:**
+- `sidrar` - SIDRA API access for population data
+- `testthat` - Testing
+- `knitr`, `rmarkdown` - Vignettes
+- `pkgdown` - Website
+
+## Workflow Examples
+
+### Standard Monthly Analysis
 ```r
-# Only TWO exported functions
-export(build_crosswalk)
-export(apply_crosswalk)
-
-# Optional: export utilities if useful standalone
-export(fetch_monthly_population)
-export(validate_pnadc)
+crosswalk <- pnadc_identify_periods(pnadc_stacked)
+result <- pnadc_apply_periods(pnadc_2023, crosswalk,
+                              weight_var = "V1028",
+                              anchor = "quarter")
 ```
 
----
-
-## Crosswalk Structure Detail
-
-The crosswalk is a `data.table` with these columns:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `UPA` | integer | Primary sampling unit |
-| `V1014` | integer | Panel group (1-8) |
-| `ref_month` | Date | Reference month (1st of month) |
-| `ref_month_in_quarter` | integer | Position in quarter (1, 2, 3) or NA |
-| `ref_month_yyyymm` | integer | YYYYMM format (202301) |
-| `ref_week` | Date | Reference week (Monday) |
-| `ref_week_in_quarter` | integer | Position in quarter (1-14) or NA |
-| `ref_week_yyyyww` | integer | ISO YYYYWW format (202301) |
-| `determined` | logical | TRUE if reference period was determined |
-
-**Join keys:** `UPA` + `V1014`
-
-**Note:** The crosswalk is at the UPA-panel level, not individual level. One row per unique (UPA, V1014) combination across all quarters in the input data.
-
----
-
-## Calibration Logic (Unified)
-
-The unified calibration function handles all cases:
-
+### Annual Data
 ```r
-calibrate_weights_internal <- function(
-  data,
-  unit = c("month", "week"),
-  anchor = c("quarter", "year"),
-  target_totals,
-  smooth = TRUE
-) {
-
-  # Determine grouping variable based on anchor
-  anchor_var <- if (anchor == "quarter") {
-    c("Ano", "Trimestre")
-  } else {
-    "Ano"
-  }
-
-  # Determine target variable based on unit
-  ref_var <- if (unit == "month") "ref_month_yyyymm" else "ref_week_yyyyww"
-
-  # Step 1: Create hierarchical cells (SAME for all)
-  data <- create_calibration_cells(data)
-
-  # Step 2: Iterative reweighting at 4 levels
-  # Key insight: only the anchor grouping changes
-  for (cell_level in paste0("celula", 1:4)) {
-    data <- reweight_at_cell_level(
-      data,
-      cell_var = cell_level,
-      anchor_var = anchor_var,
-      ref_var = ref_var
-    )
-  }
-
-  # Step 3: Calibrate to external population totals
-  data <- calibrate_to_totals(data, target_totals, ref_var)
-
-  # Step 4: Smooth (optional)
-  if (smooth) {
-    data <- smooth_weights(data, unit)
-  }
-
-  return(data)
-}
+result <- pnadc_apply_periods(pnadc_annual, crosswalk,
+                              weight_var = "V1032",
+                              anchor = "year")
 ```
 
-**Key insight:** The ONLY difference between quarterly/annual/weekly calibration is:
-1. `anchor_var` - what period to preserve totals within
-2. `ref_var` - what temporal unit to redistribute to
-
-Everything else (cell creation, reweighting logic, smoothing) is identical.
-
----
-
-## Documentation Plan
-
-### Vignettes
-1. **getting-started.Rmd** - Quick start with both functions
-2. **working-with-annual-data.Rmd** - Annual data specifics
-3. **weekly-analysis.Rmd** - Weekly temporal unit
-4. **how-it-works.Rmd** - Algorithm deep-dive (update)
-5. **applied-examples.Rmd** - Real-world examples (update)
-
-### Function Documentation
-- `build_crosswalk()` - Full roxygen2 with examples
-- `apply_crosswalk()` - Full roxygen2 with examples for all use cases
-
-### pkgdown
-- Simplified reference (only 2 main functions)
-- Clear workflow diagrams
-- Migration guide from old API (for existing users)
-
----
-
-## Implementation Phases
-
-### Phase 1: Core Functions
-1. Create `build_crosswalk()` that returns unified crosswalk (month + week)
-2. Create `apply_crosswalk()` with calibration pipeline
-3. Unify calibration logic into single internal function
-4. Update `identify_reference_week()` to derive from monthly
-
-### Phase 2: Cleanup
-1. Delete old files: `mensalizePNADC.R`, `semanalizePNADC.R`, `mensalize-annual.R`
-2. Delete `calibrate-weekly-weights.R` (merged)
-3. Update NAMESPACE
-4. Update DESCRIPTION (maybe rename package)
-
-### Phase 3: Documentation
-1. Rewrite all vignettes
-2. Update roxygen2 for new functions
-3. Update CLAUDE.md
-4. Update README
-
-### Phase 4: Testing
-1. Write tests for `build_crosswalk()`
-2. Write tests for `apply_crosswalk()` (all variants)
-3. Integration tests
-
-### Phase 5: Release
-1. Bump to version 2.0.0 (or 1.0.0 if renaming package)
-2. Write NEWS.md
-3. Rebuild pkgdown site
-4. Push to GitHub
-
----
-
-## Open Questions
-
-1. **Package name:** Keep `mensalizePNADC` or rename to `pnadcTemporal`?
-
-2. **Smoothing for aggregates:** Keep `smooth_monthly_aggregates()` as separate export, or fold into the pipeline?
-
-3. **Validation export:** Keep `validate_pnadc()` exported for users to check their data?
-
-4. **Population fetch export:** Keep `fetch_monthly_population()` exported for users who want raw SIDRA data?
+### Crosswalk Only (No Calibration)
+```r
+result <- pnadc_apply_periods(pnadc_2023, crosswalk,
+                              calibrate = FALSE)
+```

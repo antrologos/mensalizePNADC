@@ -501,12 +501,12 @@ confint(poverty_estimate)
 
 For detailed guidance on variance estimation with monthly weights, including the replication weights approach, see the [Complex Survey Design](complex-survey-design.html) vignette.
 
-### Example 3: Smoothing
+### Example 3: Post-hoc Smoothing of Aggregates
 
-The raw monthly series may show quarterly artifacts from IBGE's rotating panel design. The `smooth_monthly_aggregates()` function can help remove these patterns:
+The raw monthly series may show quarterly artifacts from IBGE's rotating panel design. If artifacts persist after weight calibration (which applies smoothing by default), you can apply additional post-hoc smoothing to your aggregated estimates:
 
 ```{r example-smoothing}
-# Three-month centered rolling average
+# Three-month centered rolling average (using data.table::frollmean)
 monthly_poverty[, poverty_rate_smoothed :=
                   frollmean(poverty_rate, 3, align = "center")]
 ```

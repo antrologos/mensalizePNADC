@@ -37,7 +37,7 @@ A data.table with the original key columns plus:
 \itemize{
 \item \code{ref_week}: Reference week as Date (Monday of that week)
 \item \code{ref_week_in_quarter}: Position in quarter (1-14) or NA if indeterminate
-\item \code{ref_week_iso_yyyyww}: Integer YYYYWW format (e.g., 202301)
+\item \code{ref_week_yyyyww}: Integer YYYYWW format (e.g., 202301)
 }
 }
 \description{
@@ -78,10 +78,11 @@ only, because households are NOT interviewed in the same week across quarterly v
 
 \subsection{Expected Determination Rate}{
 
-The weekly determination rate (~50-75\%) is lower than monthly (~97\%) because:
+The weekly determination rate (~1-2\%) is much lower than monthly (~97\%) because:
 \itemize{
 \item Cannot aggregate across quarters (no consistent week position in panel design)
-\item Finer granularity (13 weeks vs 3 months per quarter)
+\item Finer granularity (13-14 weeks vs 3 months per quarter)
+\item Birthday constraints rarely narrow the interview window to a single 7-day period
 }
 }
 

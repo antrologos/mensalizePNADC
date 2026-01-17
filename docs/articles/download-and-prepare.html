@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Download and Prepare PNADC Data • mensalizePNADC</title>
+<title>Download and Prepare PNADC Data • PNADCperiods</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
@@ -18,9 +18,9 @@
 
     <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
 
-    <a class="navbar-brand me-2" href="../index.html">mensalizePNADC</a>
+    <a class="navbar-brand me-2" href="../index.html">PNADCperiods</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,7 +38,7 @@
     <li><a class="dropdown-item" href="../articles/applied-examples.html">Applied Examples</a></li>
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
-    <li><a class="dropdown-item" href="../articles/how-it-works.html">How mensalizePNADC Works</a></li>
+    <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
   </ul>
 </li>
       </ul>
@@ -73,9 +73,6 @@
 MAINTAINER NOTE:
 This vignette uses eval=FALSE for all code chunks.
 Pre-computed outputs are shown as text blocks.
-
-The determination rate figure is generated separately and stored in:
-  mensalizePNADC/vignettes/figures/download-and-prepare/
 -->
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
@@ -120,7 +117,7 @@ Works</a>.</p>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">PNADcIBGE</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org" class="external-link">tidyverse</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://www.fstpackage.org" class="external-link">fst</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="system-requirements">System Requirements<a class="anchor" aria-label="anchor" href="#system-requirements"></a>
@@ -151,17 +148,38 @@ quarterly release contains approximately 500,000 observations.</p>
 <p><strong>Why stack multiple quarters?</strong> The mensalization
 algorithm identifies reference months by tracking households across
 their panel interviews. With a single quarter, the determination rate is
-only ~65-75%. By stacking multiple quarters, the algorithm can leverage
-the rotating panel structure to achieve a <strong>97% determination
+only ~73%. By stacking multiple quarters, the algorithm can leverage the
+rotating panel structure to achieve a <strong>97% determination
 rate</strong>.</p>
-<p>The figure below shows how determination rate improves as more
-quarters are stacked:</p>
-<div class="float">
-<img src="figures/download-and-prepare/fig-determination-rate.png" style="width:100.0%" alt="Determination rate improves with more stacked quarters"><div class="figcaption">Determination rate improves with more stacked
-quarters</div>
-</div>
-<p>For most applications, we recommend stacking at least 2-3 years of
-data to achieve optimal results.</p>
+<table class="table">
+<thead><tr class="header">
+<th>Quarters Stacked</th>
+<th>Determination Rate</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>1 (single quarter)</td>
+<td>73%</td>
+</tr>
+<tr class="even">
+<td>4 (1 year)</td>
+<td>94%</td>
+</tr>
+<tr class="odd">
+<td>8 (2 years)</td>
+<td>96%</td>
+</tr>
+<tr class="even">
+<td>20+ (5+ years)</td>
+<td><strong>97%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>For most applications, we recommend stacking at least 2 years (8
+quarters) of data. For a detailed explanation of how determination rates
+improve with stacking, including a figure computed from real data, see
+the <a href="how-it-works.html#why-stacked-data-matters">How
+PNADCperiods Works</a> vignette.</p>
 </div>
 <div class="section level2">
 <h2 id="step-1-set-up-your-environment">Step 1: Set Up Your Environment<a class="anchor" aria-label="anchor" href="#step-1-set-up-your-environment"></a>
@@ -289,28 +307,42 @@ Total observations: 10,847,562</code></pre>
 <div class="section level2">
 <h2 id="step-5-apply-mensalization">Step 5: Apply Mensalization<a class="anchor" aria-label="anchor" href="#step-5-apply-mensalization"></a>
 </h2>
-<p>Now apply the mensalization algorithm. Setting
-<code>compute_weights = TRUE</code> also generates monthly survey
-weights:</p>
+<p>Now apply the period identification algorithm and optionally compute
+calibrated weights:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Apply mensalization with monthly weight computation</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span></span>
-<span>  data <span class="op">=</span> <span class="va">pnadc_stacked</span>,</span>
-<span>  compute_weights <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Step 1: Build crosswalk (identify reference periods)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check the determination rate</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Determination rate:"</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">result</span>, <span class="st">"determination_rate"</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.1f%%"</span>, <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">crosswalk</span>, <span class="st">"determination_rates"</span><span class="op">)</span><span class="op">$</span><span class="va">month</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Step 2: Apply crosswalk and calibrate weights</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
+<span>  data <span class="op">=</span> <span class="va">pnadc_stacked</span>,</span>
+<span>  crosswalk <span class="op">=</span> <span class="va">crosswalk</span>,</span>
+<span>  weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>  anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>Expected output:</p>
-<pre><code>Processing PNADC data...
-|========================================================| 100%
-  Determination rate: 97.0%
-  Observations with monthly weights: 10,523,189</code></pre>
+<pre><code>Building reference period crosswalk...
+  Step 1/3: Identifying reference months...
+    -&gt; Month determination rate: 97.0%
+  Step 2/3: Identifying reference fortnights...
+    -&gt; Fortnight determination rate: 88.2%
+  Step 3/3: Identifying reference weeks...
+    -&gt; Week determination rate: 62.1%
+
+Crosswalk complete:
+  - 10,523,189 unique household-quarter observations
+  - Month determination: 97.0%
+  - Fortnight determination: 88.2%
+  - Week determination: 62.1%</code></pre>
 <p>The determination rate tells you what percentage of observations have
-their reference month identified. With 19 quarters stacked, you should
-achieve approximately 97%.</p>
+their reference period identified. With 19 quarters stacked, you should
+achieve approximately 97% for months.</p>
 </div>
 <div class="section level2">
 <h2 id="step-6-explore-the-results">Step 6: Explore the Results<a class="anchor" aria-label="anchor" href="#step-6-explore-the-results"></a>
@@ -500,7 +532,8 @@ for more resources</li>
 (visit-specific microdata with comprehensive income variables) requires
 a different workflow. See <a href="annual-poverty-analysis.html">Monthly
 Poverty Analysis with Annual PNADC Data</a> for details on using
-<code><a href="../reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc()</a></code>.</p>
+<code><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods()</a></code> with
+<code>anchor = "year"</code>.</p>
 </blockquote>
 <p>For questions or issues, please open an issue on <a href="https://github.com/antrologos/mensalizePNADC/issues" class="external-link">GitHub</a>.</p>
 </div>

@@ -11,9 +11,6 @@ vignette: >
 MAINTAINER NOTE:
 This vignette uses eval=FALSE for all code chunks.
 Pre-computed outputs are shown as text blocks.
-
-The determination rate figure is generated separately and stored in:
-  mensalizePNADC/vignettes/figures/download-and-prepare/
 -->
 
 ```{r setup, include=FALSE}
@@ -68,13 +65,16 @@ library(PNADCperiods)
 
 PNADC is Brazil's primary household survey for labor market statistics, conducted by IBGE. The survey uses a rotating panel design where each household is interviewed five times over 15 months. Each quarterly release contains approximately 500,000 observations.
 
-**Why stack multiple quarters?** The mensalization algorithm identifies reference months by tracking households across their panel interviews. With a single quarter, the determination rate is only ~65-75%. By stacking multiple quarters, the algorithm can leverage the rotating panel structure to achieve a **97% determination rate**.
+**Why stack multiple quarters?** The mensalization algorithm identifies reference months by tracking households across their panel interviews. With a single quarter, the determination rate is only ~73%. By stacking multiple quarters, the algorithm can leverage the rotating panel structure to achieve a **97% determination rate**.
 
-The figure below shows how determination rate improves as more quarters are stacked:
+| Quarters Stacked | Determination Rate |
+|------------------|-------------------|
+| 1 (single quarter) | 73% |
+| 4 (1 year) | 94% |
+| 8 (2 years) | 96% |
+| 20+ (5+ years) | **97%** |
 
-![Determination rate improves with more stacked quarters](figures/download-and-prepare/fig-determination-rate.png){width=100%}
-
-For most applications, we recommend stacking at least 2-3 years of data to achieve optimal results.
+For most applications, we recommend stacking at least 2 years (8 quarters) of data. For a detailed explanation of how determination rates improve with stacking, including a figure computed from real data, see the [How PNADCperiods Works](how-it-works.html#why-stacked-data-matters) vignette.
 
 ## Step 1: Set Up Your Environment
 

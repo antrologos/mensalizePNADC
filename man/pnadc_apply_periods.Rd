@@ -43,10 +43,12 @@ One of \code{"month"} (default), \code{"fortnight"}, or \code{"week"}.}
 
 \item{target_totals}{Optional data.table with population targets. If NULL
 (default), fetches monthly population from SIDRA and derives targets for
-fortnight/week.}
+fortnight/week. Each time period (month, fortnight, or week) is calibrated
+to the FULL Brazilian population from SIDRA.}
 
 \item{smooth}{Logical. If TRUE (default), smooth calibrated weights to
-remove quarterly artifacts.}
+remove quarterly artifacts. Smoothing is adapted per time period:
+monthly (3-period window), fortnight (7-period window), weekly (no smoothing).}
 
 \item{keep_all}{Logical. If TRUE (default), keep all observations including
 those with undetermined reference periods. If FALSE, drop undetermined rows.}
@@ -78,8 +80,30 @@ When \code{calibrate = TRUE}, the function performs hierarchical rake weighting:
 \enumerate{
 \item Groups observations by nested demographic/geographic cells
 \item Iteratively adjusts weights so sub-period totals match anchor-period totals
-\item Calibrates final weights against external population totals
+\item Calibrates final weights against external population totals (FULL Brazilian population)
 \item Optionally smooths weights to remove quarterly artifacts
+}
+}
+
+\subsection{Population Targets}{
+
+All time periods (months, fortnights, and weeks) are calibrated to the FULL
+Brazilian population from SIDRA. This means:
+\itemize{
+\item Monthly weights sum to the Brazilian population for that month
+\item Fortnight weights sum to the Brazilian population for the containing month
+\item Weekly weights sum to the Brazilian population for the containing month
+}
+}
+
+\subsection{Hierarchical Raking Levels}{
+
+The number of hierarchical cell levels is automatically adjusted based on the
+calibration unit to avoid sparse cell issues:
+\itemize{
+\item \code{"month"}: 4 levels (age, region, state, post-stratum) - full hierarchy
+\item \code{"fortnight"}: 2 levels (age, region) - simplified for lower sample size
+\item \code{"week"}: 1 level (age groups only) - minimal hierarchy for sparse data
 }
 }
 

@@ -23,9 +23,13 @@ for sub-quarterly estimates using hierarchical rake weighting
 }
 
 The package is highly optimized for large datasets: approximately 1 minute to
-process 28.4 million rows (450,000 rows/sec), with 97.0 percent determination
-rate for months, ~85-90 percent for fortnights, and ~50-75 percent for weeks.
+process 28.4 million rows (450,000 rows/sec), with ~97 percent determination
+rate for months, ~2-5 percent for fortnights, and ~1-2 percent for weeks.
 Uses pre-computed lookup tables for 20x faster date creation.
+
+\strong{Note:} Fortnight and week determination rates are inherently low because
+they cannot leverage cross-quarter aggregation like months can. Only birthday
+constraints within a single quarter are available to narrow the interview window.
 
 The main functions are:
 \itemize{

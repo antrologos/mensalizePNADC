@@ -5,12 +5,12 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Get Started with mensalizePNADC • mensalizePNADC</title>
+<title>Get Started with PNADCperiods • PNADCperiods</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Get Started with mensalizePNADC">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Get Started with PNADCperiods">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -18,9 +18,9 @@
 
     <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
 
-    <a class="navbar-brand me-2" href="../index.html">mensalizePNADC</a>
+    <a class="navbar-brand me-2" href="../index.html">PNADCperiods</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,7 +38,7 @@
     <li><a class="dropdown-item" href="../articles/applied-examples.html">Applied Examples</a></li>
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
-    <li><a class="dropdown-item" href="../articles/how-it-works.html">How mensalizePNADC Works</a></li>
+    <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
   </ul>
 </li>
       </ul>
@@ -60,7 +60,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Get Started with mensalizePNADC</h1>
+      <h1>Get Started with PNADCperiods</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/antrologos/mensalizePNADC/blob/HEAD/vignettes/getting-started.Rmd" class="external-link"><code>vignettes/getting-started.Rmd</code></a></small>
@@ -72,11 +72,13 @@
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>The <code>mensalizePNADC</code> package converts Brazil’s quarterly
+<p>The <code>PNADCperiods</code> package converts Brazil’s quarterly
 PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data
-into monthly time series. It identifies which specific month each survey
-observation refers to, achieving a <strong>97% determination
-rate</strong> on stacked multi-quarter data.</p>
+into sub-quarterly time series. It identifies which specific
+<strong>month</strong>, <strong>fortnight</strong> (quinzena), or
+<strong>week</strong> each survey observation refers to, achieving a
+<strong>97% determination rate</strong> for months on stacked
+multi-quarter data.</p>
 <p><strong>Why does this matter?</strong> PNADC quarterly statistics are
 actually moving averages of three months, which obscures:</p>
 <ul>
@@ -85,9 +87,9 @@ peak?)</li>
 <li>The actual magnitude of changes (how high was the peak?)</li>
 <li>Turning points in trends (when did recovery begin?)</li>
 </ul>
-<p>Mensalization recovers the specific reference month, enabling true
-monthly labor market analysis.</p>
-<p>For a detailed explanation of the algorithm, see the <a href="how-it-works.html">How mensalizePNADC Works</a> vignette.</p>
+<p>PNADCperiods recovers the specific reference period, enabling true
+monthly (or finer) labor market analysis.</p>
+<p>For a detailed explanation of the algorithm, see the <a href="how-it-works.html">How PNADCperiods Works</a> vignette.</p>
 <hr>
 </div>
 <div class="section level2">
@@ -98,7 +100,7 @@ monthly labor market analysis.</p>
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"antrologos/mensalizePNADC"</span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load the package</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">mensalizePNADC</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span></code></pre></div>
 <p><strong>Dependencies:</strong></p>
 <ul>
@@ -113,13 +115,29 @@ monthly labor market analysis.</p>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="your-first-mensalization">Your First Mensalization<a class="anchor" aria-label="anchor" href="#your-first-mensalization"></a>
+<h2 id="two-step-workflow">Two-Step Workflow<a class="anchor" aria-label="anchor" href="#two-step-workflow"></a>
+</h2>
+<p>The package uses a <strong>two-function workflow</strong>:</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong><code><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods()</a></code></strong> - Builds a
+universal crosswalk with reference periods</li>
+<li>
+<strong><code><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods()</a></code></strong> - Applies
+crosswalk to data and optionally calibrates weights</li>
+</ol>
+<p>This separation allows you to: - Build the crosswalk once from
+stacked data - Apply it to any quarterly or annual dataset - Choose your
+calibration approach flexibly</p>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="your-first-analysis">Your First Analysis<a class="anchor" aria-label="anchor" href="#your-first-analysis"></a>
 </h2>
 <div class="section level3">
 <h3 id="required-input-columns">Required Input Columns<a class="anchor" aria-label="anchor" href="#required-input-columns"></a>
 </h3>
-<p>The mensalization algorithm needs these columns from your PNADC
-data:</p>
+<p>The algorithm needs these columns from your PNADC data:</p>
 <table class="table">
 <thead><tr class="header">
 <th>Column</th>
@@ -176,9 +194,7 @@ data:</p>
 complete workflow.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load your stacked quarterly PNADC data</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span>,</span>
-<span>  select <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span>,</span>
-<span>             <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check data dimensions</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Rows:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
@@ -189,21 +205,31 @@ yields only ~65-75% determination rate, while stacking 2+ years achieves
 ~97%.</p>
 </div>
 <div class="section level3">
-<h3 id="step-2-run-mensalization">Step 2: Run Mensalization<a class="anchor" aria-label="anchor" href="#step-2-run-mensalization"></a>
+<h3 id="step-2-build-the-crosswalk">Step 2: Build the Crosswalk<a class="anchor" aria-label="anchor" href="#step-2-build-the-crosswalk"></a>
 </h3>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Identify reference months</span></span>
-<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># Identify reference periods (month, fortnight, week)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span></code></pre></div>
 <p>Expected output:</p>
-<pre><code>Processing PNADC data...
-|========================================================| 100%
-  Determination rate: 97.0%</code></pre>
+<pre><code>Building reference period crosswalk...
+  Step 1/3: Identifying reference months...
+    -&gt; Month determination rate: 97.0%
+  Step 2/3: Identifying reference fortnights...
+    -&gt; Fortnight determination rate: 88.5%
+  Step 3/3: Identifying reference weeks...
+    -&gt; Week determination rate: 62.3%
+
+Crosswalk complete:
+  - 123,456 unique UPA-panel combinations
+  - Month determination: 97.0%
+  - Fortnight determination: 88.5%
+  - Week determination: 62.3%</code></pre>
 </div>
 <div class="section level3">
-<h3 id="step-3-understand-the-output">Step 3: Understand the Output<a class="anchor" aria-label="anchor" href="#step-3-understand-the-output"></a>
+<h3 id="step-3-understand-the-crosswalk">Step 3: Understand the Crosswalk<a class="anchor" aria-label="anchor" href="#step-3-understand-the-crosswalk"></a>
 </h3>
-<p>The function returns a <code>data.table</code> with the original
-identifier columns plus:</p>
+<p>The crosswalk contains one row per UPA-V1014 combination with three
+granularity levels:</p>
 <table class="table">
 <colgroup>
 <col width="44%">
@@ -217,142 +243,202 @@ identifier columns plus:</p>
 </tr></thead>
 <tbody>
 <tr class="odd">
+<td><code>UPA</code></td>
+<td>Integer</td>
+<td>Primary sampling unit</td>
+</tr>
+<tr class="even">
+<td><code>V1014</code></td>
+<td>Integer</td>
+<td>Panel group (1-8)</td>
+</tr>
+<tr class="odd">
+<td><strong>Month</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
 <td><code>ref_month</code></td>
 <td>Date</td>
 <td>Reference month as Date (e.g., “2023-01-01”)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>ref_month_in_quarter</code></td>
 <td>Integer</td>
 <td>Position in quarter: 1, 2, 3, or NA</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>ref_month_yyyymm</code></td>
 <td>Integer</td>
 <td>YYYYMM format (e.g., 202301)</td>
+</tr>
+<tr class="odd">
+<td><code>determined_month</code></td>
+<td>Logical</td>
+<td>TRUE if month was determined</td>
+</tr>
+<tr class="even">
+<td><strong>Fortnight</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><code>ref_fortnight</code></td>
+<td>Date</td>
+<td>Reference fortnight (1st or 16th of month)</td>
+</tr>
+<tr class="even">
+<td><code>ref_fortnight_in_quarter</code></td>
+<td>Integer</td>
+<td>Position 1-6, or NA</td>
+</tr>
+<tr class="odd">
+<td><code>ref_fortnight_yyyyff</code></td>
+<td>Integer</td>
+<td>YYYYFF format (1-24 per year)</td>
+</tr>
+<tr class="even">
+<td><code>determined_fortnight</code></td>
+<td>Logical</td>
+<td>TRUE if fortnight was determined</td>
+</tr>
+<tr class="odd">
+<td><strong>Week</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>ref_week</code></td>
+<td>Date</td>
+<td>Reference week (Monday of week)</td>
+</tr>
+<tr class="odd">
+<td><code>ref_week_in_quarter</code></td>
+<td>Integer</td>
+<td>Position 1-14, or NA</td>
+</tr>
+<tr class="even">
+<td><code>ref_week_yyyyww</code></td>
+<td>Integer</td>
+<td>ISO YYYYWW format</td>
+</tr>
+<tr class="odd">
+<td><code>determined_week</code></td>
+<td>Logical</td>
+<td>TRUE if week was determined</td>
 </tr>
 </tbody>
 </table>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># View the crosswalk</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">crosswalk</span><span class="op">)</span></span>
-<span><span class="co">#    Ano Trimestre    UPA V1008 V1014 V2003   ref_month ref_month_in_quarter ref_month_yyyymm</span></span>
-<span><span class="co"># 1: 2012         1 110000     1     1     1 2012-01-01                    1           201201</span></span>
-<span><span class="co"># 2: 2012         1 110000     1     1     2 2012-01-01                    1           201201</span></span>
 <span></span>
-<span><span class="co"># Check the determination rate attribute</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">crosswalk</span>, <span class="st">"determination_rate"</span><span class="op">)</span></span>
-<span><span class="co"># [1] 0.97</span></span></code></pre></div>
-<p>Observations with <code>ref_month_in_quarter = NA</code> are
-<strong>indeterminate</strong> – the algorithm couldn’t narrow down to a
-single month. This affects about 3% of observations.</p>
+<span><span class="co"># Check determination rates</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">crosswalk</span>, <span class="st">"determination_rates"</span><span class="op">)</span></span>
+<span><span class="co"># $month</span></span>
+<span><span class="co"># [1] 0.97</span></span>
+<span><span class="co"># $fortnight</span></span>
+<span><span class="co"># [1] 0.885</span></span>
+<span><span class="co"># $week</span></span>
+<span><span class="co"># [1] 0.623</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="step-4-join-with-original-data">Step 4: Join with Original Data<a class="anchor" aria-label="anchor" href="#step-4-join-with-original-data"></a>
+<h3 id="step-4-apply-to-your-data">Step 4: Apply to Your Data<a class="anchor" aria-label="anchor" href="#step-4-apply-to-your-data"></a>
 </h3>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Load an original quarterly file with all variables you need</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://haven.tidyverse.org" class="external-link">haven</a></span><span class="op">)</span></span>
-<span><span class="va">original</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://haven.tidyverse.org/reference/read_dta.html" class="external-link">read_dta</a></span><span class="op">(</span><span class="st">"PNADC_2023T1.dta"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Join to add monthly information</span></span>
-<span><span class="va">monthly_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">original</span>, <span class="va">crosswalk</span>,</span>
-<span>  by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span><span class="op">)</span>,</span>
-<span>  all.x <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="step-5-use-for-monthly-analysis">Step 5: Use for Monthly Analysis<a class="anchor" aria-label="anchor" href="#step-5-use-for-monthly-analysis"></a>
-</h3>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Filter to a specific month</span></span>
-<span><span class="va">jan_2023</span> <span class="op">&lt;-</span> <span class="va">monthly_data</span><span class="op">[</span><span class="va">ref_month_yyyymm</span> <span class="op">==</span> <span class="fl">202301</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Group by month</span></span>
-<span><span class="va">by_month</span> <span class="op">&lt;-</span> <span class="va">monthly_data</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  n_obs <span class="op">=</span> <span class="va">.N</span>,</span>
-<span>  mean_age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/weighted.mean.html" class="external-link">weighted.mean</a></span><span class="op">(</span><span class="va">V2009</span>, <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># Check determination rate by year</span></span>
-<span><span class="va">monthly_data</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  total <span class="op">=</span> <span class="va">.N</span>,</span>
-<span>  determined <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">Ano</span><span class="op">]</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># Apply crosswalk to a specific quarterly dataset</span></span>
+<span><span class="co"># For quarterly data, use anchor = "quarter" and weight_var = "V1028"</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">pnadc_2023q1</span>,</span>
+<span>  <span class="va">crosswalk</span>,</span>
+<span>  weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>  anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  calibration_unit <span class="op">=</span> <span class="st">"month"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The result includes all original columns plus reference periods and
+calibrated weights.</p>
 <hr>
 </div>
 </div>
 <div class="section level2">
-<h2 id="computing-monthly-weights">Computing Monthly Weights<a class="anchor" aria-label="anchor" href="#computing-monthly-weights"></a>
+<h2 id="understanding-the-workflow">Understanding the Workflow<a class="anchor" aria-label="anchor" href="#understanding-the-workflow"></a>
 </h2>
-<p>For proper monthly aggregate estimates, you need monthly-appropriate
-survey weights. The original PNADC weight (<code>V1028</code>) is
-designed for quarterly estimates.</p>
 <div class="section level3">
-<h3 id="when-do-you-need-monthly-weights">When Do You Need Monthly Weights?<a class="anchor" aria-label="anchor" href="#when-do-you-need-monthly-weights"></a>
+<h3 id="building-vs--applying">Building vs. Applying<a class="anchor" aria-label="anchor" href="#building-vs--applying"></a>
 </h3>
-<ul>
-<li>
-<strong>Just reference months</strong>: If you only need to know
-which month each observation belongs to, you don’t need monthly
-weights</li>
-<li>
-<strong>Monthly aggregates</strong>: If you’re computing weighted
-estimates (totals, means, rates) by month, use
-<code>weight_monthly</code>
-</li>
-</ul>
-</div>
-<div class="section level3">
-<h3 id="additional-required-columns">Additional Required Columns<a class="anchor" aria-label="anchor" href="#additional-required-columns"></a>
-</h3>
-<p>For weight computation, you also need:</p>
-<table class="table">
-<thead><tr class="header">
-<th>Variable</th>
-<th>Description</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>V1028</code></td>
-<td>Original quarterly survey weight</td>
-</tr>
-<tr class="even">
-<td><code>UF</code></td>
-<td>State code</td>
-</tr>
-<tr class="odd">
-<td><code>posest</code></td>
-<td>Post-stratification cell</td>
-</tr>
-<tr class="even">
-<td><code>posest_sxi</code></td>
-<td>Post-stratification group</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level3">
-<h3 id="computing-weights">Computing Weights<a class="anchor" aria-label="anchor" href="#computing-weights"></a>
-</h3>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Load full data with weight columns</span></span>
-<span><span class="va">pnadc_full</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked_full.csv"</span><span class="op">)</span></span>
+<p><strong>Build the crosswalk once</strong> from stacked data (2+ years
+recommended):</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Stack multiple years of quarterly data</span></span>
+<span><span class="va">pnadc_stacked</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">pnadc_2020</span>, <span class="va">pnadc_2021</span>, <span class="va">pnadc_2022</span>, <span class="va">pnadc_2023</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Run mensalization with weight computation</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc_full</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>Expected output:</p>
-<pre><code>Processing PNADC data...
-|========================================================| 100%
-  Determination rate: 97.0%
-  Observations with monthly weights: 10,523,189</code></pre>
+<span><span class="co"># Build crosswalk (only needs the identification columns)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Save for reuse</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crosswalk</span>, <span class="st">"crosswalk_2020_2023.rds"</span><span class="op">)</span></span></code></pre></div>
+<p><strong>Apply to any dataset</strong> as needed:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Load saved crosswalk</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="st">"crosswalk_2020_2023.rds"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Apply to quarterly data</span></span>
+<span><span class="va">monthly_q1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc_2023q1</span>, <span class="va">crosswalk</span>,</span>
+<span>                                   weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>                                   anchor <span class="op">=</span> <span class="st">"quarter"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Apply to annual data (with V1032 weights)</span></span>
+<span><span class="va">monthly_annual</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc_annual_2023</span>, <span class="va">crosswalk</span>,</span>
+<span>                                       weight_var <span class="op">=</span> <span class="st">"V1032"</span>,</span>
+<span>                                       anchor <span class="op">=</span> <span class="st">"year"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="using-monthly-weights">Using Monthly Weights<a class="anchor" aria-label="anchor" href="#using-monthly-weights"></a>
+<h3 id="calibration-options">Calibration Options<a class="anchor" aria-label="anchor" href="#calibration-options"></a>
 </h3>
+<p>The <code>calibration_unit</code> parameter controls the granularity
+of weight calibration:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Monthly calibration (default)</span></span>
+<span><span class="va">result_month</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk</span>,</span>
+<span>                                     weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>                                     anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>                                     calibration_unit <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span></span>
+<span><span class="co"># -&gt; Adds weight_monthly column</span></span>
+<span></span>
+<span><span class="co"># Fortnight calibration</span></span>
+<span><span class="va">result_fortnight</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk</span>,</span>
+<span>                                         weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>                                         anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>                                         calibration_unit <span class="op">=</span> <span class="st">"fortnight"</span><span class="op">)</span></span>
+<span><span class="co"># -&gt; Adds weight_fortnight column</span></span>
+<span></span>
+<span><span class="co"># Weekly calibration</span></span>
+<span><span class="va">result_week</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk</span>,</span>
+<span>                                    weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>                                    anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>                                    calibration_unit <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span>
+<span><span class="co"># -&gt; Adds weight_weekly column</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="no-calibration-option">No Calibration Option<a class="anchor" aria-label="anchor" href="#no-calibration-option"></a>
+</h3>
+<p>If you only need reference periods without calibrated weights:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk</span>,</span>
+<span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>                               anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>                               calibrate <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="co"># Result has ref_month, ref_fortnight, ref_week but no weight_monthly</span></span></code></pre></div>
+<hr>
+</div>
+</div>
+<div class="section level2">
+<h2 id="using-for-monthly-analysis">Using for Monthly Analysis<a class="anchor" aria-label="anchor" href="#using-for-monthly-analysis"></a>
+</h2>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Compute monthly unemployment rate</span></span>
-<span><span class="va">monthly_unemployment</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span><span class="va">monthly_unemployment</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="va">determined_month</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="fu">.</span><span class="op">(</span></span>
 <span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">(</span><span class="va">VD4002</span> <span class="op">==</span> <span class="fl">2</span><span class="op">)</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
 <span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span> <span class="op">*</span> <span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span>
@@ -361,28 +447,9 @@ estimates (totals, means, rates) by month, use
 <span><span class="va">monthly_pop</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
 <span>  population <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_monthly</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span>, by <span class="op">=</span> <span class="va">ref_month_yyyymm</span><span class="op">]</span></span></code></pre></div>
-<p><strong>Note:</strong> Indeterminate observations have
-<code>weight_monthly = NA</code>. Always use <code>na.rm = TRUE</code>
-when aggregating, or filter to <code>!is.na(weight_monthly)</code>.</p>
-</div>
-<div class="section level3">
-<h3 id="handling-indeterminate-observations">Handling Indeterminate Observations<a class="anchor" aria-label="anchor" href="#handling-indeterminate-observations"></a>
-</h3>
-<p>By default (<code>keep_all = TRUE</code>), all input rows are
-returned:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Default: all rows returned</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc_full</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">pnadc_full</span><span class="op">)</span>  <span class="co"># TRUE</span></span>
-<span></span>
-<span><span class="co"># About 3% have NA weights</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">weight_monthly</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span>  <span class="co"># ~0.03</span></span>
-<span></span>
-<span><span class="co"># Alternative: only return determined rows</span></span>
-<span><span class="va">result_determined</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span><span class="va">pnadc_full</span>, compute_weights <span class="op">=</span> <span class="cn">TRUE</span>, keep_all <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result_determined</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">pnadc_full</span><span class="op">)</span>  <span class="co"># TRUE (~97% of rows)</span></span></code></pre></div>
+<p><strong>Note:</strong> Use <code>determined_month == TRUE</code> to
+filter to observations with determined months.</p>
 <hr>
-</div>
 </div>
 <div class="section level2">
 <h2 id="understanding-determination-rates">Understanding Determination Rates<a class="anchor" aria-label="anchor" href="#understanding-determination-rates"></a>
@@ -410,16 +477,22 @@ Cross-quarter aggregation:
 <table class="table">
 <thead><tr class="header">
 <th>Processing Mode</th>
-<th>Determination Rate</th>
+<th>Month Rate</th>
+<th>Fortnight Rate</th>
+<th>Week Rate</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td>Single quarter</td>
 <td>65-75%</td>
+<td>50-60%</td>
+<td>30-40%</td>
 </tr>
 <tr class="even">
 <td>Stacked (2+ years)</td>
 <td><strong>97%</strong></td>
+<td><strong>~88%</strong></td>
+<td><strong>~62%</strong></td>
 </tr>
 </tbody>
 </table>
@@ -427,7 +500,7 @@ Cross-quarter aggregation:
 <div class="section level3">
 <h3 id="what-makes-observations-indeterminate">What Makes Observations Indeterminate?<a class="anchor" aria-label="anchor" href="#what-makes-observations-indeterminate"></a>
 </h3>
-<p>About 3% of observations remain indeterminate because:</p>
+<p>About 3% of observations remain indeterminate for months because:</p>
 <ul>
 <li>
 <strong>Incomplete panel coverage</strong>: First/last quarters in
@@ -442,7 +515,7 @@ constraints</li>
 <strong>Unit non-response</strong>: Some households don’t respond in
 all quarters</li>
 </ul>
-<p>For the full algorithm explanation, see <a href="how-it-works.html">How mensalizePNADC Works</a>.</p>
+<p>For the full algorithm explanation, see <a href="how-it-works.html">How PNADCperiods Works</a>.</p>
 <hr>
 </div>
 </div>
@@ -458,8 +531,8 @@ market analysis comparing monthly vs quarterly data, including COVID
 unemployment and minimum wage validation.</p></li>
 <li><p><strong>Annual PNADC data</strong>: Working with annual income
 data? See <a href="annual-poverty-analysis.html">Monthly Poverty
-Analysis with Annual PNADC Data</a> for the workflow using
-<code><a href="../reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc()</a></code>.</p></li>
+Analysis with Annual PNADC Data</a> for the workflow using annual
+data.</p></li>
 <li><p><strong>Function reference</strong>: Browse the <a href="../reference/index.html">Reference</a> for documentation of all
 exported functions.</p></li>
 </ul>
@@ -469,72 +542,28 @@ exported functions.</p></li>
 <h2 id="quick-reference">Quick Reference<a class="anchor" aria-label="anchor" href="#quick-reference"></a>
 </h2>
 <div class="section level3">
-<h3 id="main-function-parameters">Main Function Parameters<a class="anchor" aria-label="anchor" href="#main-function-parameters"></a>
+<h3 id="main-functions">Main Functions<a class="anchor" aria-label="anchor" href="#main-functions"></a>
 </h3>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/mensalizePNADC.html">mensalizePNADC</a></span><span class="op">(</span></span>
-<span>  <span class="va">data</span>,                    <span class="co"># Stacked PNADC data.table/data.frame</span></span>
-<span>  compute_weights <span class="op">=</span> <span class="cn">FALSE</span>, <span class="co"># Compute monthly calibrated weights?</span></span>
-<span>  keep_all <span class="op">=</span> <span class="cn">TRUE</span>,         <span class="co"># Return all rows (including indeterminate)?</span></span>
-<span>  output <span class="op">=</span> <span class="st">"crosswalk"</span>,    <span class="co"># "crosswalk", "microdata", or "aggregates"</span></span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>           <span class="co"># Show progress bar?</span></span>
+<code class="sourceCode R"><span><span class="co"># Step 1: Build crosswalk from stacked data</span></span>
+<span><span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">data</span>,              <span class="co"># Stacked PNADC data</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>     <span class="co"># Show progress?</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Step 2: Apply crosswalk and optionally calibrate weights</span></span>
+<span><span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">data</span>,              <span class="co"># PNADC data to augment</span></span>
+<span>  <span class="va">crosswalk</span>,         <span class="co"># Crosswalk from pnadc_identify_periods()</span></span>
+<span>  <span class="va">weight_var</span>,        <span class="co"># REQUIRED: "V1028" (quarterly) or "V1032" (annual)</span></span>
+<span>  <span class="va">anchor</span>,            <span class="co"># REQUIRED: "quarter" or "year"</span></span>
+<span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,  <span class="co"># Calibrate weights to SIDRA population?</span></span>
+<span>  calibration_unit <span class="op">=</span> <span class="st">"month"</span>,  <span class="co"># "month", "fortnight", or "week"</span></span>
+<span>  target_totals <span class="op">=</span> <span class="cn">NULL</span>,        <span class="co"># Custom targets (NULL = auto-fetch)</span></span>
+<span>  smooth <span class="op">=</span> <span class="cn">TRUE</span>,     <span class="co"># Apply smoothing to weights?</span></span>
+<span>  keep_all <span class="op">=</span> <span class="cn">TRUE</span>,   <span class="co"># Return all rows (including undetermined)?</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>     <span class="co"># Show progress?</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><strong><code>output</code> options:</strong></p>
-<ul>
-<li>
-<code>"crosswalk"</code> (default): Returns join keys + reference
-month columns + weight_monthly</li>
-<li>
-<code>"microdata"</code>: Returns full input data with all computed
-columns attached</li>
-<li>
-<code>"aggregates"</code>: Returns monthly aggregated indicators
-(requires <code>compute_weights = TRUE</code>)</li>
-</ul>
-</div>
-<div class="section level3">
-<h3 id="functions">Functions<a class="anchor" aria-label="anchor" href="#functions"></a>
-</h3>
-<table class="table">
-<colgroup>
-<col width="43%">
-<col width="56%">
-</colgroup>
-<thead><tr class="header">
-<th>Function</th>
-<th>Description</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code><a href="../reference/mensalizePNADC.html">mensalizePNADC()</a></code></td>
-<td>Main function: identify months + optional weights</td>
-</tr>
-<tr class="even">
-<td><code><a href="../reference/mensalize_annual_pnadc.html">mensalize_annual_pnadc()</a></code></td>
-<td>Merge crosswalk with annual data + calibrate V1032 weights</td>
-</tr>
-<tr class="odd">
-<td><code><a href="../reference/identify_reference_month.html">identify_reference_month()</a></code></td>
-<td>Just reference month identification</td>
-</tr>
-<tr class="even">
-<td><code><a href="../reference/calibrate_monthly_weights.html">calibrate_monthly_weights()</a></code></td>
-<td>Rake weighting for monthly weights (quarterly data)</td>
-</tr>
-<tr class="odd">
-<td><code><a href="../reference/smooth_monthly_aggregates.html">smooth_monthly_aggregates()</a></code></td>
-<td>Remove quarterly artifacts from series</td>
-</tr>
-<tr class="even">
-<td><code><a href="../reference/fetch_monthly_population.html">fetch_monthly_population()</a></code></td>
-<td>Fetch population from SIDRA API</td>
-</tr>
-<tr class="odd">
-<td><code><a href="../reference/validate_pnadc.html">validate_pnadc()</a></code></td>
-<td>Input data validation</td>
-</tr>
-</tbody>
-</table>
 </div>
 <div class="section level3">
 <h3 id="performance">Performance<a class="anchor" aria-label="anchor" href="#performance"></a>
@@ -546,21 +575,27 @@ columns attached</li>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>Determination rate</td>
+<td>Month determination rate</td>
 <td>
 <strong>97.0%</strong> (on stacked data)</td>
 </tr>
 <tr class="even">
-<td>Processing time (basic)</td>
+<td>Fortnight determination rate</td>
+<td>
+<strong>~88%</strong> (on stacked data)</td>
+</tr>
+<tr class="odd">
+<td>Week determination rate</td>
+<td>
+<strong>~62%</strong> (on stacked data)</td>
+</tr>
+<tr class="even">
+<td>Processing time (identification)</td>
 <td>~1 minute for 28M rows</td>
 </tr>
 <tr class="odd">
-<td>Processing time (with weights)</td>
+<td>Processing time (with calibration)</td>
 <td>~5 minutes for 28M rows</td>
-</tr>
-<tr class="even">
-<td>Throughput</td>
-<td>~450,000 rows/second</td>
 </tr>
 </tbody>
 </table>

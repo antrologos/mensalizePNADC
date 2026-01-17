@@ -47,7 +47,7 @@
 #'   \itemize{
 #'     \item \code{ref_week}: Reference week as Date (Monday of that week)
 #'     \item \code{ref_week_in_quarter}: Position in quarter (1-14) or NA if indeterminate
-#'     \item \code{ref_week_iso_yyyyww}: Integer YYYYWW format (e.g., 202301)
+#'     \item \code{ref_week_yyyyww}: Integer YYYYWW format (e.g., 202301)
 #'   }
 #'
 #' @details
@@ -67,10 +67,11 @@
 #'
 #' ## Expected Determination Rate
 #'
-#' The weekly determination rate (~50-75%) is lower than monthly (~97%) because:
+#' The weekly determination rate (~1-2%) is much lower than monthly (~97%) because:
 #' \itemize{
 #'   \item Cannot aggregate across quarters (no consistent week position in panel design)
-#'   \item Finer granularity (13 weeks vs 3 months per quarter)
+#'   \item Finer granularity (13-14 weeks vs 3 months per quarter)
+#'   \item Birthday constraints rarely narrow the interview window to a single 7-day period
 #' }
 #'
 #' ## ISO 8601 Weeks
@@ -323,14 +324,14 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # ============================================================================
 
   # Assign reference week: if min == max, that's the week; otherwise indeterminate
-  dt[, ref_week_iso_yyyyww := NA_integer_]
+  dt[, ref_week_yyyyww := NA_integer_]
   dt[hh_week_min == hh_week_max & !is.infinite(hh_week_min),
-     ref_week_iso_yyyyww := hh_week_min]
+     ref_week_yyyyww := hh_week_min]
 
   # Calculate final reference week Date (Monday of that week)
   dt[, ref_week := as.Date(NA)]
-  dt[!is.na(ref_week_iso_yyyyww),
-     ref_week := yyyyww_to_date(ref_week_iso_yyyyww)]
+  dt[!is.na(ref_week_yyyyww),
+     ref_week := yyyyww_to_date(ref_week_yyyyww)]
 
   # Calculate week position in quarter
   dt[, ref_week_in_quarter := NA_integer_]
@@ -357,7 +358,7 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
 
   # Select output columns
   key_cols <- intersect(join_key_vars(), names(dt))
-  output_cols <- c(key_cols, "ref_week", "ref_week_in_quarter", "ref_week_iso_yyyyww")
+  output_cols <- c(key_cols, "ref_week", "ref_week_in_quarter", "ref_week_yyyyww")
 
   result <- dt[, ..output_cols]
 

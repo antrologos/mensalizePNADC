@@ -20,12 +20,12 @@ test_that("identify_reference_week returns correct structure", {
   # Check output columns exist
   expect_true("ref_week" %in% names(result))
   expect_true("ref_week_in_quarter" %in% names(result))
-  expect_true("ref_week_iso_yyyyww" %in% names(result))
+  expect_true("ref_week_yyyyww" %in% names(result))
 
   # Check data types
   expect_s3_class(result$ref_week, "Date")
   expect_type(result$ref_week_in_quarter, "integer")
-  expect_type(result$ref_week_iso_yyyyww, "integer")
+  expect_type(result$ref_week_yyyyww, "integer")
 
   # Check ref_week_in_quarter values are valid (1-14 range for quarters)
   valid_values <- result$ref_week_in_quarter[!is.na(result$ref_week_in_quarter)]
@@ -82,7 +82,7 @@ test_that("household aggregation improves determination", {
   result <- identify_reference_week(test_data, verbose = FALSE)
 
   # Both rows should have same determination (same household)
-  expect_equal(result$ref_week_iso_yyyyww[1], result$ref_week_iso_yyyyww[2])
+  expect_equal(result$ref_week_yyyyww[1], result$ref_week_yyyyww[2])
   expect_equal(result$ref_week[1], result$ref_week[2])
 })
 
@@ -104,10 +104,10 @@ test_that("different households in same UPA can have different weeks", {
   result <- identify_reference_week(test_data, verbose = FALSE)
 
   # Household 1 should have same week
-  expect_equal(result$ref_week_iso_yyyyww[1], result$ref_week_iso_yyyyww[2])
+  expect_equal(result$ref_week_yyyyww[1], result$ref_week_yyyyww[2])
 
   # Household 2 should have same week
-  expect_equal(result$ref_week_iso_yyyyww[3], result$ref_week_iso_yyyyww[4])
+  expect_equal(result$ref_week_yyyyww[3], result$ref_week_yyyyww[4])
 
   # Two households MAY have different weeks (depending on birthday constraints)
   # This is not guaranteed, just possible
@@ -134,8 +134,8 @@ test_that("ISO year boundary is handled correctly", {
   expect_s3_class(result, "data.table")
 
   # If determined, week could be in ISO year 2025 (e.g., Dec 30-31 2024 is week 2025-W01)
-  if (!is.na(result$ref_week_iso_yyyyww[1])) {
-    iso_yr <- result$ref_week_iso_yyyyww[1] %/% 100L
+  if (!is.na(result$ref_week_yyyyww[1])) {
+    iso_yr <- result$ref_week_yyyyww[1] %/% 100L
     # ISO year should be 2024 or 2025 for Q4 2024
     expect_true(iso_yr %in% c(2024L, 2025L))
   }
@@ -186,7 +186,7 @@ test_that("ref_week is Monday of the ISO week", {
   }
 })
 
-test_that("ref_week_iso_yyyyww matches ref_week", {
+test_that("ref_week_yyyyww matches ref_week", {
   test_data <- data.table::data.table(
     Ano = c(2024L),
     Trimestre = c(1L),
@@ -202,9 +202,9 @@ test_that("ref_week_iso_yyyyww matches ref_week", {
 
   result <- identify_reference_week(test_data, verbose = FALSE)
 
-  if (!is.na(result$ref_week[1]) && !is.na(result$ref_week_iso_yyyyww[1])) {
+  if (!is.na(result$ref_week[1]) && !is.na(result$ref_week_yyyyww[1])) {
     # Convert ref_week back to yyyyww and compare
     expected_yyyyww <- PNADCperiods:::date_to_yyyyww(result$ref_week[1])
-    expect_equal(result$ref_week_iso_yyyyww[1], expected_yyyyww)
+    expect_equal(result$ref_week_yyyyww[1], expected_yyyyww)
   }
 })

@@ -16,9 +16,13 @@
 #' }
 #'
 #' The package is highly optimized for large datasets: approximately 1 minute to
-#' process 28.4 million rows (450,000 rows/sec), with 97.0 percent determination
-#' rate for months, ~85-90 percent for fortnights, and ~50-75 percent for weeks.
+#' process 28.4 million rows (450,000 rows/sec), with ~97 percent determination
+#' rate for months, ~2-5 percent for fortnights, and ~1-2 percent for weeks.
 #' Uses pre-computed lookup tables for 20x faster date creation.
+#'
+#' \strong{Note:} Fortnight and week determination rates are inherently low because
+#' they cannot leverage cross-quarter aggregation like months can. Only birthday
+#' constraints within a single quarter are available to narrow the interview window.
 #'
 #' The main functions are:
 #' \itemize{
@@ -66,6 +70,8 @@ utils::globalVariables(c(
   "upa_month_min_final", "upa_month_max_final",
   "requires_exception", "requires_exc_m1", "requires_exc_m2", "requires_exc_m3",
   "trim_exc_m1", "trim_exc_m2", "trim_exc_m3",
+  "requires_exc_fortnight", "trim_exc_fortnight",
+  "requires_exc_week", "trim_exc_week",
   # Computed variables - reference fortnight identification
   "ref_fortnight", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff",
   "fortnight_min_pos", "fortnight_max_pos", "fortnight_min_yyyyff", "fortnight_max_yyyyff",
@@ -91,10 +97,8 @@ utils::globalVariables(c(
   # Computed variables - smooth aggregates
   "month_pos", "weight_smoothed", "pop_current",
   "row_num", "row_num2", "d_pop", "quarter_yyyyq",
-  # Computed variables - smooth_single_variable optimization
-  "d3_filled", "cum_values", "row_idx", "e0", "mean_e0",
   # Computed variables - monthly to weekly/fortnight targets
-  "yyyyww", "yyyymm", "yyyyff", "n_days",
+  "yyyyww", "yyyymm", "yyyyff", "n_days", "days_in_month", "ref_month_yyyymm",
   # data.table join prefix variables (i.* references right table columns)
   "i.month1", "i.month2", "i.month3",
   "i.first_sat_m1", "i.first_sat_m2", "i.first_sat_m3",
@@ -112,7 +116,7 @@ utils::globalVariables(c(
   # Unified calibration variables
   "anchor_year", "target_pop", "i.target_pop",
   "n_cells_anchor", "n_cells_period", "pop_anchor", "pop_period",
-  "ref_week_iso_yyyyww",
+  "ref_week_iso_yyyyww", "ref_week_yyyyww",
   # Smoothing variables
   "period_pos", "i.pos", "cell_pop", "pop_smoothed", "pop_lag", "pop_lead",
   "smooth_factor", "i.smooth_factor", "pop_orig", "pop_new", "final_factor",
