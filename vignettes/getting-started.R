@@ -24,20 +24,14 @@ knitr::opts_chunk$set(
 
 ## ----build-crosswalk----------------------------------------------------------
 # # Identify reference periods (month, fortnight, week)
-# crosswalk <- pnadc_identify_periods(pnadc)
+# crosswalk <- pnadc_identify_periods(pnadc, verbose = TRUE)
 
 ## ----view-crosswalk-----------------------------------------------------------
 # # View the crosswalk
 # head(crosswalk)
 # 
-# # Check determination rates
+# # Check determination rates (stored as attribute)
 # attr(crosswalk, "determination_rates")
-# # $month
-# # [1] 0.97
-# # $fortnight
-# # [1] 0.885
-# # $week
-# # [1] 0.623
 
 ## ----apply-crosswalk----------------------------------------------------------
 # # Apply crosswalk to a specific quarterly dataset

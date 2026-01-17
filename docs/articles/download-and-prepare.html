@@ -267,12 +267,14 @@ memory, we only load the columns needed for mensalization:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Columns needed for mensalization</span></span>
 <span><span class="va">cols_needed</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>  <span class="co"># Time and identifiers</span></span>
-<span>  <span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span>,</span>
-<span>  <span class="co"># Birthday variables (for reference month algorithm)</span></span>
+<span>  <span class="co"># Time and identifiers (required)</span></span>
+<span>  <span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>,</span>
+<span>  <span class="co"># Birthday variables (required for reference period algorithm)</span></span>
 <span>  <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span>,</span>
-<span>  <span class="co"># Weight and stratification (for weight calibration)</span></span>
-<span>  <span class="st">"V1028"</span>, <span class="st">"UF"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span></span>
+<span>  <span class="co"># Weight and stratification (required for weight calibration)</span></span>
+<span>  <span class="st">"V1028"</span>, <span class="st">"UF"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span>,</span>
+<span>  <span class="co"># Optional but recommended for person-level tracking</span></span>
+<span>  <span class="st">"V2003"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Stack all quarters</span></span>
@@ -368,10 +370,6 @@ cases (this is higher than the ~3% seen with full 2012-2025 data because
 boundary quarters have lower determination rates).</p>
 <p>The output columns include:</p>
 <table class="table">
-<colgroup>
-<col width="38%">
-<col width="61%">
-</colgroup>
 <thead><tr class="header">
 <th>Column</th>
 <th>Description</th>
@@ -391,7 +389,7 @@ boundary quarters have lower determination rates).</p>
 </tr>
 <tr class="even">
 <td><code>weight_monthly</code></td>
-<td>Monthly survey weight (if <code>compute_weights = TRUE</code>)</td>
+<td>Monthly survey weight (if <code>calibrate = TRUE</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -412,12 +410,12 @@ your full PNADC data:</p>
 <code class="sourceCode R"><span><span class="co"># Load a quarterly file with all variables</span></span>
 <span><span class="va">full_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">data_dir</span>, <span class="st">"pnadc_2023-1q.fst"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Join with mensalization results</span></span>
+<span><span class="co"># Join with mensalization results (crosswalk is at household-quarter level)</span></span>
 <span><span class="va">analysis_data</span> <span class="op">&lt;-</span> <span class="va">full_data</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span></span>
-<span>    <span class="va">result</span> <span class="op">|&gt;</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">UPA</span>, <span class="va">V1008</span>, <span class="va">V1014</span>, <span class="va">V2003</span>,</span>
+<span>    <span class="va">result</span> <span class="op">|&gt;</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">UPA</span>, <span class="va">V1008</span>, <span class="va">V1014</span>,</span>
 <span>                     <span class="va">ref_month</span>, <span class="va">ref_month_in_quarter</span>, <span class="va">weight_monthly</span><span class="op">)</span>,</span>
-<span>    by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span><span class="op">)</span></span>
+<span>    by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Now you can aggregate by month using weight_monthly</span></span>
@@ -508,8 +506,8 @@ downloads.</p></li>
 a time, or use a machine with more RAM.</p></li>
 <li><p><strong>SIDRA API errors</strong>: The weight calibration
 requires internet access to the SIDRA API. If it fails, try again later
-or use <code>compute_weights = FALSE</code> for just reference month
-identification.</p></li>
+or use <code>calibrate = FALSE</code> for just reference period
+identification without weight calibration.</p></li>
 </ol>
 </div>
 </div>

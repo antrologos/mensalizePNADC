@@ -75,8 +75,8 @@ The algorithm needs these columns from your PNADC data:
 | `Ano` | Survey year |
 | `Trimestre` | Quarter (1-4) |
 | `UPA` | Primary Sampling Unit |
-| `V1014` | Panel identifier |
 | `V1008` | Household identifier |
+| `V1014` | Panel identifier (rotation group 1-8) |
 | `V2003` | Person identifier |
 | `V2008` | Birth day (1-31, or 99 for unknown) |
 | `V20081` | Birth month (1-12, or 99 for unknown) |
@@ -124,11 +124,15 @@ Crosswalk complete:
 
 ### Step 3: Understand the Crosswalk
 
-The crosswalk contains one row per UPA-V1014 combination with three granularity levels:
+The crosswalk contains one row per **household-quarter** combination (keyed by `Ano`, `Trimestre`, `UPA`, `V1008`, `V1014`) with three granularity levels:
 
 | Output Column | Type | Description |
 |---------------|------|-------------|
+| **Keys** | | |
+| `Ano` | Integer | Survey year |
+| `Trimestre` | Integer | Quarter (1-4) |
 | `UPA` | Integer | Primary sampling unit |
+| `V1008` | Integer | Household identifier |
 | `V1014` | Integer | Panel group (1-8) |
 | **Month** | | |
 | `ref_month` | Date | Reference month as Date (e.g., "2023-01-01") |
@@ -150,15 +154,11 @@ The crosswalk contains one row per UPA-V1014 combination with three granularity 
 # View the crosswalk
 head(crosswalk)
 
-# Check determination rates
+# Check determination rates (stored as attribute)
 attr(crosswalk, "determination_rates")
-# $month
-# [1] 0.97
-# $fortnight
-# [1] 0.885
-# $week
-# [1] 0.623
 ```
+
+The determination rates attribute returns a list with rates for each period type. See the "Understanding Determination Rates" section below for expected values.
 
 ### Step 4: Apply to Your Data
 
@@ -176,6 +176,36 @@ result <- pnadc_apply_periods(
 ```
 
 The result includes all original columns plus reference periods and calibrated weights.
+
+#### Understanding the Key Arguments
+
+**`weight_var`** (required): The name of the original PNADC weight variable to use as the starting point for calibration.
+
+| Value | Use When |
+|-------|----------|
+| `"V1028"` | Quarterly PNADC data (trimestral) |
+| `"V1032"` | Annual PNADC data (anual) |
+
+These weights come from IBGE's original calibration and reflect the survey design. The package uses them as input for the sub-quarterly calibration process.
+
+**`anchor`** (required): Specifies whether the data contains all rotation groups for a quarter or a year.
+
+| Value | Use When | Meaning |
+|-------|----------|---------|
+| `"quarter"` | Quarterly PNADC releases | Each quarter contains all 8 rotation groups interviewed during that quarter |
+| `"year"` | Annual PNADC releases | Each year contains specific visits (e.g., visit 1 or visit 5) from households across rotation groups |
+
+This affects how the calibration targets are computed: quarterly data calibrates within each quarter, while annual data calibrates within each year.
+
+**`calibration_unit`**: The time period granularity for weight calibration.
+
+| Value | Calibrates to | Best for |
+|-------|---------------|----------|
+| `"month"` (default) | Monthly population totals | Most analyses; highest determination rate (~97%) |
+| `"fortnight"` | Fortnightly totals | When you need bi-weekly precision (low determination ~2-5%) |
+| `"week"` | Weekly totals | Fine-grained analysis (very low determination ~1-2%) |
+
+**What is calibration?** Weight calibration adjusts the survey weights so that weighted totals match known population benchmarks (from IBGE's SIDRA API). This ensures your monthly estimates sum to the correct population totals. Without calibration, sub-quarterly estimates may not properly aggregate to known quarterly totals.
 
 ---
 
@@ -297,8 +327,10 @@ Cross-quarter aggregation:
 
 | Processing Mode | Month Rate | Fortnight Rate | Week Rate |
 |-----------------|------------|----------------|-----------|
-| Single quarter | 65-75% | 50-60% | 30-40% |
-| Stacked (2+ years) | **97%** | **~88%** | **~62%** |
+| Single quarter | 65-75% | ~2-5% | ~1-2% |
+| Stacked (2+ years) | **~97%** | ~2-5% | ~1-2% |
+
+**Important:** Fortnight and week determination rates remain low (~2-5% and ~1-2%) regardless of stacking because their constraints cannot aggregate across quarters—each quarter's interview timing is independent at the sub-monthly level. Only month determination benefits from cross-quarter aggregation through the rotating panel design.
 
 ### What Makes Observations Indeterminate?
 
@@ -355,8 +387,8 @@ pnadc_apply_periods(
 
 | Metric | Value |
 |--------|-------|
-| Month determination rate | **97.0%** (on stacked data) |
-| Fortnight determination rate | **~88%** (on stacked data) |
-| Week determination rate | **~62%** (on stacked data) |
+| Month determination rate | **~97%** (on stacked data) |
+| Fortnight determination rate | ~2-5% |
+| Week determination rate | ~1-2% |
 | Processing time (identification) | ~1 minute for 28M rows |
 | Processing time (with calibration) | ~5 minutes for 28M rows |

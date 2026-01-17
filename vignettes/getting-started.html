@@ -419,35 +419,33 @@ calibration approach flexibly</p>
 <td>Primary Sampling Unit</td>
 </tr>
 <tr class="even">
-<td><code>V1014</code></td>
-<td>Panel identifier</td>
-</tr>
-<tr class="odd">
 <td><code>V1008</code></td>
 <td>Household identifier</td>
 </tr>
-<tr class="even">
-<td><code>V2003</code></td>
-<td>Person identifier</td>
-</tr>
 <tr class="odd">
+<td><code>V1014</code></td>
+<td>Panel identifier (rotation group 1-8)</td>
+</tr>
+<tr class="even">
 <td><code>V2008</code></td>
 <td>Birth day (1-31, or 99 for unknown)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>V20081</code></td>
 <td>Birth month (1-12, or 99 for unknown)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>V20082</code></td>
 <td>Birth year (or 9999 for unknown)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>V2009</code></td>
 <td>Age</td>
 </tr>
 </tbody>
 </table>
+<p><em>Optional but recommended:</em> <code>V2003</code> (person
+identifier) for person-level tracking.</p>
 </div>
 <div id="step-1-load-your-data" class="section level3">
 <h3>Step 1: Load Your Data</h3>
@@ -467,25 +465,27 @@ yields only ~65-75% determination rate, while stacking 2+ years achieves
 <div id="step-2-build-the-crosswalk" class="section level3">
 <h3>Step 2: Build the Crosswalk</h3>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Identify reference periods (month, fortnight, week)</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">pnadc_identify_periods</span>(pnadc)</span></code></pre></div>
-<p>Expected output:</p>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>crosswalk <span class="ot">&lt;-</span> <span class="fu">pnadc_identify_periods</span>(pnadc, <span class="at">verbose =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>Output (from real PNADC 2020-2024 data):</p>
 <pre><code>Building reference period crosswalk...
-  Step 1/3: Identifying reference months...
-    -&gt; Month determination rate: 97.0%
-  Step 2/3: Identifying reference fortnights...
-    -&gt; Fortnight determination rate: 88.5%
-  Step 3/3: Identifying reference weeks...
-    -&gt; Week determination rate: 62.3%
+  Preprocessing data (shared computation)...
+  Converting date bounds to period positions...
+  Aggregating constraints and determining periods...
+  Applying exception rules...
+  Assigning reference periods...
+  Building crosswalk...
 
 Crosswalk complete:
-  - 123,456 unique UPA-panel combinations
-  - Month determination: 97.0%
-  - Fortnight determination: 88.5%
-  - Week determination: 62.3%</code></pre>
+  - 3,159,265 unique household-quarter observations
+  - Month determination: 94.2%
+  - Fortnight determination: 2.8%
+  - Week determination: 0.9%</code></pre>
 </div>
 <div id="step-3-understand-the-crosswalk" class="section level3">
 <h3>Step 3: Understand the Crosswalk</h3>
-<p>The crosswalk contains one row per UPA-V1014 combination with three
+<p>The crosswalk contains one row per <strong>household-quarter</strong>
+combination (keyed by <code>Ano</code>, <code>Trimestre</code>,
+<code>UPA</code>, <code>V1008</code>, <code>V1014</code>) with three
 granularity levels:</p>
 <table>
 <colgroup>
@@ -502,9 +502,29 @@ granularity levels:</p>
 </thead>
 <tbody>
 <tr class="odd">
+<td><strong>Keys</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>Ano</code></td>
+<td>Integer</td>
+<td>Survey year</td>
+</tr>
+<tr class="odd">
+<td><code>Trimestre</code></td>
+<td>Integer</td>
+<td>Quarter (1-4)</td>
+</tr>
+<tr class="even">
 <td><code>UPA</code></td>
 <td>Integer</td>
 <td>Primary sampling unit</td>
+</tr>
+<tr class="odd">
+<td><code>V1008</code></td>
+<td>Integer</td>
+<td>Household identifier</td>
 </tr>
 <tr class="even">
 <td><code>V1014</code></td>
@@ -591,14 +611,11 @@ granularity levels:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># View the crosswalk</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">head</span>(crosswalk)</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># Check determination rates</span></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">attr</span>(crosswalk, <span class="st">&quot;determination_rates&quot;</span>)</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co"># $month</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co"># [1] 0.97</span></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># $fortnight</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co"># [1] 0.885</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co"># $week</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co"># [1] 0.623</span></span></code></pre></div>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># Check determination rates (stored as attribute)</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">attr</span>(crosswalk, <span class="st">&quot;determination_rates&quot;</span>)</span></code></pre></div>
+<p>The determination rates attribute returns a list with rates for each
+period type. See the “Understanding Determination Rates” section below
+for expected values.</p>
 </div>
 <div id="step-4-apply-to-your-data" class="section level3">
 <h3>Step 4: Apply to Your Data</h3>
@@ -614,7 +631,105 @@ granularity levels:</p>
 <span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>)</span></code></pre></div>
 <p>The result includes all original columns plus reference periods and
 calibrated weights.</p>
+<div id="understanding-the-key-arguments" class="section level4">
+<h4>Understanding the Key Arguments</h4>
+<p><strong><code>weight_var</code></strong> (required): The name of the
+original PNADC weight variable to use as the starting point for
+calibration.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Value</th>
+<th>Use When</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;V1028&quot;</code></td>
+<td>Quarterly PNADC data (trimestral)</td>
+</tr>
+<tr class="even">
+<td><code>&quot;V1032&quot;</code></td>
+<td>Annual PNADC data (anual)</td>
+</tr>
+</tbody>
+</table>
+<p>These weights come from IBGE’s original calibration and reflect the
+survey design. The package uses them as input for the sub-quarterly
+calibration process.</p>
+<p><strong><code>anchor</code></strong> (required): Specifies whether
+the data contains all rotation groups for a quarter or a year.</p>
+<table>
+<colgroup>
+<col width="26%" />
+<col width="38%" />
+<col width="34%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Value</th>
+<th>Use When</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;quarter&quot;</code></td>
+<td>Quarterly PNADC releases</td>
+<td>Each quarter contains all 8 rotation groups interviewed during that
+quarter</td>
+</tr>
+<tr class="even">
+<td><code>&quot;year&quot;</code></td>
+<td>Annual PNADC releases</td>
+<td>Each year contains specific visits (e.g., visit 1 or visit 5) from
+households across rotation groups</td>
+</tr>
+</tbody>
+</table>
+<p>This affects how the calibration targets are computed: quarterly data
+calibrates within each quarter, while annual data calibrates within each
+year.</p>
+<p><strong><code>calibration_unit</code></strong>: The time period
+granularity for weight calibration.</p>
+<table>
+<colgroup>
+<col width="21%" />
+<col width="46%" />
+<col width="31%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Value</th>
+<th>Calibrates to</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;month&quot;</code> (default)</td>
+<td>Monthly population totals</td>
+<td>Most analyses; highest determination rate (~97%)</td>
+</tr>
+<tr class="even">
+<td><code>&quot;fortnight&quot;</code></td>
+<td>Fortnightly totals</td>
+<td>When you need bi-weekly precision (low determination ~2-5%)</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;week&quot;</code></td>
+<td>Weekly totals</td>
+<td>Fine-grained analysis (very low determination ~1-2%)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What is calibration?</strong> Weight calibration adjusts the
+survey weights so that weighted totals match known population benchmarks
+(from IBGE’s SIDRA API). This ensures your monthly estimates sum to the
+correct population totals. Without calibration, sub-quarterly estimates
+may not properly aggregate to known quarterly totals.</p>
 <hr />
+</div>
 </div>
 </div>
 <div id="understanding-the-workflow" class="section level2">
@@ -731,17 +846,23 @@ Cross-quarter aggregation:
 <tr class="odd">
 <td>Single quarter</td>
 <td>65-75%</td>
-<td>50-60%</td>
-<td>30-40%</td>
+<td>~2-5%</td>
+<td>~1-2%</td>
 </tr>
 <tr class="even">
 <td>Stacked (2+ years)</td>
-<td><strong>97%</strong></td>
-<td><strong>~88%</strong></td>
-<td><strong>~62%</strong></td>
+<td><strong>~97%</strong></td>
+<td>~2-5%</td>
+<td>~1-2%</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Important:</strong> Fortnight and week determination rates
+remain low (~2-5% and ~1-2%) regardless of stacking because their
+constraints cannot aggregate across quarters—each quarter’s interview
+timing is independent at the sub-monthly level. Only month determination
+benefits from cross-quarter aggregation through the rotating panel
+design.</p>
 </div>
 <div id="what-makes-observations-indeterminate" class="section level3">
 <h3>What Makes Observations Indeterminate?</h3>
@@ -814,15 +935,15 @@ exported functions.</p></li>
 <tbody>
 <tr class="odd">
 <td>Month determination rate</td>
-<td><strong>97.0%</strong> (on stacked data)</td>
+<td><strong>~97%</strong> (on stacked data)</td>
 </tr>
 <tr class="even">
 <td>Fortnight determination rate</td>
-<td><strong>~88%</strong> (on stacked data)</td>
+<td>~2-5%</td>
 </tr>
 <tr class="odd">
 <td>Week determination rate</td>
-<td><strong>~62%</strong> (on stacked data)</td>
+<td>~1-2%</td>
 </tr>
 <tr class="even">
 <td>Processing time (identification)</td>

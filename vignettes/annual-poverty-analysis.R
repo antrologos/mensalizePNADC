@@ -276,7 +276,7 @@ knitr::opts_chunk$set(
 # confint(poverty_estimate)
 
 ## ----example-smoothing--------------------------------------------------------
-# # Three-month centered rolling average
+# # Three-month centered rolling average (using data.table::frollmean)
 # monthly_poverty[, poverty_rate_smoothed :=
 #                   frollmean(poverty_rate, 3, align = "center")]
 

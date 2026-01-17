@@ -31,9 +31,9 @@ The workflow covers three main tasks:
 
 1. **Downloading** quarterly PNADC microdata from IBGE using the `PNADcIBGE` package
 2. **Stacking** multiple quarters into a single dataset (critical for high determination rates)
-3. **Applying mensalization** using the `mensalizePNADC` package
+3. **Applying mensalization** using the `PNADCperiods` package
 
-If you already have PNADC data and want to learn the package API first, see [Get Started](getting-started.html). For algorithm details, see [How mensalizePNADC Works](how-it-works.html).
+If you already have PNADC data and want to learn the package API first, see [Get Started](getting-started.html). For algorithm details, see [How PNADCperiods Works](how-it-works.html).
 
 ## Prerequisites
 
@@ -159,7 +159,7 @@ Now stack all the quarterly files into a single dataset. To save memory, we only
 cols_needed <- c(
   # Time and identifiers
   "Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003",
-  # Birthday variables (for reference month algorithm)
+  # Birthday variables (for reference period algorithm)
   "V2008", "V20081", "V20082", "V2009",
   # Weight and stratification (for weight calibration)
   "V1028", "UF", "posest", "posest_sxi"
@@ -272,7 +272,7 @@ The output columns include:
 | `ref_month` | Reference month as Date (first day of month) |
 | `ref_month_in_quarter` | Position within quarter (1, 2, or 3) |
 | `ref_month_yyyymm` | Reference month as YYYYMM integer |
-| `weight_monthly` | Monthly survey weight (if `compute_weights = TRUE`) |
+| `weight_monthly` | Monthly survey weight (if `calibrate = TRUE`) |
 
 Observations with `ref_month_in_quarter = NA` have indeterminate reference months and should be excluded from monthly analyses.
 
@@ -291,12 +291,12 @@ To use the results in analysis, join the mensalization crosswalk with your full 
 # Load a quarterly file with all variables
 full_data <- read_fst(file.path(data_dir, "pnadc_2023-1q.fst"))
 
-# Join with mensalization results
+# Join with mensalization results (crosswalk is at household-quarter level)
 analysis_data <- full_data |>
   left_join(
-    result |> select(Ano, Trimestre, UPA, V1008, V1014, V2003,
+    result |> select(Ano, Trimestre, UPA, V1008, V1014,
                      ref_month, ref_month_in_quarter, weight_monthly),
-    by = c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003")
+    by = c("Ano", "Trimestre", "UPA", "V1008", "V1014")
   )
 
 # Now you can aggregate by month using weight_monthly
@@ -355,7 +355,7 @@ The full history provides approximately 28 million observations and achieves the
 
 3. **Memory errors**: Try processing fewer quarters at a time, or use a machine with more RAM.
 
-4. **SIDRA API errors**: The weight calibration requires internet access to the SIDRA API. If it fails, try again later or use `compute_weights = FALSE` for just reference month identification.
+4. **SIDRA API errors**: The weight calibration requires internet access to the SIDRA API. If it fails, try again later or use `calibrate = FALSE` for just reference period identification without weight calibration.
 
 ## Next Steps
 
@@ -363,7 +363,7 @@ Now that you have mensalized PNADC data, you can:
 
 - Follow the usage patterns in [Get Started](getting-started.html) with your real data
 - See analysis examples in [Applied Examples](applied-examples.html)
-- Learn about the algorithm in [How mensalizePNADC Works](how-it-works.html)
+- Learn about the algorithm in [How PNADCperiods Works](how-it-works.html)
 - Visit the [package website](https://antrologos.github.io/mensalizePNADC/) for more resources
 
 > **Working with annual PNADC data?** Annual data (visit-specific microdata with comprehensive income variables) requires a different workflow. See [Monthly Poverty Analysis with Annual PNADC Data](annual-poverty-analysis.html) for details on using `pnadc_apply_periods()` with `anchor = "year"`.

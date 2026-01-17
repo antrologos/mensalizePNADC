@@ -910,12 +910,13 @@ weights:</p>
 including the replication weights approach, see the <a href="complex-survey-design.html">Complex Survey Design</a>
 vignette.</p>
 </div>
-<div id="example-3-smoothing" class="section level3">
-<h3>Example 3: Smoothing</h3>
+<div id="example-3-post-hoc-smoothing-of-aggregates" class="section level3">
+<h3>Example 3: Post-hoc Smoothing of Aggregates</h3>
 <p>The raw monthly series may show quarterly artifacts from IBGE’s
-rotating panel design. The <code>smooth_monthly_aggregates()</code>
-function can help remove these patterns:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Three-month centered rolling average</span></span>
+rotating panel design. If artifacts persist after weight calibration
+(which applies smoothing by default), you can apply additional post-hoc
+smoothing to your aggregated estimates:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Three-month centered rolling average (using data.table::frollmean)</span></span>
 <span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>monthly_poverty[, poverty_rate_smoothed <span class="sc">:=</span></span>
 <span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>                  <span class="fu">frollmean</span>(poverty_rate, <span class="dv">3</span>, <span class="at">align =</span> <span class="st">&quot;center&quot;</span>)]</span></code></pre></div>
 <div class="float">
