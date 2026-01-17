@@ -442,44 +442,53 @@ quarters are stacked, computed from real PNADC data (2012-2025):</p>
 quarters</div>
 </div>
 <p><strong>Empirical determination rates by number of quarters
-stacked:</strong></p>
+stacked</strong> (from real PNADC 2012-2025 data):</p>
 <table class="table">
 <thead><tr class="header">
 <th>Quarters Stacked</th>
+<th>Observations</th>
 <th>Determination Rate</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td>1 (single quarter)</td>
+<td>566,873</td>
 <td>73.0%</td>
 </tr>
 <tr class="even">
 <td>2</td>
+<td>1,133,889</td>
 <td>88.2%</td>
 </tr>
 <tr class="odd">
 <td>4 (1 year)</td>
+<td>2,252,464</td>
 <td>93.9%</td>
 </tr>
 <tr class="even">
 <td>8 (2 years)</td>
+<td>4,530,641</td>
 <td>96.3%</td>
 </tr>
 <tr class="odd">
 <td>12 (3 years)</td>
+<td>6,828,144</td>
 <td>97.1%</td>
 </tr>
 <tr class="even">
 <td>20 (5 years)</td>
+<td>11,391,346</td>
 <td>97.3%</td>
 </tr>
 <tr class="odd">
 <td>32 (8 years)</td>
-<td>97.4%</td>
+<td>18,088,581</td>
+<td><strong>97.4%</strong></td>
 </tr>
 <tr class="even">
 <td>55 (full history)</td>
-<td><strong>97.0%</strong></td>
+<td>28,395,273</td>
+<td>97.0%</td>
 </tr>
 </tbody>
 </table>
@@ -1123,6 +1132,28 @@ fortnights/weeks to handle smaller samples.</p></li>
 <span>  anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
 <span>  calibration_unit <span class="op">=</span> <span class="st">"fortnight"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Output (from real PNADC 2012-2025 data):</p>
+<pre><code>Building reference period crosswalk...
+  Preprocessing data (shared computation)...
+  Converting date bounds to period positions...
+  Aggregating constraints and determining periods...
+  Applying exception rules...
+  Assigning reference periods...
+  Building crosswalk...
+
+Crosswalk complete:
+  - 9,769,932 unique household-quarter observations
+  - Month determination: 97.0%
+  - Fortnight determination: 2.9%
+  - Week determination: 0.9%
+
+# Sample determination rates by quarter (2023):
+     Ano Trimestre   n_obs det_month det_fortnight det_week
+   &lt;int&gt;     &lt;int&gt;   &lt;int&gt;     &lt;num&gt;         &lt;num&gt;    &lt;num&gt;
+1:  2023         1  169879     0.954         0.027    0.010
+2:  2023         2  171776     0.960         0.027    0.006
+3:  2023         3  175418     0.965         0.039    0.010
+4:  2023         4  173676     0.968         0.037    0.010</code></pre>
 <hr>
 </div>
 </div>
@@ -1218,7 +1249,7 @@ adjusted so period totals match anchor totals proportionally.</p>
 <p>Monthly calibration uses the full 4-level hierarchical raking because
 the high determination rate (~97%) provides sufficient sample size in
 each cell.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Apply crosswalk and calibrate monthly weights</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span>, <span class="va">crosswalk</span>,</span>
 <span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
@@ -1332,7 +1363,7 @@ observations) and skips raking levels if cells become too sparse.</p>
 <p>Weekly data skips smoothing entirely because the small sample sizes
 make cell-level smoothing unstable.</p>
 <p><strong>Usage Example</strong></p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Fortnight calibration</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc_data</span>, <span class="va">crosswalk</span>,</span>
 <span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
@@ -1351,7 +1382,7 @@ make cell-level smoothing unstable.</p>
 <p>By default (<code>keep_all = TRUE</code>), all input rows are
 returned, with <code>weight_monthly = NA</code> for indeterminate
 observations:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Build crosswalk and apply (returns all rows by default)</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_full</span><span class="op">)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc_full</span>, <span class="va">crosswalk</span>,</span>
@@ -1464,7 +1495,7 @@ shifts)</li>
 <li>The underlying phenomenon is expected to change smoothly over
 time</li>
 </ul>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># With smoothing (default) - recommended for most analyses</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
 <span>  <span class="va">pnadc_data</span>, <span class="va">crosswalk</span>,</span>
@@ -1595,7 +1626,7 @@ months.</p>
 </h3>
 <p>Use <code>anchor = "quarter"</code> with quarterly PNADC data (V1028
 weights):</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Build crosswalk from stacked quarterly data</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span><span class="op">)</span></span>
 <span></span>
@@ -1633,7 +1664,7 @@ weights):</p>
 weights). Note that <strong>the crosswalk is still built from quarterly
 data</strong> (which contains the birthday variables needed for period
 identification).</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Step 1: Build crosswalk from quarterly data</span></span>
 <span><span class="va">quarterly_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="st">"pnadc_quarterly_stacked.fst"</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">quarterly_data</span><span class="op">)</span></span>
@@ -1699,7 +1730,7 @@ vignette.</p>
 <h3 id="using-modular-functions">Using Modular Functions<a class="anchor" aria-label="anchor" href="#using-modular-functions"></a>
 </h3>
 <p>For more control, use the individual identification functions:</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Identify reference months only</span></span>
 <span><span class="va">months</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/identify_reference_month.html">identify_reference_month</a></span><span class="op">(</span><span class="va">pnadc_stacked</span><span class="op">)</span></span>
 <span></span>
@@ -1715,11 +1746,18 @@ vignette.</p>
 <span>  determined <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<p>Output (sample from 2023, using real PNADC data):</p>
+<pre><code>   Ano Trimestre  total determined  rate
+ &lt;int&gt;     &lt;int&gt;  &lt;int&gt;      &lt;int&gt; &lt;num&gt;
+1: 2023         1 169879     162107  95.4
+2: 2023         2 171776     164920  96.0
+3: 2023         3 175418     169215  96.5
+4: 2023         4 173676     168094  96.8</code></pre>
 </div>
 <div class="section level3">
 <h3 id="validation-and-population-data">Validation and Population Data<a class="anchor" aria-label="anchor" href="#validation-and-population-data"></a>
 </h3>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Validate input data before processing</span></span>
 <span><span class="va">validation</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/validate_pnadc.html">validate_pnadc</a></span><span class="op">(</span><span class="va">pnadc_stacked</span>, stop_on_error <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
@@ -1730,6 +1768,18 @@ vignette.</p>
 <span><span class="co"># Note: pnadc_apply_periods() fetches population data automatically</span></span>
 <span><span class="co"># when calibrate = TRUE. Manual fetching is only needed for inspection</span></span>
 <span><span class="co"># or custom calibration workflows.</span></span></code></pre></div>
+<p>Output (sample from fetch_monthly_population):</p>
+<pre><code>Fetching monthly population data from SIDRA (table 6022)...
+  Retrieved 159 rows for 2012-2025
+
+   year_month population_total
+        &lt;int&gt;            &lt;num&gt;
+1:     201202        193146000
+2:     201203        193470000
+3:     201204        193804000
+4:     201205        194138000
+5:     201206        194469000
+6:     201207        194788000</code></pre>
 <hr>
 </div>
 </div>
@@ -1861,8 +1911,15 @@ month is enough.</p></li>
 <p><strong>Check determination rates by year</strong>: Monthly rates
 should be 97-99% for 2013-2019. Lower rates may indicate data
 issues.</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crosswalk</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span>rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_month_in_quarter</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<p>Example output (2019):</p>
+<pre><code>   Ano Trimestre   rate
+ &lt;int&gt;     &lt;int&gt;  &lt;num&gt;
+1: 2019         1 0.973
+2: 2019         2 0.976
+3: 2019         3 0.979
+4: 2019         4 0.978</code></pre>
 </li>
 <li><p><strong>Handle indeterminate observations</strong>: Decide
 whether to exclude them or use quarterly-level analysis for those
@@ -1882,7 +1939,7 @@ vignette.</p>
 <div class="section level3">
 <h3 id="scenario-monthly-unemployment-analysis-2019-2024">Scenario: Monthly Unemployment Analysis (2019-2024)<a class="anchor" aria-label="anchor" href="#scenario-monthly-unemployment-analysis-2019-2024"></a>
 </h3>
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
@@ -1920,17 +1977,48 @@ vignette.</p>
 <span><span class="co"># =============================================================================</span></span>
 <span></span>
 <span><span class="co"># This identifies months, fortnights, and weeks for all observations</span></span>
-<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Check determination rates by year</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<p>Output:</p>
+<pre><code>Building reference period crosswalk...
+  Preprocessing data (shared computation)...
+  Converting date bounds to period positions...
+  Aggregating constraints and determining periods...
+  Applying exception rules...
+  Assigning reference periods...
+  Building crosswalk...
+
+Crosswalk complete:
+  - 9,769,932 unique household-quarter observations
+  - Month determination: 97.0%
+  - Fortnight determination: 2.9%
+  - Week determination: 0.9%</code></pre>
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Check determination rates by year</span></span>
 <span><span class="va">crosswalk</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
 <span>  n <span class="op">=</span> <span class="va">.N</span>,</span>
 <span>  det_month <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_month</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>,</span>
 <span>  det_fortnight <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span>,</span>
 <span>  det_week <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">Ano</span><span class="op">]</span></span>
-<span></span>
-<span><span class="co"># =============================================================================</span></span>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="va">Ano</span><span class="op">]</span></span></code></pre></div>
+<p>Output (from real PNADC 2012-2025 data):</p>
+<pre><code>      Ano       n det_month det_fortnight det_week
+    &lt;int&gt;   &lt;int&gt;     &lt;num&gt;         &lt;num&gt;    &lt;num&gt;
+ 1:  2012  695083      96.3           4.0      1.2
+ 2:  2013  719697      98.7           3.5      0.9
+ 3:  2014  739655      98.4           3.2      0.7
+ 4:  2015  745247      98.2           2.7      0.9
+ 5:  2016  749631      97.2           2.3      0.9
+ 6:  2017  752066      96.9           3.4      1.0
+ 7:  2018  750274      97.1           3.5      1.1
+ 8:  2019  746873      97.6           3.2      0.9
+ 9:  2020  535970      96.2           2.6      0.7
+10:  2021  544817      93.3           2.1      1.1
+11:  2022  679389      95.0           2.6      0.9
+12:  2023  690749      96.2           3.2      0.9
+13:  2024  708340      97.3           3.1      0.9
+14:  2025  540932      93.0           2.8      0.6</code></pre>
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># =============================================================================</span></span>
 <span><span class="co"># STEP 4: Apply crosswalk and calibrate monthly weights</span></span>
 <span><span class="co"># =============================================================================</span></span>
 <span></span>

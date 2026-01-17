@@ -161,18 +161,18 @@ The figure below shows how determination rate improves as more quarters are stac
 
 ![Determination rate improves with more stacked quarters](figures/how-it-works/fig-determination-rate.png){width=100%}
 
-**Empirical determination rates by number of quarters stacked:**
+**Empirical determination rates by number of quarters stacked** (from real PNADC 2012-2025 data):
 
-| Quarters Stacked | Determination Rate |
-|------------------|-------------------|
-| 1 (single quarter) | 73.0% |
-| 2 | 88.2% |
-| 4 (1 year) | 93.9% |
-| 8 (2 years) | 96.3% |
-| 12 (3 years) | 97.1% |
-| 20 (5 years) | 97.3% |
-| 32 (8 years) | 97.4% |
-| 55 (full history) | **97.0%** |
+| Quarters Stacked | Observations | Determination Rate |
+|------------------|--------------|-------------------|
+| 1 (single quarter) | 566,873 | 73.0% |
+| 2 | 1,133,889 | 88.2% |
+| 4 (1 year) | 2,252,464 | 93.9% |
+| 8 (2 years) | 4,530,641 | 96.3% |
+| 12 (3 years) | 6,828,144 | 97.1% |
+| 20 (5 years) | 11,391,346 | 97.3% |
+| 32 (8 years) | 18,088,581 | **97.4%** |
+| 55 (full history) | 28,395,273 | 97.0% |
 
 Note that the rate peaks around 32 quarters and then stabilizes. This is because the boundary quarters (first 4 and last 4 of any series) have inherently lower rates due to incomplete panel coverage.
 
@@ -680,6 +680,31 @@ result <- pnadc_apply_periods(
 )
 ```
 
+Output (from real PNADC 2012-2025 data):
+```
+Building reference period crosswalk...
+  Preprocessing data (shared computation)...
+  Converting date bounds to period positions...
+  Aggregating constraints and determining periods...
+  Applying exception rules...
+  Assigning reference periods...
+  Building crosswalk...
+
+Crosswalk complete:
+  - 9,769,932 unique household-quarter observations
+  - Month determination: 97.0%
+  - Fortnight determination: 2.9%
+  - Week determination: 0.9%
+
+# Sample determination rates by quarter (2023):
+     Ano Trimestre   n_obs det_month det_fortnight det_week
+   <int>     <int>   <int>     <num>         <num>    <num>
+1:  2023         1  169879     0.954         0.027    0.010
+2:  2023         2  171776     0.960         0.027    0.006
+3:  2023         3  175418     0.965         0.039    0.010
+4:  2023         4  173676     0.968         0.037    0.010
+```
+
 ---
 
 ## Weight Calibration
@@ -1051,6 +1076,16 @@ months[, .(
 ), by = .(Ano, Trimestre)]
 ```
 
+Output (sample from 2023, using real PNADC data):
+```
+   Ano Trimestre  total determined  rate
+ <int>     <int>  <int>      <int> <num>
+1: 2023         1 169879     162107  95.4
+2: 2023         2 171776     164920  96.0
+3: 2023         3 175418     169215  96.5
+4: 2023         4 173676     168094  96.8
+```
+
 ### Validation and Population Data
 
 ```{r modular-utilities}
@@ -1064,6 +1099,21 @@ head(pop_data)
 # Note: pnadc_apply_periods() fetches population data automatically
 # when calibrate = TRUE. Manual fetching is only needed for inspection
 # or custom calibration workflows.
+```
+
+Output (sample from fetch_monthly_population):
+```
+Fetching monthly population data from SIDRA (table 6022)...
+  Retrieved 159 rows for 2012-2025
+
+   year_month population_total
+        <int>            <num>
+1:     201202        193146000
+2:     201203        193470000
+3:     201204        193804000
+4:     201205        194138000
+5:     201206        194469000
+6:     201207        194788000
 ```
 
 ---
@@ -1112,6 +1162,16 @@ Based on real PNADC data (2012-2025, 55 quarters, 28.4M observations):
 
    ```{r check-rates}
    crosswalk[, .(rate = mean(!is.na(ref_month_in_quarter))), by = .(Ano, Trimestre)]
+   ```
+
+   Example output (2019):
+   ```
+      Ano Trimestre   rate
+    <int>     <int>  <num>
+   1: 2019         1 0.973
+   2: 2019         2 0.976
+   3: 2019         3 0.979
+   4: 2019         4 0.978
    ```
 
 4. **Handle indeterminate observations**: Decide whether to exclude them or use quarterly-level analysis for those cases.
@@ -1165,7 +1225,26 @@ pnadc_stacked[, .N, by = .(Ano, Trimestre)][order(Ano, Trimestre)]
 
 # This identifies months, fortnights, and weeks for all observations
 crosswalk <- pnadc_identify_periods(pnadc_stacked, verbose = TRUE)
+```
 
+Output:
+```
+Building reference period crosswalk...
+  Preprocessing data (shared computation)...
+  Converting date bounds to period positions...
+  Aggregating constraints and determining periods...
+  Applying exception rules...
+  Assigning reference periods...
+  Building crosswalk...
+
+Crosswalk complete:
+  - 9,769,932 unique household-quarter observations
+  - Month determination: 97.0%
+  - Fortnight determination: 2.9%
+  - Week determination: 0.9%
+```
+
+```{r complete-workflow-step3b, eval=FALSE}
 # Check determination rates by year
 crosswalk[, .(
   n = .N,
@@ -1173,7 +1252,29 @@ crosswalk[, .(
   det_fortnight = round(mean(determined_fortnight, na.rm = TRUE) * 100, 1),
   det_week = round(mean(determined_week, na.rm = TRUE) * 100, 1)
 ), by = Ano]
+```
 
+Output (from real PNADC 2012-2025 data):
+```
+      Ano       n det_month det_fortnight det_week
+    <int>   <int>     <num>         <num>    <num>
+ 1:  2012  695083      96.3           4.0      1.2
+ 2:  2013  719697      98.7           3.5      0.9
+ 3:  2014  739655      98.4           3.2      0.7
+ 4:  2015  745247      98.2           2.7      0.9
+ 5:  2016  749631      97.2           2.3      0.9
+ 6:  2017  752066      96.9           3.4      1.0
+ 7:  2018  750274      97.1           3.5      1.1
+ 8:  2019  746873      97.6           3.2      0.9
+ 9:  2020  535970      96.2           2.6      0.7
+10:  2021  544817      93.3           2.1      1.1
+11:  2022  679389      95.0           2.6      0.9
+12:  2023  690749      96.2           3.2      0.9
+13:  2024  708340      97.3           3.1      0.9
+14:  2025  540932      93.0           2.8      0.6
+```
+
+```{r complete-workflow-step4, eval=FALSE}
 # =============================================================================
 # STEP 4: Apply crosswalk and calibrate monthly weights
 # =============================================================================
