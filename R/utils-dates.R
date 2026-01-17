@@ -329,21 +329,23 @@ month_in_quarter <- function(date) {
 # We use pure integer arithmetic with lookup tables for 300x speedup.
 # ============================================================================
 
-#' ISO Week Number (Optimized)
+#' ISO Week and Year Combined (Optimized)
 #'
-#' Returns the ISO 8601 week number for a date. Week 1 is the week containing
-#' January 4th (equivalently, the first week with at least 4 days in January).
+#' Returns both ISO 8601 week number and week-year for a date in a single pass.
+#' This avoids redundant computation when both values are needed.
 #'
-#' OPTIMIZATION: Uses pure integer arithmetic with pre-computed lookup tables.
-#' This is ~300x faster than data.table::isoweek() for large vectors.
+#' OPTIMIZATION: Computes Thursday of the week only once, then derives both
+#' week number and year. This is 2x faster than calling iso_week() and iso_year()
+#' separately when both values are needed.
 #'
 #' @param date Date vector
-#' @return Integer vector of ISO week numbers (1-53)
+#' @return List with two integer vectors: \code{year} (ISO week-year) and
+#'   \code{week} (ISO week number 1-53)
 #' @keywords internal
 #' @noRd
-iso_week <- function(date) {
+iso_week_year <- function(date) {
   # Days since epoch
- days <- as.integer(date)
+  days <- as.integer(date)
 
   # Day of week (0=Sun, 1=Mon, ..., 6=Sat) using R's Thursday origin
   date_dow <- (days + 4L) %% 7L
@@ -351,7 +353,7 @@ iso_week <- function(date) {
   # ISO weekday (Mon=1, ..., Sun=7)
   date_iso_wday <- data.table::fifelse(date_dow == 0L, 7L, as.integer(date_dow))
 
-  # Thursday of the week containing this date
+  # Thursday of the week containing this date (COMPUTED ONCE)
   thursday_days <- days + (4L - date_iso_wday)
 
   # ISO year = year of the Thursday
@@ -373,7 +375,28 @@ iso_week <- function(date) {
   date_monday_days <- days - (date_iso_wday - 1L)
 
   # ISO week number
-  as.integer((date_monday_days - week1_monday_days) / 7L) + 1L
+  iso_wk <- as.integer((date_monday_days - week1_monday_days) / 7L) + 1L
+
+  list(year = iso_yr, week = iso_wk)
+}
+
+#' ISO Week Number (Optimized)
+#'
+#' Returns the ISO 8601 week number for a date. Week 1 is the week containing
+#' January 4th (equivalently, the first week with at least 4 days in January).
+#'
+#' OPTIMIZATION: Uses pure integer arithmetic with pre-computed lookup tables.
+#' This is ~300x faster than data.table::isoweek() for large vectors.
+#'
+#' Note: If you need both week and year, use \code{iso_week_year()} instead
+#' to avoid redundant computation.
+#'
+#' @param date Date vector
+#' @return Integer vector of ISO week numbers (1-53)
+#' @keywords internal
+#' @noRd
+iso_week <- function(date) {
+  iso_week_year(date)$week
 }
 
 #' ISO Week-Year (Optimized)
@@ -382,26 +405,15 @@ iso_week <- function(date) {
 #' year for dates near year boundaries (e.g., Dec 31 may be in week 1 of the
 #' next year, and Jan 1-3 may be in week 52/53 of the previous year).
 #'
+#' Note: If you need both week and year, use \code{iso_week_year()} instead
+#' to avoid redundant computation.
+#'
 #' @param date Date vector
 #' @return Integer vector of ISO week-years
 #' @keywords internal
 #' @noRd
 iso_year <- function(date) {
-  # ISO year: the year of the Thursday in that week
-  # Days since epoch
-  days <- as.integer(date)
-
-  # Day of week (0=Sun, 1=Mon, ..., 6=Sat)
-  date_dow <- (days + 4L) %% 7L
-
-  # ISO weekday (Mon=1, ..., Sun=7)
-  date_iso_wday <- data.table::fifelse(date_dow == 0L, 7L, as.integer(date_dow))
-
-  # Thursday of the week = date + (4 - iso_wday)
-  thursday_days <- days + (4L - date_iso_wday)
-  thursday_date <- structure(thursday_days, class = "Date")
-
-  data.table::year(thursday_date)
+  iso_week_year(date)$year
 }
 
 #' Create ISO Week Integer (YYYYWW format)
@@ -419,12 +431,15 @@ yyyyww <- function(iso_yr, iso_wk) {
 
 #' Convert Date to YYYYWW Format
 #'
+#' Optimized to compute ISO year and week in a single pass.
+#'
 #' @param date Date vector
 #' @return Integer vector in YYYYWW format
 #' @keywords internal
 #' @noRd
 date_to_yyyyww <- function(date) {
-  yyyyww(iso_year(date), iso_week(date))
+  iwy <- iso_week_year(date)
+  yyyyww(iwy$year, iwy$week)
 }
 
 #' Monday of ISO Week (Optimized)
