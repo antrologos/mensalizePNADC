@@ -1,0 +1,175 @@
+# CLAUDE.md
+
+## Project Overview
+
+R package (`PNADCperiods`) that converts Brazil's quarterly PNADC survey data into sub-quarterly time series (monthly, fortnightly, weekly) with optional weight calibration.
+
+**Authors:** Marcos Hecksher (methodology) | Rogerio Barbosa (R package)
+**Repository:** https://github.com/antrologos/mensalizePNADC
+
+## Quick Reference
+
+```r
+library(PNADCperiods)
+crosswalk <- pnadc_identify_periods(pnadc_stacked)
+result <- pnadc_apply_periods(pnadc_2023, crosswalk, weight_var = "V1028", anchor = "quarter")
+```
+
+### Key Functions
+
+| Function | Purpose |
+|----------|---------|
+| `pnadc_identify_periods()` | Build crosswalk (month/fortnight/week) |
+| `pnadc_apply_periods()` | Apply crosswalk + calibrate weights |
+| `identify_reference_month()` | Month identification (standalone) |
+| `identify_reference_fortnight()` | Fortnight identification (standalone) |
+| `identify_reference_week()` | Week identification (standalone) |
+| `fetch_monthly_population()` | Fetch population from SIDRA API |
+| `validate_pnadc()` | Input validation |
+| `pnadc_experimental_periods()` | Experimental probabilistic period assignment |
+
+### Required Variables
+
+- **Identification:** `Ano`, `Trimestre`, `UPA`, `V1008`, `V1014`, `V2008`, `V20081`, `V20082`, `V2009`
+- **Calibration:** add `V1028`/`V1032`, `UF`, `posest`, `posest_sxi`
+
+### Determination Rates
+
+| Period | Rate | Notes |
+|--------|------|-------|
+| Month | ~97% | Aggregates across quarters at UPA-V1014 level (panel design) |
+| Fortnight | ~2-5% | Within-quarter only; cannot aggregate across quarters |
+| Week | ~1-2% | Within-quarter only; cannot aggregate across quarters |
+
+**Always use stacked multi-quarter data for best month determination rate.**
+
+## Development Workflow
+
+```r
+devtools::document("mensalizePNADC")  # Update NAMESPACE and man/
+devtools::check("mensalizePNADC")     # R CMD check
+devtools::test("mensalizePNADC")      # Run tests
+devtools::install("mensalizePNADC", dependencies = FALSE)  # Install locally
+pkgdown::build_site("mensalizePNADC")  # Rebuild docs locally
+```
+
+pkgdown site rebuilds automatically via GitHub Actions on push to master:
+https://antrologos.github.io/mensalizePNADC/
+
+## Source Files
+
+| File | Purpose |
+|------|---------|
+| `pnadc-identify-periods.R` | Main crosswalk builder (month + fortnight + week) |
+| `pnadc-apply-periods.R` | Apply crosswalk + unified calibration (includes internal smoothing) |
+| `identify-reference-month.R` | Core month algorithm with dynamic exceptions |
+| `identify-reference-fortnight.R` | Fortnight (quinzena) identification |
+| `identify-reference-week.R` | Week identification |
+| `calibrate-weights.R` | Legacy monthly calibration |
+| `fetch-sidra-population.R` | Fetch population from SIDRA API |
+| `experimental-period-identification.R` | Experimental probabilistic strategies |
+| `utils-dates.R` | Fast date utilities (lookup tables, ISO week functions) |
+| `utils-validation.R` | Input validation |
+
+## Algorithm Summary
+
+1. Calculate valid interview Saturdays (IBGE timing rules)
+2. Apply birthday constraints to narrow date range
+3. Convert dates to month/fortnight/week positions
+4. Aggregate constraints at UPA-panel level **across all quarters** (months only)
+5. Dynamic exception detection for edge cases
+6. Final determination: if min == max → determined
+
+**Critical:** Months aggregate by `.(UPA, V1014)` across all quarters. Fortnights/weeks aggregate by `.(Ano, Trimestre, UPA, V1008)` within quarter only.
+
+### Weight Calibration
+
+All time periods calibrate to **FULL Brazilian population** (not divided). Hierarchical raking is simplified for sparse data:
+
+| Period | Cell Levels | Smoothing |
+|--------|-------------|-----------|
+| Month | 4 (full hierarchy) | 3-period rolling mean |
+| Fortnight | 2 (age + region) | 7-period rolling mean |
+| Week | 1 (age only) | None |
+
+## Important Notes for Claude Code
+
+### Running R Scripts on Windows
+
+**R location:** `C:\Program Files\R\R-4.5.0\bin\Rscript.exe`
+
+To run R scripts from the command line:
+```bash
+"C:\\Program Files\\R\\R-4.5.0\\bin\\Rscript.exe" script.R
+```
+
+**NEVER use `-e` flag for complex R code** - causes segfaults.
+
+```bash
+# WRONG
+Rscript -e "complex code..."
+
+# CORRECT - write to file first
+# 1. Write script to temp.R
+# 2. Run: "C:\\Program Files\\R\\R-4.5.0\\bin\\Rscript.exe" temp.R
+```
+
+### Data Quality Rules
+
+**NEVER use simulated or placeholder data** in vignettes, figures, or examples. All figures and analyses must use real PNADC data or real official statistics. If external validation data is needed (e.g., IBGE official poverty estimates), fetch it from official sources or clearly state that validation requires user-provided data.
+
+**NEVER use "Expected output" sections** in vignettes or documentation. All code examples should either:
+1. Show actual outputs pre-computed from real data (for eval=FALSE chunks), or
+2. Be executable with real data (for eval=TRUE chunks)
+
+If output cannot be shown (e.g., depends on user's data), omit the output section entirely rather than showing hypothetical results.
+
+### Git Repository Location
+
+**CRITICAL:** The git repository is inside the package directory, NOT the project root.
+
+```
+D:\Dropbox\Artigos\mensalizacao_pnad\          # Project root (NOT a git repo)
+└── mensalizePNADC\                            # Git repository is HERE
+    ├── .git\
+    ├── R\
+    ├── tests\
+    └── ...
+```
+
+**Always use the package directory for git commands:**
+```bash
+# WRONG - causes exit codes 128/129
+cd "D:\Dropbox\Artigos\mensalizacao_pnad" && git status
+
+# CORRECT
+cd "D:\Dropbox\Artigos\mensalizacao_pnad\mensalizePNADC" && git status
+```
+
+Common git errors when using wrong directory:
+- Exit code 128: `fatal: not a git repository`
+- Exit code 129: `warning: Not a git repository`
+
+### Common Issues
+
+1. **Low determination rate** → Stack 2+ years of data
+2. **Missing columns** → Use `validate_pnadc()` to check
+3. **SIDRA API errors** → Check internet; API has rate limits
+4. **Git errors (exit 128/129)** → Use `mensalizePNADC/` directory, not project root
+
+### Local Data Paths (Rogerio's machine)
+
+```
+D:/Dropbox/Bancos_Dados/PNADC/
+├── Trimestral/Dados/           # Quarterly data (pnadc_YYYY-Nq.fst)
+└── Anual/visitas/              # Annual visit data (pnadc_YYYY_visitaN.fst)
+```
+
+**File naming conventions:**
+- Quarterly: `pnadc_2019-1q.fst`, `pnadc_2019-2q.fst`, etc.
+- Annual: `pnadc_2019_visita1.fst`, `pnadc_2020_visita5.fst`, etc.
+
+**Visit selection for annual data:**
+- 2015-2019: Visit 1
+- 2020-2021: Visit 5 (COVID period - visit 1 not available)
+- 2022-2024: Visit 1
