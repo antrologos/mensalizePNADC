@@ -84,3 +84,26 @@ and weeks cannot use this cross-quarter aggregation because their positions
 are not consistent across panel visits.
 }
 }
+\examples{
+\dontrun{
+# Identify reference fortnights
+result <- identify_reference_fortnight(pnadc_data)
+
+# Check determination rate by quarter
+result[, .(
+  total = .N,
+  determined = sum(!is.na(ref_fortnight_in_quarter)),
+  rate = mean(!is.na(ref_fortnight_in_quarter))
+), by = .(Ano, Trimestre)]
+
+# Note: Fortnight determination rate is typically low (~2-5\%)
+# because fortnights cannot aggregate across quarters like months can.
+}
+
+}
+\seealso{
+\code{\link{pnadc_identify_periods}} for the main function that
+builds a complete crosswalk including months, fortnights, and weeks.
+\code{\link{identify_reference_month}} for month-only identification.
+\code{\link{identify_reference_week}} for week-only identification.
+}

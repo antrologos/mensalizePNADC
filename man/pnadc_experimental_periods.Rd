@@ -109,3 +109,7 @@ crosswalk_exp[, .(
 }
 
 }
+\seealso{
+\code{\link{pnadc_identify_periods}} to build the crosswalk that
+this function modifies.
+}

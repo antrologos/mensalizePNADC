@@ -5,6 +5,7 @@
 [![pkgdown](https://github.com/antrologos/mensalizePNADC/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/antrologos/mensalizePNADC/actions/workflows/pkgdown.yaml)
 [![codecov](https://codecov.io/gh/antrologos/mensalizePNADC/branch/master/graph/badge.svg)](https://codecov.io/gh/antrologos/mensalizePNADC)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 <!-- badges: end -->
 
 Convert Brazil's quarterly PNADC survey data into sub-quarterly time series (monthly, fortnightly, weekly).
@@ -33,12 +34,18 @@ The `PNADCperiods` package identifies reference periods (months, fortnights, wee
 | `calibrate_monthly_weights()` | Hierarchical rake weighting for monthly weights |
 | `fetch_monthly_population()` | Fetch population totals from IBGE SIDRA API |
 | `validate_pnadc()` | Validate input data has required columns |
+| `pnadc_experimental_periods()` | Experimental probabilistic period assignment |
 
 ## Installation
 
 ```r
+# Requires R >= 4.0.0
+
 # Install from GitHub
 devtools::install_github("antrologos/mensalizePNADC")
+
+# For SIDRA API integration (optional):
+install.packages("sidrar")
 ```
 
 ## Quick Example
@@ -86,6 +93,15 @@ result[, .(n = .N), by = ref_month_yyyymm]
 
 For complete examples, see the [Get Started guide](https://antrologos.github.io/mensalizePNADC/articles/getting-started.html).
 
+## Experimental Features
+
+The `pnadc_experimental_periods()` function provides experimental strategies to improve fortnight and week determination rates:
+
+- **Probabilistic assignment**: When the date range spans only 2 possible periods, assigns the most likely one based on date midpoint (with confidence scores)
+- **UPA aggregation**: Aggregates constraints at UPA level (experimental)
+
+These features are marked experimental and may change in future versions.
+
 ## Documentation
 
 | Guide | Description |
@@ -94,12 +110,29 @@ For complete examples, see the [Get Started guide](https://antrologos.github.io/
 | [Download Data](https://antrologos.github.io/mensalizePNADC/articles/download-and-prepare.html) | Prepare PNADC microdata |
 | [Applied Examples](https://antrologos.github.io/mensalizePNADC/articles/applied-examples.html) | COVID, recession, minimum wage validation |
 | [How It Works](https://antrologos.github.io/mensalizePNADC/articles/how-it-works.html) | Algorithm details |
+| [Annual Poverty Analysis](https://antrologos.github.io/mensalizePNADC/articles/annual-poverty-analysis.html) | Using annual visit data |
+| [Complex Survey Design](https://antrologos.github.io/mensalizePNADC/articles/complex-survey-design.html) | Survey design considerations |
 | [Reference](https://antrologos.github.io/mensalizePNADC/reference/index.html) | Function documentation |
+
+## Citation
+
+If you use this package in your research, please cite:
+
+```r
+citation("PNADCperiods")
+```
+
+> Hecksher, M. & Barbosa, R. (2024). PNADCperiods: Identify Reference Periods in Brazil's PNADC Survey Data. R package. https://github.com/antrologos/mensalizePNADC
+
+## Getting Help
+
+- **Bug reports**: [GitHub Issues](https://github.com/antrologos/mensalizePNADC/issues)
+- **Questions**: Open a GitHub issue with the "question" label
 
 ## Authors
 
-- **Marcos Hecksher** - Original methodology
-- **Rogerio Barbosa** - R package maintainer
+- **Marcos Hecksher** - Original methodology ([ORCID](https://orcid.org/0000-0003-2992-1252))
+- **Rogerio Barbosa** - R package maintainer ([ORCID](https://orcid.org/0000-0002-6796-4547))
 
 ## References
 

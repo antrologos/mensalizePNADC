@@ -40,7 +40,7 @@
 #'
 #' @import data.table
 #' @importFrom checkmate assert_data_frame assert_int assert_logical assert_string assert_character assert_choice
-#' @importFrom stats median na.omit lm predict
+#' @importFrom stats lm predict
 #' @importFrom utils head setTxtProgressBar txtProgressBar
 #' @keywords internal
 "_PACKAGE"

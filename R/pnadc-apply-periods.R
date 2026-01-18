@@ -60,7 +60,6 @@
 #' ## Population Targets
 #'
 #' All time periods (months, fortnights, and weeks) are calibrated to the FULL
-
 #' Brazilian population from SIDRA. This means:
 #' \itemize{
 #'   \item Monthly weights sum to the Brazilian population for that month

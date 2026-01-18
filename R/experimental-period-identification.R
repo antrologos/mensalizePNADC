@@ -67,6 +67,9 @@
 #'   \item Research into identification algorithm improvements
 #' }
 #'
+#' @seealso \code{\link{pnadc_identify_periods}} to build the crosswalk that
+#'   this function modifies.
+#'
 #' @examples
 #' \dontrun{
 #' # Build standard crosswalk

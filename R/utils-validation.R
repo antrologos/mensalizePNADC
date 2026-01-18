@@ -73,6 +73,24 @@ required_vars_monthly_totals <- function() {
 #'     \item \code{join_keys_available}: Character vector of available join key columns
 #'   }
 #'
+#' @details
+#' The function performs the following validations:
+#' \itemize{
+#'   \item Checks for required columns for reference period identification:
+#'     \code{Ano}, \code{Trimestre}, \code{UPA}, \code{V1008}, \code{V1014},
+#'     \code{V2008}, \code{V20081}, \code{V20082}, \code{V2009}
+#'   \item Validates year range (2012-2100 for PNADC coverage)
+#'   \item Validates quarter values (must be 1-4)
+#'   \item Validates birth day values (must be 1-31 or 99 for unknown)
+#'   \item Validates birth month values (must be 1-12 or 99 for unknown)
+#'   \item Warns about unusual ages (outside 0-130 range)
+#'   \item If \code{check_weights = TRUE}, also validates weight-related columns:
+#'     \code{V1028}, \code{UF}, \code{posest}, \code{posest_sxi}
+#' }
+#'
+#' @seealso \code{\link{pnadc_identify_periods}} which calls this function
+#'   internally to validate input data.
+#'
 #' @examples
 #' \dontrun{
 #' validate_pnadc(my_data)
