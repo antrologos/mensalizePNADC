@@ -18,21 +18,20 @@ knitr::opts_chunk$set(
 # library(scales)
 
 ## ----load-data----------------------------------------------------------------
-# # Load the mensalized data from download-and-prepare workflow
-# # This should contain all PNADC variables plus the mensalization results
+# # Load your stacked PNADC data (see download-and-prepare vignette)
 # library(fst)
-# pnadc <- read_fst("path/to/your/pnadc_mensalized.fst", as.data.table = TRUE)
+# pnadc <- read_fst("path/to/your/pnadc_stacked.fst", as.data.table = TRUE)
 # 
-# # Alternative: If you have full microdata separately, join with crosswalk
-# full_data <- fread("path/to/pnadc_full.csv")
-# crosswalk <- read_fst("path/to/mensalized_crosswalk.fst", as.data.table = TRUE)
+# # Build crosswalk (identify reference periods)
+# crosswalk <- pnadc_identify_periods(pnadc, verbose = TRUE)
 # 
-# pnadc <- merge(
-#   full_data,
-#   crosswalk[, .(Ano, Trimestre, UPA, V1008, V1014, V2003,
-#                 ref_month, ref_month_in_quarter, ref_month_yyyymm, weight_monthly)],
-#   by = c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003"),
-#   all.x = TRUE
+# # Apply crosswalk with weight calibration
+# pnadc <- pnadc_apply_periods(
+#   pnadc,
+#   crosswalk,
+#   weight_var = "V1028",
+#   anchor = "quarter",
+#   calibrate = TRUE
 # )
 
 ## ----create-variables---------------------------------------------------------
@@ -225,9 +224,13 @@ knitr::opts_chunk$set(
 
 ## ----mw-data-prep-------------------------------------------------------------
 # # Historical minimum wage values (R$)
+# # Note: 2020 had two adjustments (Jan and Feb), 2023 had mid-year adjustment (May)
 # mw_history <- data.table(
-#   start_yyyymm = c(201201, 201301, 201401, 201501, 201601, 201701, 201801, 201901, 202001, 202002, 202101, 202201, 202301, 202401, 202501),
-#   mw_value = c(622, 678, 724, 788, 880, 937, 954, 998, 1039, 1045, 1100, 1212, 1302, 1412, 1518)
+#   start_yyyymm = c(201201, 201301, 201401, 201501, 201601, 201701, 201801,
+#                    201901, 202001, 202002, 202101, 202201, 202301, 202305,
+#                    202401, 202501),
+#   mw_value = c(622, 678, 724, 788, 880, 937, 954, 998, 1039, 1045, 1100,
+#                1212, 1302, 1320, 1412, 1518)
 # )
 # mw_adjustment_months <- mw_history$start_yyyymm
 # 
@@ -391,6 +394,106 @@ knitr::opts_chunk$set(
 #   ) +
 #   guides(color = guide_legend(ncol = 2))
 
+## ----covid-fortnight----------------------------------------------------------
+# # For fortnightly analysis, we need observations with determined fortnights
+# pnadc_fortnight <- result[!is.na(weight_fortnight) & Ano == 2020 & Trimestre %in% 1:2]
+# 
+# # Compute participation rate by fortnight
+# fortnight_covid <- pnadc_fortnight[, .(
+#   participation_rate = sum(pea * weight_fortnight, na.rm = TRUE) /
+#                        sum(weight_fortnight, na.rm = TRUE),
+#   unemployment_rate = sum(unemployed * weight_fortnight, na.rm = TRUE) /
+#                       sum(pea * weight_fortnight, na.rm = TRUE),
+#   n_obs = .N
+# ), by = .(Ano, Trimestre, ref_fortnight_in_quarter, ref_fortnight_yyyyff)]
+# 
+# # Add period Date column (1st or 16th of month)
+# fortnight_covid[, `:=`(
+#   month = ((ref_fortnight_yyyyff %% 100) - 1L) %/% 2L + 1L,
+#   day = fifelse(ref_fortnight_yyyyff %% 2L == 1L, 1L, 16L),
+#   year = ref_fortnight_yyyyff %/% 100L
+# )]
+# fortnight_covid[, period := as.Date(paste(year, month, day, sep = "-"))]
+# 
+# # Create plot comparing monthly vs fortnightly
+# ggplot() +
+#   # Monthly as reference
+#   geom_line(data = covid_monthly_participation,
+#             aes(x = period, y = participation_rate),
+#             color = "darkred", linewidth = 1, alpha = 0.7) +
+#   geom_point(data = covid_monthly_participation,
+#              aes(x = period, y = participation_rate),
+#              color = "darkred", size = 3) +
+# 
+#   # Fortnightly
+#   geom_line(data = covid_fortnight_participation,
+#             aes(x = period, y = participation_rate),
+#             color = "#ff7f0e", linewidth = 0.8, linetype = "dashed") +
+#   geom_point(data = covid_fortnight_participation,
+#              aes(x = period, y = participation_rate),
+#              color = "#ff7f0e", size = 2) +
+# 
+#   # Mark lockdown transition
+#   geom_vline(xintercept = as.Date("2020-03-16"),
+#              linetype = "dotted", color = "gray40") +
+# 
+#   scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+#   scale_x_date(date_breaks = "1 month", date_labels = "%b\n%Y") +
+#   labs(
+#     title = "COVID-19 Labor Force Participation: Monthly vs Fortnightly",
+#     subtitle = "Fortnightly data (orange) reveals sharper discontinuity at lockdown onset",
+#     x = NULL, y = "Labor Force Participation Rate",
+#     caption = "Monthly (red): ~65,000 obs/month | Fortnightly (orange): ~3,000 obs/fortnight"
+#   ) +
+#   theme_minimal(base_size = 11)
+
+## ----carnival-weekly----------------------------------------------------------
+# # Filter to Q1 of Carnival years (2019, 2022-2024)
+# carnival_years <- c(2019L, 2022L, 2023L, 2024L)
+# pnadc_weekly <- result[
+#   !is.na(weight_weekly) & Trimestre == 1L & Ano %in% carnival_years
+# ]
+# 
+# # Define Carnival weeks (ISO week of Carnival Tuesday varies by year)
+# # 2019: Week 10 | 2022: Week 9 | 2023: Week 8 | 2024: Week 7
+# carnival_weeks <- data.table(
+#   Ano = carnival_years,
+#   carnival_iso_week = c(10L, 9L, 8L, 7L)
+# )
+# 
+# # Extract ISO week and merge
+# pnadc_weekly[, iso_week := ref_week_yyyyww %% 100L]
+# pnadc_weekly <- merge(pnadc_weekly, carnival_weeks, by = "Ano", all.x = TRUE)
+# pnadc_weekly[, is_carnival_week := (iso_week == carnival_iso_week)]
+# 
+# # Flag Carnival-intensive states (BA=29, RJ=33, PE=26)
+# pnadc_weekly[, is_carnival_state := UF %in% c(29L, 33L, 26L)]
+# 
+# # Aggregate: Carnival vs non-Carnival weeks × region
+# weekly_carnival <- pnadc_weekly[, .(
+#   formalization_rate = sum(formal * weight_weekly, na.rm = TRUE) /
+#                        sum(employed * weight_weekly, na.rm = TRUE),
+#   n_obs = .N
+# ), by = .(is_carnival_week, is_carnival_state)]
+# 
+# # Create difference-in-differences plot
+# ggplot(weekly_carnival,
+#        aes(x = fifelse(is_carnival_week, "Carnival Week", "Other Weeks"),
+#            y = formalization_rate,
+#            fill = fifelse(is_carnival_state, "Carnival States (BA/RJ/PE)", "Other States"))) +
+#   geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+#   scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+#   scale_fill_manual(values = c("Carnival States (BA/RJ/PE)" = "#ff7f0e",
+#                                "Other States" = "#1f77b4")) +
+#   labs(
+#     title = "Formalization Rate by Week Type and Region",
+#     subtitle = "Pooled data from Q1 2019, 2022-2024",
+#     x = NULL, y = "Formalization Rate",
+#     fill = "Region",
+#     caption = "Weekly determination rate: ~1%. Data pooled across 4 years."
+#   ) +
+#   theme_minimal(base_size = 11)
+
 ## ----reproduce, eval=FALSE----------------------------------------------------
 # library(PNADCperiods)
 # library(data.table)
@@ -398,11 +501,12 @@ knitr::opts_chunk$set(
 # # Load your stacked PNADC data
 # pnadc <- fread("your_pnadc_stacked.csv")
 # 
-# # Build crosswalk and apply with weight computation
+# # Build crosswalk and apply with weight calibration
 # crosswalk <- pnadc_identify_periods(pnadc)
 # result <- pnadc_apply_periods(pnadc, crosswalk,
 #                                weight_var = "V1028",
-#                                anchor = "quarter")
+#                                anchor = "quarter",
+#                                calibrate = TRUE)
 # 
 # # Compute monthly series
 # monthly_total <- result[!is.na(weight_monthly), .(

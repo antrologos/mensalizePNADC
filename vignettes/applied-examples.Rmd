@@ -578,6 +578,168 @@ Monthly data from `PNADCperiods` enables:
 
 ---
 
+## 4. Beyond Monthly: Fortnightly and Weekly Analysis
+
+The examples above demonstrate the power of monthly disaggregation. But `PNADCperiods` can go even finer: the package also identifies **fortnightly** (quinzenal, 15-day periods) and **weekly** reference periods for each observation.
+
+### When Does Finer Granularity Matter?
+
+Some phenomena unfold faster than monthly cycles:
+
+- **Rapid policy shocks**: COVID-19 lockdowns began mid-March 2020---the monthly average blends pre- and post-lockdown
+- **Holiday effects**: Carnival, Christmas, and New Year have distinctive within-month labor market patterns
+- **Transition timing**: Knowing exactly which fortnight or week a change occurred can matter for event studies
+
+However, finer granularity comes at a cost: **smaller samples**.
+
+### The Sample Size Trade-Off
+
+| Granularity | Determination Rate | Typical Obs/Period | Best For |
+|-------------|-------------------|-------------------|----------|
+| Monthly | ~97% | ~65,000 | Most analyses |
+| Fortnightly | ~3% | ~3,000 | Transition timing |
+| Weekly | ~1% | ~500 | Shock detection |
+
+**Why the low rates for fortnights and weeks?** Unlike months, which aggregate constraints across multiple quarterly visits (leveraging the panel design), fortnights and weeks can only use information from within a single quarter. The birthday constraints rarely narrow the interview window to a single 15-day or 7-day period.
+
+### Example: COVID-19 Lockdown at Fortnightly Resolution
+
+The COVID-19 pandemic provides a compelling test case. Brazilian lockdowns began around March 16, 2020---almost perfectly aligned with the fortnight boundary. Monthly data for March averages the pre-lockdown first half with the post-lockdown second half. Fortnightly data can separate them.
+
+We examine **labor force participation**, which dropped sharply as workers exited the labor market entirely (not just becoming unemployed, but stopping their job search):
+
+```{r covid-fortnight}
+# For fortnightly analysis, we need observations with determined fortnights
+pnadc_fortnight <- result[!is.na(weight_fortnight) & Ano == 2020 & Trimestre %in% 1:2]
+
+# Compute participation rate by fortnight
+fortnight_covid <- pnadc_fortnight[, .(
+  participation_rate = sum(pea * weight_fortnight, na.rm = TRUE) /
+                       sum(weight_fortnight, na.rm = TRUE),
+  unemployment_rate = sum(unemployed * weight_fortnight, na.rm = TRUE) /
+                      sum(pea * weight_fortnight, na.rm = TRUE),
+  n_obs = .N
+), by = .(Ano, Trimestre, ref_fortnight_in_quarter, ref_fortnight_yyyyff)]
+
+# Add period Date column (1st or 16th of month)
+fortnight_covid[, `:=`(
+  month = ((ref_fortnight_yyyyff %% 100) - 1L) %/% 2L + 1L,
+  day = fifelse(ref_fortnight_yyyyff %% 2L == 1L, 1L, 16L),
+  year = ref_fortnight_yyyyff %/% 100L
+)]
+fortnight_covid[, period := as.Date(paste(year, month, day, sep = "-"))]
+
+# Create plot comparing monthly vs fortnightly
+ggplot() +
+  # Monthly as reference
+  geom_line(data = covid_monthly_participation,
+            aes(x = period, y = participation_rate),
+            color = "darkred", linewidth = 1, alpha = 0.7) +
+  geom_point(data = covid_monthly_participation,
+             aes(x = period, y = participation_rate),
+             color = "darkred", size = 3) +
+
+  # Fortnightly
+  geom_line(data = covid_fortnight_participation,
+            aes(x = period, y = participation_rate),
+            color = "#ff7f0e", linewidth = 0.8, linetype = "dashed") +
+  geom_point(data = covid_fortnight_participation,
+             aes(x = period, y = participation_rate),
+             color = "#ff7f0e", size = 2) +
+
+  # Mark lockdown transition
+  geom_vline(xintercept = as.Date("2020-03-16"),
+             linetype = "dotted", color = "gray40") +
+
+  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b\n%Y") +
+  labs(
+    title = "COVID-19 Labor Force Participation: Monthly vs Fortnightly",
+    subtitle = "Fortnightly data (orange) reveals sharper discontinuity at lockdown onset",
+    x = NULL, y = "Labor Force Participation Rate",
+    caption = "Monthly (red): ~65,000 obs/month | Fortnightly (orange): ~3,000 obs/fortnight"
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+![COVID Lockdown: Monthly vs Fortnightly](figures/applied-examples/fig-covid-fortnight-comparison.png){width=100%}
+
+The fortnightly data shows a sharper discontinuity around March 16---the participation rate in the second fortnight of March (Mar-2) dropped more steeply than the monthly average suggests. This demonstrates how fortnightly resolution can capture transition timing more precisely.
+
+### Example: Carnival Week Labor Market Effects
+
+Carnival is Brazil's largest cultural event, concentrated in specific states (Bahia, Rio de Janeiro, Pernambuco) and occurring during a specific week each year. Does formalization rate change during Carnival week, as temporary and informal workers increase?
+
+This is a challenging analysis due to the ~1% weekly determination rate. To increase sample size, we **pool multiple years** (2019, 2022-2024, excluding COVID years) and compare Carnival states to other states:
+
+```{r carnival-weekly}
+# Filter to Q1 of Carnival years (2019, 2022-2024)
+carnival_years <- c(2019L, 2022L, 2023L, 2024L)
+pnadc_weekly <- result[
+  !is.na(weight_weekly) & Trimestre == 1L & Ano %in% carnival_years
+]
+
+# Define Carnival weeks (ISO week of Carnival Tuesday varies by year)
+# 2019: Week 10 | 2022: Week 9 | 2023: Week 8 | 2024: Week 7
+carnival_weeks <- data.table(
+  Ano = carnival_years,
+  carnival_iso_week = c(10L, 9L, 8L, 7L)
+)
+
+# Extract ISO week and merge
+pnadc_weekly[, iso_week := ref_week_yyyyww %% 100L]
+pnadc_weekly <- merge(pnadc_weekly, carnival_weeks, by = "Ano", all.x = TRUE)
+pnadc_weekly[, is_carnival_week := (iso_week == carnival_iso_week)]
+
+# Flag Carnival-intensive states (BA=29, RJ=33, PE=26)
+pnadc_weekly[, is_carnival_state := UF %in% c(29L, 33L, 26L)]
+
+# Aggregate: Carnival vs non-Carnival weeks × region
+weekly_carnival <- pnadc_weekly[, .(
+  formalization_rate = sum(formal * weight_weekly, na.rm = TRUE) /
+                       sum(employed * weight_weekly, na.rm = TRUE),
+  n_obs = .N
+), by = .(is_carnival_week, is_carnival_state)]
+
+# Create difference-in-differences plot
+ggplot(weekly_carnival,
+       aes(x = fifelse(is_carnival_week, "Carnival Week", "Other Weeks"),
+           y = formalization_rate,
+           fill = fifelse(is_carnival_state, "Carnival States (BA/RJ/PE)", "Other States"))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  scale_y_continuous(labels = percent_format(accuracy = 0.1)) +
+  scale_fill_manual(values = c("Carnival States (BA/RJ/PE)" = "#ff7f0e",
+                               "Other States" = "#1f77b4")) +
+  labs(
+    title = "Formalization Rate by Week Type and Region",
+    subtitle = "Pooled data from Q1 2019, 2022-2024",
+    x = NULL, y = "Formalization Rate",
+    fill = "Region",
+    caption = "Weekly determination rate: ~1%. Data pooled across 4 years."
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+![Carnival Week Effects](figures/applied-examples/fig-carnival-weekly-did.png){width=100%}
+
+The comparison shows whether Carnival-intensive states experience a formalization dip during Carnival week that other states don't. Even with pooled data, the confidence intervals are wide due to the low weekly determination rate---but the methodology demonstrates how weekly analysis can be used for event studies when the effect is expected to be localized in time and space.
+
+### Practical Guidelines for Sub-Monthly Analysis
+
+| Question Type | Recommended Granularity | Sample Strategy |
+|---------------|------------------------|-----------------|
+| "How much changed?" | Monthly | Standard |
+| "When exactly did it change?" | Fortnight | National-level only |
+| "Was there a within-week pattern?" | Weekly | Pool multiple years |
+
+**Key takeaways:**
+
+1. **Monthly analysis handles most use cases** with high determination rates and robust samples
+2. **Fortnightly analysis** works for detecting transition timing when the fortnight boundary aligns with the event of interest (e.g., mid-month policy changes)
+3. **Weekly analysis** requires pooling multiple years and focusing on aggregate patterns; subgroup analysis is rarely feasible
+
+---
+
 ## Reproducing These Results
 
 To reproduce the analyses in this vignette:

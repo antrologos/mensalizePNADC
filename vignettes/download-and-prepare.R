@@ -79,7 +79,7 @@ knitr::opts_chunk$set(
 # cols_needed <- c(
 #   # Time and identifiers
 #   "Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003",
-#   # Birthday variables (for reference month algorithm)
+#   # Birthday variables (for reference period algorithm)
 #   "V2008", "V20081", "V20082", "V2009",
 #   # Weight and stratification (for weight calibration)
 #   "V1028", "UF", "posest", "posest_sxi"
@@ -143,12 +143,12 @@ knitr::opts_chunk$set(
 # # Load a quarterly file with all variables
 # full_data <- read_fst(file.path(data_dir, "pnadc_2023-1q.fst"))
 # 
-# # Join with mensalization results
+# # Join with mensalization results (crosswalk is at household-quarter level)
 # analysis_data <- full_data |>
 #   left_join(
-#     result |> select(Ano, Trimestre, UPA, V1008, V1014, V2003,
+#     result |> select(Ano, Trimestre, UPA, V1008, V1014,
 #                      ref_month, ref_month_in_quarter, weight_monthly),
-#     by = c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003")
+#     by = c("Ano", "Trimestre", "UPA", "V1008", "V1014")
 #   )
 # 
 # # Now you can aggregate by month using weight_monthly

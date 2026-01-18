@@ -360,12 +360,11 @@ using the <code>PNADcIBGE</code> package</li>
 <li><strong>Stacking</strong> multiple quarters into a single dataset
 (critical for high determination rates)</li>
 <li><strong>Applying mensalization</strong> using the
-<code>mensalizePNADC</code> package</li>
+<code>PNADCperiods</code> package</li>
 </ol>
 <p>If you already have PNADC data and want to learn the package API
 first, see <a href="getting-started.html">Get Started</a>. For algorithm
-details, see <a href="how-it-works.html">How mensalizePNADC
-Works</a>.</p>
+details, see <a href="how-it-works.html">How PNADCperiods Works</a>.</p>
 </div>
 <div id="prerequisites" class="section level2">
 <h2>Prerequisites</h2>
@@ -522,7 +521,7 @@ memory, we only load the columns needed for mensalization:</p>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>cols_needed <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="co"># Time and identifiers</span></span>
 <span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="st">&quot;Ano&quot;</span>, <span class="st">&quot;Trimestre&quot;</span>, <span class="st">&quot;UPA&quot;</span>, <span class="st">&quot;V1008&quot;</span>, <span class="st">&quot;V1014&quot;</span>, <span class="st">&quot;V2003&quot;</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="co"># Birthday variables (for reference month algorithm)</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="co"># Birthday variables (for reference period algorithm)</span></span>
 <span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="st">&quot;V2008&quot;</span>, <span class="st">&quot;V20081&quot;</span>, <span class="st">&quot;V20082&quot;</span>, <span class="st">&quot;V2009&quot;</span>,</span>
 <span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="co"># Weight and stratification (for weight calibration)</span></span>
 <span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="st">&quot;V1028&quot;</span>, <span class="st">&quot;UF&quot;</span>, <span class="st">&quot;posest&quot;</span>, <span class="st">&quot;posest_sxi&quot;</span></span>
@@ -617,10 +616,6 @@ cases (this is higher than the ~3% seen with full 2012-2025 data because
 boundary quarters have lower determination rates).</p>
 <p>The output columns include:</p>
 <table>
-<colgroup>
-<col width="38%" />
-<col width="61%" />
-</colgroup>
 <thead>
 <tr class="header">
 <th>Column</th>
@@ -642,7 +637,7 @@ boundary quarters have lower determination rates).</p>
 </tr>
 <tr class="even">
 <td><code>weight_monthly</code></td>
-<td>Monthly survey weight (if <code>compute_weights = TRUE</code>)</td>
+<td>Monthly survey weight (if <code>calibrate = TRUE</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -660,12 +655,12 @@ your full PNADC data:</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Load a quarterly file with all variables</span></span>
 <span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>full_data <span class="ot">&lt;-</span> <span class="fu">read_fst</span>(<span class="fu">file.path</span>(data_dir, <span class="st">&quot;pnadc_2023-1q.fst&quot;</span>))</span>
 <span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co"># Join with mensalization results</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co"># Join with mensalization results (crosswalk is at household-quarter level)</span></span>
 <span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>analysis_data <span class="ot">&lt;-</span> full_data <span class="sc">|&gt;</span></span>
 <span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    result <span class="sc">|&gt;</span> <span class="fu">select</span>(Ano, Trimestre, UPA, V1008, V1014, V2003,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    result <span class="sc">|&gt;</span> <span class="fu">select</span>(Ano, Trimestre, UPA, V1008, V1014,</span>
 <span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>                     ref_month, ref_month_in_quarter, weight_monthly),</span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Ano&quot;</span>, <span class="st">&quot;Trimestre&quot;</span>, <span class="st">&quot;UPA&quot;</span>, <span class="st">&quot;V1008&quot;</span>, <span class="st">&quot;V1014&quot;</span>, <span class="st">&quot;V2003&quot;</span>)</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Ano&quot;</span>, <span class="st">&quot;Trimestre&quot;</span>, <span class="st">&quot;UPA&quot;</span>, <span class="st">&quot;V1008&quot;</span>, <span class="st">&quot;V1014&quot;</span>)</span>
 <span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  )</span>
 <span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a></span>
 <span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="co"># Now you can aggregate by month using weight_monthly</span></span>
@@ -752,8 +747,8 @@ downloads.</p></li>
 a time, or use a machine with more RAM.</p></li>
 <li><p><strong>SIDRA API errors</strong>: The weight calibration
 requires internet access to the SIDRA API. If it fails, try again later
-or use <code>compute_weights = FALSE</code> for just reference month
-identification.</p></li>
+or use <code>calibrate = FALSE</code> for just reference period
+identification without weight calibration.</p></li>
 </ol>
 </div>
 </div>
@@ -766,7 +761,7 @@ Started</a> with your real data</li>
 <li>See analysis examples in <a href="applied-examples.html">Applied
 Examples</a></li>
 <li>Learn about the algorithm in <a href="how-it-works.html">How
-mensalizePNADC Works</a></li>
+PNADCperiods Works</a></li>
 <li>Visit the <a href="https://antrologos.github.io/mensalizePNADC/">package website</a>
 for more resources</li>
 </ul>
