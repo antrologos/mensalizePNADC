@@ -4,3 +4,7 @@
 .Ruserdata
 /doc/
 /Meta/
+
+# Generated vignette files (should only be in inst/doc/)
+vignettes/*.html
+vignettes/*.R
