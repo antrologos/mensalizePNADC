@@ -24,6 +24,8 @@
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
     <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/determination-rates-benchmark.html">Benchmark Report</a></li>
   </ul></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -76,6 +78,24 @@ If <code>stop_on_error = FALSE</code>, returns a list with:</p><ul><li><p><code>
 <li><p><code>n_cols</code>: Number of columns in input data</p></li>
 <li><p><code>join_keys_available</code>: Character vector of available join key columns</p></li>
 </ul></div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The function performs the following validations:</p><ul><li><p>Checks for required columns for reference period identification:
+<code>Ano</code>, <code>Trimestre</code>, <code>UPA</code>, <code>V1008</code>, <code>V1014</code>,
+<code>V2008</code>, <code>V20081</code>, <code>V20082</code>, <code>V2009</code></p></li>
+<li><p>Validates year range (2012-2100 for PNADC coverage)</p></li>
+<li><p>Validates quarter values (must be 1-4)</p></li>
+<li><p>Validates birth day values (must be 1-31 or 99 for unknown)</p></li>
+<li><p>Validates birth month values (must be 1-12 or 99 for unknown)</p></li>
+<li><p>Warns about unusual ages (outside 0-130 range)</p></li>
+<li><p>If <code>check_weights = TRUE</code>, also validates weight-related columns:
+<code>V1028</code>, <code>UF</code>, <code>posest</code>, <code>posest_sxi</code></p></li>
+</ul></div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="pnadc_identify_periods.html">pnadc_identify_periods</a></code> which calls this function
+internally to validate input data.</p></div>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

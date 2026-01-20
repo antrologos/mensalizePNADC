@@ -4,11 +4,13 @@
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/annual-poverty-analysis.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/applied-examples.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/complex-survey-design.html</loc></url>
+<url><loc>https://antrologos.github.io/mensalizePNADC/articles/determination-rates-benchmark.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/download-and-prepare.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/getting-started.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/how-it-works.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/articles/index.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/authors.html</loc></url>
+<url><loc>https://antrologos.github.io/mensalizePNADC/CLAUDE.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/index.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/LICENSE-text.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/calibrate_monthly_weights.html</loc></url>
@@ -23,6 +25,7 @@
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/mensalize_annual_pnadc.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/PNADCperiods-package.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/pnadc_apply_periods.html</loc></url>
+<url><loc>https://antrologos.github.io/mensalizePNADC/reference/pnadc_experimental_periods.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/pnadc_identify_periods.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/smooth_monthly_aggregates.html</loc></url>
 <url><loc>https://antrologos.github.io/mensalizePNADC/reference/utils-dates.html</loc></url>

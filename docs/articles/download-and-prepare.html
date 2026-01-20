@@ -39,6 +39,8 @@
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
     <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/determination-rates-benchmark.html">Benchmark Report</a></li>
   </ul>
 </li>
       </ul>
@@ -92,12 +94,11 @@ using the <code>PNADcIBGE</code> package</li>
 (critical for high determination rates)</li>
 <li>
 <strong>Applying mensalization</strong> using the
-<code>mensalizePNADC</code> package</li>
+<code>PNADCperiods</code> package</li>
 </ol>
 <p>If you already have PNADC data and want to learn the package API
 first, see <a href="getting-started.html">Get Started</a>. For algorithm
-details, see <a href="how-it-works.html">How mensalizePNADC
-Works</a>.</p>
+details, see <a href="how-it-works.html">How PNADCperiods Works</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="prerequisites">Prerequisites<a class="anchor" aria-label="anchor" href="#prerequisites"></a>
@@ -267,14 +268,12 @@ memory, we only load the columns needed for mensalization:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Columns needed for mensalization</span></span>
 <span><span class="va">cols_needed</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>  <span class="co"># Time and identifiers (required)</span></span>
-<span>  <span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>,</span>
-<span>  <span class="co"># Birthday variables (required for reference period algorithm)</span></span>
+<span>  <span class="co"># Time and identifiers</span></span>
+<span>  <span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span>,</span>
+<span>  <span class="co"># Birthday variables (for reference period algorithm)</span></span>
 <span>  <span class="st">"V2008"</span>, <span class="st">"V20081"</span>, <span class="st">"V20082"</span>, <span class="st">"V2009"</span>,</span>
-<span>  <span class="co"># Weight and stratification (required for weight calibration)</span></span>
-<span>  <span class="st">"V1028"</span>, <span class="st">"UF"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span>,</span>
-<span>  <span class="co"># Optional but recommended for person-level tracking</span></span>
-<span>  <span class="st">"V2003"</span></span>
+<span>  <span class="co"># Weight and stratification (for weight calibration)</span></span>
+<span>  <span class="st">"V1028"</span>, <span class="st">"UF"</span>, <span class="st">"posest"</span>, <span class="st">"posest_sxi"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Stack all quarters</span></span>
@@ -522,7 +521,7 @@ Started</a> with your real data</li>
 Examples</a>
 </li>
 <li>Learn about the algorithm in <a href="how-it-works.html">How
-mensalizePNADC Works</a>
+PNADCperiods Works</a>
 </li>
 <li>Visit the <a href="https://antrologos.github.io/mensalizePNADC/">package website</a>
 for more resources</li>

@@ -39,6 +39,8 @@
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
     <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/determination-rates-benchmark.html">Benchmark Report</a></li>
   </ul>
 </li>
       </ul>
@@ -165,25 +167,27 @@ calibration approach flexibly</p>
 <td>Panel identifier (rotation group 1-8)</td>
 </tr>
 <tr class="even">
+<td><code>V2003</code></td>
+<td>Person identifier</td>
+</tr>
+<tr class="odd">
 <td><code>V2008</code></td>
 <td>Birth day (1-31, or 99 for unknown)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>V20081</code></td>
 <td>Birth month (1-12, or 99 for unknown)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>V20082</code></td>
 <td>Birth year (or 9999 for unknown)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>V2009</code></td>
 <td>Age</td>
 </tr>
 </tbody>
 </table>
-<p><em>Optional but recommended:</em> <code>V2003</code> (person
-identifier) for person-level tracking.</p>
 </div>
 <div class="section level3">
 <h3 id="step-1-load-your-data">Step 1: Load Your Data<a class="anchor" aria-label="anchor" href="#step-1-load-your-data"></a>
@@ -596,23 +600,27 @@ Cross-quarter aggregation:
 <tr class="odd">
 <td>Single quarter</td>
 <td>65-75%</td>
-<td>~2-5%</td>
-<td>~1-2%</td>
+<td>~3%</td>
+<td>~1%</td>
 </tr>
 <tr class="even">
 <td>Stacked (2+ years)</td>
 <td><strong>~97%</strong></td>
-<td>~2-5%</td>
-<td>~1-2%</td>
+<td>~8%</td>
+<td>~2%</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Important:</strong> Fortnight and week determination rates
-remain low (~2-5% and ~1-2%) regardless of stacking because their
+<p><strong>Important:</strong> Strict fortnight and week determination
+rates remain low (~8% and ~2%) regardless of stacking because their
 constraints cannot aggregate across quarters—each quarter’s interview
 timing is independent at the sub-monthly level. Only month determination
 benefits from cross-quarter aggregation through the rotating panel
 design.</p>
+<p><strong>Experimental strategies:</strong> The
+<code><a href="../reference/pnadc_experimental_periods.html">pnadc_experimental_periods()</a></code> function can boost fortnight
+rates to ~58% and week rates to ~14% using UPA aggregation. See the <a href="determination-rates-benchmark.html">Benchmark Report</a> for
+details.</p>
 </div>
 <div class="section level3">
 <h3 id="what-makes-observations-indeterminate">What Makes Observations Indeterminate?<a class="anchor" aria-label="anchor" href="#what-makes-observations-indeterminate"></a>
@@ -637,6 +645,70 @@ all quarters</li>
 </div>
 </div>
 <div class="section level2">
+<h2 id="experimental-strategies-for-improved-rates">Experimental Strategies for Improved Rates<a class="anchor" aria-label="anchor" href="#experimental-strategies-for-improved-rates"></a>
+</h2>
+<p>For fortnight and week analysis, experimental strategies can
+significantly improve determination rates:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Build standard crosswalk first</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Apply experimental UPA aggregation strategy</span></span>
+<span><span class="va">crosswalk_exp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_experimental_periods.html">pnadc_experimental_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">crosswalk</span>,</span>
+<span>  <span class="va">pnadc_stacked</span>,</span>
+<span>  strategy <span class="op">=</span> <span class="st">"upa_aggregation"</span>  <span class="co"># or "probabilistic" or "both"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Check improvement</span></span>
+<span><span class="va">crosswalk_exp</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  fortnight_strict <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span><span class="op">)</span>,</span>
+<span>  fortnight_upa <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span> <span class="op">|</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_fortnight_upa</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  week_strict <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span><span class="op">)</span>,</span>
+<span>  week_upa <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span> <span class="op">|</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_week_upa</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<table class="table">
+<thead><tr class="header">
+<th>Strategy</th>
+<th>Fortnight %</th>
+<th>Week %</th>
+<th>Notes</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Strict only</td>
+<td>7.64%</td>
+<td>1.54%</td>
+<td>Baseline</td>
+</tr>
+<tr class="even">
+<td>+ Probabilistic</td>
+<td>13.61%</td>
+<td>1.82%</td>
+<td>Adds confidence scores</td>
+</tr>
+<tr class="odd">
+<td>+ UPA aggregation</td>
+<td><strong>57.69%</strong></td>
+<td><strong>14.36%</strong></td>
+<td>Best coverage</td>
+</tr>
+<tr class="even">
+<td>+ Both</td>
+<td><strong>60.33%</strong></td>
+<td><strong>14.60%</strong></td>
+<td>Maximum coverage</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key finding:</strong> UPA homogeneity rate = 100%. When any
+household in a UPA has a strictly determined period, ALL households with
+determined periods in that UPA have the SAME period.</p>
+<p>See the <a href="determination-rates-benchmark.html">Benchmark
+Report</a> for detailed methodology and results.</p>
+<hr>
+</div>
+<div class="section level2">
 <h2 id="next-steps">Next Steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
 </h2>
 <ul>
@@ -650,6 +722,9 @@ unemployment and minimum wage validation.</p></li>
 data? See <a href="annual-poverty-analysis.html">Monthly Poverty
 Analysis with Annual PNADC Data</a> for the workflow using annual
 data.</p></li>
+<li><p><strong>Benchmark report</strong>: See <a href="determination-rates-benchmark.html">Determination Rates
+Benchmark</a> for comprehensive benchmarks on complete 2012-2025 PNADC
+data.</p></li>
 <li><p><strong>Function reference</strong>: Browse the <a href="../reference/index.html">Reference</a> for documentation of all
 exported functions.</p></li>
 </ul>
@@ -661,7 +736,7 @@ exported functions.</p></li>
 <div class="section level3">
 <h3 id="main-functions">Main Functions<a class="anchor" aria-label="anchor" href="#main-functions"></a>
 </h3>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Step 1: Build crosswalk from stacked data</span></span>
 <span><span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span></span>
 <span>  <span class="va">data</span>,              <span class="co"># Stacked PNADC data</span></span>
@@ -697,12 +772,20 @@ exported functions.</p></li>
 <strong>~97%</strong> (on stacked data)</td>
 </tr>
 <tr class="even">
-<td>Fortnight determination rate</td>
-<td>~2-5%</td>
+<td>Fortnight determination rate (strict)</td>
+<td>~8%</td>
 </tr>
 <tr class="odd">
-<td>Week determination rate</td>
-<td>~1-2%</td>
+<td>Week determination rate (strict)</td>
+<td>~2%</td>
+</tr>
+<tr class="even">
+<td>Fortnight rate (+ UPA aggregation)</td>
+<td><strong>~58%</strong></td>
+</tr>
+<tr class="odd">
+<td>Week rate (+ UPA aggregation)</td>
+<td><strong>~14%</strong></td>
 </tr>
 <tr class="even">
 <td>Processing time (identification)</td>
@@ -714,6 +797,8 @@ exported functions.</p></li>
 </tr>
 </tbody>
 </table>
+<p>See the <a href="determination-rates-benchmark.html">Benchmark
+Report</a> for comprehensive benchmarks on 2012-2025 data.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

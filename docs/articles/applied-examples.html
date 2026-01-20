@@ -39,6 +39,8 @@
     <li><a class="dropdown-item" href="../articles/annual-poverty-analysis.html">Annual Poverty Analysis</a></li>
     <li><a class="dropdown-item" href="../articles/complex-survey-design.html">Complex Survey Design</a></li>
     <li><a class="dropdown-item" href="../articles/how-it-works.html">How PNADCperiods Works</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/determination-rates-benchmark.html">Benchmark Report</a></li>
   </ul>
 </li>
       </ul>
@@ -110,7 +112,7 @@ months, the quarterly average would show something like
 a trend reversed direction becomes blurred. Did the economy start
 recovering in May or June? Quarterly data can’t tell you.</p></li>
 </ol>
-<p>The <code>mensalizePNADC</code> package solves this problem by
+<p>The <code>PNADCperiods</code> package solves this problem by
 identifying which specific month each interview refers to, using
 birthday information and IBGE’s interview scheduling rules. With stacked
 data spanning multiple quarters, the algorithm achieves a <strong>97%
@@ -150,24 +152,23 @@ usage.</p>
 <p>This section shows how to create the aggregate time series used in
 the examples below.</p>
 <div class="section level3">
-<h3 id="step-1-load-your-mensalized-data">Step 1: Load Your Mensalized Data<a class="anchor" aria-label="anchor" href="#step-1-load-your-mensalized-data"></a>
+<h3 id="step-1-load-and-mensalize-your-data">Step 1: Load and Mensalize Your Data<a class="anchor" aria-label="anchor" href="#step-1-load-and-mensalize-your-data"></a>
 </h3>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Load the mensalized data from download-and-prepare workflow</span></span>
-<span><span class="co"># This should contain all PNADC variables plus the mensalization results</span></span>
+<code class="sourceCode R"><span><span class="co"># Load your stacked PNADC data (see download-and-prepare vignette)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="http://www.fstpackage.org" class="external-link">fst</a></span><span class="op">)</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="st">"path/to/your/pnadc_mensalized.fst"</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="st">"path/to/your/pnadc_stacked.fst"</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Alternative: If you have full microdata separately, join with crosswalk</span></span>
-<span><span class="va">full_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"path/to/pnadc_full.csv"</span><span class="op">)</span></span>
-<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="st">"path/to/mensalized_crosswalk.fst"</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co"># Build crosswalk (identify reference periods)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span></span>
-<span>  <span class="va">full_data</span>,</span>
-<span>  <span class="va">crosswalk</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">UPA</span>, <span class="va">V1008</span>, <span class="va">V1014</span>, <span class="va">V2003</span>,</span>
-<span>                <span class="va">ref_month</span>, <span class="va">ref_month_in_quarter</span>, <span class="va">ref_month_yyyymm</span>, <span class="va">weight_monthly</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ano"</span>, <span class="st">"Trimestre"</span>, <span class="st">"UPA"</span>, <span class="st">"V1008"</span>, <span class="st">"V1014"</span>, <span class="st">"V2003"</span><span class="op">)</span>,</span>
-<span>  all.x <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="co"># Apply crosswalk with weight calibration</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">pnadc</span>,</span>
+<span>  <span class="va">crosswalk</span>,</span>
+<span>  weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
+<span>  anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
@@ -471,9 +472,13 @@ transition patterns especially clear.</p>
 create them:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Historical minimum wage values (R$)</span></span>
+<span><span class="co"># Note: 2020 had two adjustments (Jan and Feb), 2023 had mid-year adjustment (May)</span></span>
 <span><span class="va">mw_history</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
-<span>  start_yyyymm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">201201</span>, <span class="fl">201301</span>, <span class="fl">201401</span>, <span class="fl">201501</span>, <span class="fl">201601</span>, <span class="fl">201701</span>, <span class="fl">201801</span>, <span class="fl">201901</span>, <span class="fl">202001</span>, <span class="fl">202002</span>, <span class="fl">202101</span>, <span class="fl">202201</span>, <span class="fl">202301</span>, <span class="fl">202401</span>, <span class="fl">202501</span><span class="op">)</span>,</span>
-<span>  mw_value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">622</span>, <span class="fl">678</span>, <span class="fl">724</span>, <span class="fl">788</span>, <span class="fl">880</span>, <span class="fl">937</span>, <span class="fl">954</span>, <span class="fl">998</span>, <span class="fl">1039</span>, <span class="fl">1045</span>, <span class="fl">1100</span>, <span class="fl">1212</span>, <span class="fl">1302</span>, <span class="fl">1412</span>, <span class="fl">1518</span><span class="op">)</span></span>
+<span>  start_yyyymm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">201201</span>, <span class="fl">201301</span>, <span class="fl">201401</span>, <span class="fl">201501</span>, <span class="fl">201601</span>, <span class="fl">201701</span>, <span class="fl">201801</span>,</span>
+<span>                   <span class="fl">201901</span>, <span class="fl">202001</span>, <span class="fl">202002</span>, <span class="fl">202101</span>, <span class="fl">202201</span>, <span class="fl">202301</span>, <span class="fl">202305</span>,</span>
+<span>                   <span class="fl">202401</span>, <span class="fl">202501</span><span class="op">)</span>,</span>
+<span>  mw_value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">622</span>, <span class="fl">678</span>, <span class="fl">724</span>, <span class="fl">788</span>, <span class="fl">880</span>, <span class="fl">937</span>, <span class="fl">954</span>, <span class="fl">998</span>, <span class="fl">1039</span>, <span class="fl">1045</span>, <span class="fl">1100</span>,</span>
+<span>               <span class="fl">1212</span>, <span class="fl">1302</span>, <span class="fl">1320</span>, <span class="fl">1412</span>, <span class="fl">1518</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">mw_adjustment_months</span> <span class="op">&lt;-</span> <span class="va">mw_history</span><span class="op">$</span><span class="va">start_yyyymm</span></span>
 <span></span>
@@ -732,7 +737,7 @@ correctly identifies reference months.</p>
 </tr>
 </tbody>
 </table>
-<p>Monthly data from <code>mensalizePNADC</code> enables:</p>
+<p>Monthly data from <code>PNADCperiods</code> enables:</p>
 <ul>
 <li>
 <strong>Precise timing</strong> of economic turning points</li>
@@ -747,6 +752,255 @@ averages)</li>
 <hr>
 </div>
 <div class="section level2">
+<h2 id="beyond-monthly-fortnightly-and-weekly-analysis">4. Beyond Monthly: Fortnightly and Weekly Analysis<a class="anchor" aria-label="anchor" href="#beyond-monthly-fortnightly-and-weekly-analysis"></a>
+</h2>
+<p>The examples above demonstrate the power of monthly disaggregation.
+But <code>PNADCperiods</code> can go even finer: the package also
+identifies <strong>fortnightly</strong> (quinzenal, 15-day periods) and
+<strong>weekly</strong> reference periods for each observation.</p>
+<div class="section level3">
+<h3 id="when-does-finer-granularity-matter">When Does Finer Granularity Matter?<a class="anchor" aria-label="anchor" href="#when-does-finer-granularity-matter"></a>
+</h3>
+<p>Some phenomena unfold faster than monthly cycles:</p>
+<ul>
+<li>
+<strong>Rapid policy shocks</strong>: COVID-19 lockdowns began
+mid-March 2020—the monthly average blends pre- and post-lockdown</li>
+<li>
+<strong>Holiday effects</strong>: Carnival, Christmas, and New Year
+have distinctive within-month labor market patterns</li>
+<li>
+<strong>Transition timing</strong>: Knowing exactly which fortnight
+or week a change occurred can matter for event studies</li>
+</ul>
+<p>However, finer granularity comes at a cost: <strong>smaller
+samples</strong>.</p>
+</div>
+<div class="section level3">
+<h3 id="the-sample-size-trade-off">The Sample Size Trade-Off<a class="anchor" aria-label="anchor" href="#the-sample-size-trade-off"></a>
+</h3>
+<table class="table">
+<thead><tr class="header">
+<th>Granularity</th>
+<th>Determination Rate</th>
+<th>Typical Obs/Period</th>
+<th>Best For</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Monthly</td>
+<td>~97%</td>
+<td>~65,000</td>
+<td>Most analyses</td>
+</tr>
+<tr class="even">
+<td>Fortnightly</td>
+<td>~3%</td>
+<td>~3,000</td>
+<td>Transition timing</td>
+</tr>
+<tr class="odd">
+<td>Weekly</td>
+<td>~1%</td>
+<td>~500</td>
+<td>Shock detection</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why the low rates for fortnights and weeks?</strong> Unlike
+months, which aggregate constraints across multiple quarterly visits
+(leveraging the panel design), fortnights and weeks can only use
+information from within a single quarter. The birthday constraints
+rarely narrow the interview window to a single 15-day or 7-day
+period.</p>
+</div>
+<div class="section level3">
+<h3 id="example-covid-19-lockdown-at-fortnightly-resolution">Example: COVID-19 Lockdown at Fortnightly Resolution<a class="anchor" aria-label="anchor" href="#example-covid-19-lockdown-at-fortnightly-resolution"></a>
+</h3>
+<p>The COVID-19 pandemic provides a compelling test case. Brazilian
+lockdowns began around March 16, 2020—almost perfectly aligned with the
+fortnight boundary. Monthly data for March averages the pre-lockdown
+first half with the post-lockdown second half. Fortnightly data can
+separate them.</p>
+<p>We examine <strong>labor force participation</strong>, which dropped
+sharply as workers exited the labor market entirely (not just becoming
+unemployed, but stopping their job search):</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># For fortnightly analysis, we need observations with determined fortnights</span></span>
+<span><span class="va">pnadc_fortnight</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_fortnight</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">Ano</span> <span class="op">==</span> <span class="fl">2020</span> <span class="op">&amp;</span> <span class="va">Trimestre</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Compute participation rate by fortnight</span></span>
+<span><span class="va">fortnight_covid</span> <span class="op">&lt;-</span> <span class="va">pnadc_fortnight</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  participation_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_fortnight</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
+<span>                       <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight_fortnight</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>  unemployment_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">unemployed</span> <span class="op">*</span> <span class="va">weight_fortnight</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
+<span>                      <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">pea</span> <span class="op">*</span> <span class="va">weight_fortnight</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>  n_obs <span class="op">=</span> <span class="va">.N</span></span>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span>, <span class="va">ref_fortnight_in_quarter</span>, <span class="va">ref_fortnight_yyyyff</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Add period Date column (1st or 16th of month)</span></span>
+<span><span class="va">fortnight_covid</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
+<span>  month <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">ref_fortnight_yyyyff</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">100</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1L</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">2L</span> <span class="op">+</span> <span class="fl">1L</span>,</span>
+<span>  day <span class="op">=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">ref_fortnight_yyyyff</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2L</span> <span class="op">==</span> <span class="fl">1L</span>, <span class="fl">1L</span>, <span class="fl">16L</span><span class="op">)</span>,</span>
+<span>  year <span class="op">=</span> <span class="va">ref_fortnight_yyyyff</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">100L</span></span>
+<span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">fortnight_covid</span><span class="op">[</span>, <span class="va">period</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">year</span>, <span class="va">month</span>, <span class="va">day</span>, sep <span class="op">=</span> <span class="st">"-"</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Create plot comparing monthly vs fortnightly</span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="co"># Monthly as reference</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_monthly_participation</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"darkred"</span>, linewidth <span class="op">=</span> <span class="fl">1</span>, alpha <span class="op">=</span> <span class="fl">0.7</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_monthly_participation</span>,</span>
+<span>             <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"darkred"</span>, size <span class="op">=</span> <span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Fortnightly</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_fortnight_participation</span>,</span>
+<span>            <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span><span class="op">)</span>,</span>
+<span>            color <span class="op">=</span> <span class="st">"#ff7f0e"</span>, linewidth <span class="op">=</span> <span class="fl">0.8</span>, linetype <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">covid_fortnight_participation</span>,</span>
+<span>             <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">period</span>, y <span class="op">=</span> <span class="va">participation_rate</span><span class="op">)</span>,</span>
+<span>             color <span class="op">=</span> <span class="st">"#ff7f0e"</span>, size <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="co"># Mark lockdown transition</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_vline</a></span><span class="op">(</span>xintercept <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="st">"2020-03-16"</span><span class="op">)</span>,</span>
+<span>             linetype <span class="op">=</span> <span class="st">"dotted"</span>, color <span class="op">=</span> <span class="st">"gray40"</span><span class="op">)</span> <span class="op">+</span></span>
+<span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu"><a href="https://scales.r-lib.org/reference/percent_format.html" class="external-link">percent_format</a></span><span class="op">(</span>accuracy <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_date.html" class="external-link">scale_x_date</a></span><span class="op">(</span>date_breaks <span class="op">=</span> <span class="st">"1 month"</span>, date_labels <span class="op">=</span> <span class="st">"%b\n%Y"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
+<span>    title <span class="op">=</span> <span class="st">"COVID-19 Labor Force Participation: Monthly vs Fortnightly"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="st">"Fortnightly data (orange) reveals sharper discontinuity at lockdown onset"</span>,</span>
+<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Labor Force Participation Rate"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"Monthly (red): ~65,000 obs/month | Fortnightly (orange): ~3,000 obs/fortnight"</span></span>
+<span>  <span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span></span></code></pre></div>
+<div class="float">
+<img src="figures/applied-examples/fig-covid-fortnight-comparison.png" style="width:100.0%" alt="COVID Lockdown: Monthly vs Fortnightly"><div class="figcaption">COVID Lockdown: Monthly vs Fortnightly</div>
+</div>
+<p>The fortnightly data shows a sharper discontinuity around March
+16—the participation rate in the second fortnight of March (Mar-2)
+dropped more steeply than the monthly average suggests. This
+demonstrates how fortnightly resolution can capture transition timing
+more precisely.</p>
+</div>
+<div class="section level3">
+<h3 id="example-carnival-week-labor-market-effects">Example: Carnival Week Labor Market Effects<a class="anchor" aria-label="anchor" href="#example-carnival-week-labor-market-effects"></a>
+</h3>
+<p>Carnival is Brazil’s largest cultural event, concentrated in specific
+states (Bahia, Rio de Janeiro, Pernambuco) and occurring during a
+specific week each year. Do workers reduce their hours during Carnival
+week?</p>
+<p>This is a challenging analysis due to the ~1% weekly determination
+rate. To increase sample size, we <strong>pool multiple years</strong>
+(2019, 2022-2024, excluding COVID years) and compare Carnival states to
+other states. We use <strong>average hours worked</strong> (VD4035) as
+our indicator, which should show a clear drop during Carnival:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Filter to Q1 of Carnival years (2019, 2022-2024)</span></span>
+<span><span class="co"># Use observations with determined weeks (among employed with valid hours)</span></span>
+<span><span class="va">carnival_years</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2019L</span>, <span class="fl">2022L</span>, <span class="fl">2023L</span>, <span class="fl">2024L</span><span class="op">)</span></span>
+<span><span class="va">pnadc_weekly</span> <span class="op">&lt;-</span> <span class="va">pnadc</span><span class="op">[</span></span>
+<span>  <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_week_in_quarter</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">Trimestre</span> <span class="op">==</span> <span class="fl">1L</span> <span class="op">&amp;</span> <span class="va">Ano</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">carnival_years</span> <span class="op">&amp;</span></span>
+<span>  <span class="va">employed</span> <span class="op">==</span> <span class="fl">1L</span> <span class="op">&amp;</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">VD4035</span><span class="op">)</span></span>
+<span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Define Carnival weeks (ISO week of Carnival Tuesday varies by year)</span></span>
+<span><span class="co"># 2019: Week 10 | 2022: Week 9 | 2023: Week 8 | 2024: Week 7</span></span>
+<span><span class="va">carnival_weeks</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
+<span>  Ano <span class="op">=</span> <span class="va">carnival_years</span>,</span>
+<span>  carnival_iso_week <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10L</span>, <span class="fl">9L</span>, <span class="fl">8L</span>, <span class="fl">7L</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Extract ISO week and merge</span></span>
+<span><span class="va">pnadc_weekly</span><span class="op">[</span>, <span class="va">iso_week</span> <span class="op">:=</span> <span class="va">ref_week_yyyyww</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">100L</span><span class="op">]</span></span>
+<span><span class="va">pnadc_weekly</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">pnadc_weekly</span>, <span class="va">carnival_weeks</span>, by <span class="op">=</span> <span class="st">"Ano"</span>, all.x <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">pnadc_weekly</span><span class="op">[</span>, <span class="va">is_carnival_week</span> <span class="op">:=</span> <span class="op">(</span><span class="va">iso_week</span> <span class="op">==</span> <span class="va">carnival_iso_week</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Flag Carnival-intensive states (BA=29, RJ=33, PE=26)</span></span>
+<span><span class="va">pnadc_weekly</span><span class="op">[</span>, <span class="va">is_carnival_state</span> <span class="op">:=</span> <span class="va">UF</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">29L</span>, <span class="fl">33L</span>, <span class="fl">26L</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Aggregate: Average hours worked by Carnival vs non-Carnival weeks × region</span></span>
+<span><span class="va">weekly_carnival</span> <span class="op">&lt;-</span> <span class="va">pnadc_weekly</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  avg_hours_worked <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">VD4035</span> <span class="op">*</span> <span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">/</span></span>
+<span>                     <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">V1028</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>  n_obs <span class="op">=</span> <span class="va">.N</span></span>
+<span><span class="op">)</span>, by <span class="op">=</span> <span class="fu">.</span><span class="op">(</span><span class="va">is_carnival_week</span>, <span class="va">is_carnival_state</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Create difference-in-differences plot</span></span>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">weekly_carnival</span>,</span>
+<span>       <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">is_carnival_week</span>, <span class="st">"Carnival Week"</span>, <span class="st">"Other Weeks"</span><span class="op">)</span>,</span>
+<span>           y <span class="op">=</span> <span class="va">avg_hours_worked</span>,</span>
+<span>           fill <span class="op">=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">is_carnival_state</span>, <span class="st">"Carnival States (BA/RJ/PE)"</span>, <span class="st">"Other States"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_bar.html" class="external-link">geom_col</a></span><span class="op">(</span>position <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/position_dodge.html" class="external-link">position_dodge</a></span><span class="op">(</span>width <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span>, width <span class="op">=</span> <span class="fl">0.7</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html" class="external-link">scale_y_continuous</a></span><span class="op">(</span>limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">45</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html" class="external-link">scale_fill_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Carnival States (BA/RJ/PE)"</span> <span class="op">=</span> <span class="st">"#ff7f0e"</span>,</span>
+<span>                               <span class="st">"Other States"</span> <span class="op">=</span> <span class="st">"#1f77b4"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
+<span>    title <span class="op">=</span> <span class="st">"Average Hours Worked by Week Type and Region"</span>,</span>
+<span>    subtitle <span class="op">=</span> <span class="st">"Pooled data from Q1 2019, 2022-2024"</span>,</span>
+<span>    x <span class="op">=</span> <span class="cn">NULL</span>, y <span class="op">=</span> <span class="st">"Average Hours Worked (per week)"</span>,</span>
+<span>    fill <span class="op">=</span> <span class="st">"Region"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"Weekly determination rate: ~1%. Data pooled across 4 years."</span></span>
+<span>  <span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">11</span><span class="op">)</span></span></code></pre></div>
+<div class="float">
+<img src="figures/applied-examples/fig-carnival-weekly-did.png" style="width:100.0%" alt="Carnival Week Effects"><div class="figcaption">Carnival Week Effects</div>
+</div>
+<p>The comparison shows that workers in Carnival-intensive states
+(BA/RJ/PE) reduce their average hours worked during Carnival week
+(34.8h) compared to other weeks (36.9h)—a drop of about 2 hours. The
+pattern provides evidence of Carnival’s labor market impact, though the
+small weekly sample sizes mean estimates have considerable
+uncertainty.</p>
+</div>
+<div class="section level3">
+<h3 id="practical-guidelines-for-sub-monthly-analysis">Practical Guidelines for Sub-Monthly Analysis<a class="anchor" aria-label="anchor" href="#practical-guidelines-for-sub-monthly-analysis"></a>
+</h3>
+<table class="table">
+<thead><tr class="header">
+<th>Question Type</th>
+<th>Recommended Granularity</th>
+<th>Sample Strategy</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>“How much changed?”</td>
+<td>Monthly</td>
+<td>Standard</td>
+</tr>
+<tr class="even">
+<td>“When exactly did it change?”</td>
+<td>Fortnight</td>
+<td>National-level only</td>
+</tr>
+<tr class="odd">
+<td>“Was there a within-week pattern?”</td>
+<td>Weekly</td>
+<td>Pool multiple years</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key takeaways:</strong></p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>Monthly analysis handles most use cases</strong> with high
+determination rates and robust samples</li>
+<li>
+<strong>Fortnightly analysis</strong> works for detecting transition
+timing when the fortnight boundary aligns with the event of interest
+(e.g., mid-month policy changes)</li>
+<li>
+<strong>Weekly analysis</strong> requires pooling multiple years and
+focusing on aggregate patterns; subgroup analysis is rarely
+feasible</li>
+</ol>
+<hr>
+</div>
+</div>
+<div class="section level2">
 <h2 id="reproducing-these-results">Reproducing These Results<a class="anchor" aria-label="anchor" href="#reproducing-these-results"></a>
 </h2>
 <p>To reproduce the analyses in this vignette:</p>
@@ -755,18 +1009,19 @@ averages)</li>
 <li>Stack multiple quarters (we recommend at least 2 years)</li>
 <li>Apply mensalization:</li>
 </ol>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/mensalizePNADC/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load your stacked PNADC data</span></span>
 <span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"your_pnadc_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Build crosswalk and apply with weight computation</span></span>
+<span><span class="co"># Build crosswalk and apply with weight calibration</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk</span>,</span>
 <span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
-<span>                               anchor <span class="op">=</span> <span class="st">"quarter"</span><span class="op">)</span></span>
+<span>                               anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
+<span>                               calibrate <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Compute monthly series</span></span>
 <span><span class="va">monthly_total</span> <span class="op">&lt;-</span> <span class="va">result</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">weight_monthly</span><span class="op">)</span>, <span class="fu">.</span><span class="op">(</span></span>

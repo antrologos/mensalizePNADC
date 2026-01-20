@@ -5,10 +5,11 @@ articles:
   annual-poverty-analysis: annual-poverty-analysis.html
   applied-examples: applied-examples.html
   complex-survey-design: complex-survey-design.html
+  determination-rates-benchmark: determination-rates-benchmark.html
   download-and-prepare: download-and-prepare.html
   getting-started: getting-started.html
   how-it-works: how-it-works.html
-last_built: 2026-01-17T18:31Z
+last_built: 2026-01-20T11:03Z
 urls:
   reference: https://antrologos.github.io/mensalizePNADC/reference
   article: https://antrologos.github.io/mensalizePNADC/articles

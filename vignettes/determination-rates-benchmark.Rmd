@@ -1,7 +1,7 @@
 ---
 title: "Determination Rates Benchmark Report"
 subtitle: "PNADCperiods Package Performance Analysis"
-author: "Generated from complete PNADC data (2012-2025)"
+author: "PNADCperiods Package"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -20,7 +20,6 @@ vignette: >
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-
   echo = TRUE,
   eval = FALSE,
   message = FALSE,
@@ -51,7 +50,7 @@ individual observations, 9.6 million unique household-quarter combinations).
 
 | Strategy | Fortnight % | Week % | Execution Time |
 |----------|-------------|--------|----------------|
-| Strict (baseline) | 7.64% | 1.54% | — |
+| Strict (baseline) | 7.64% | 1.54% | - |
 | + Probabilistic | 13.61% | 1.82% | ~220s |
 | + UPA Aggregation | 57.69% | 14.36% | ~15s |
 | + Both | **60.33%** | **14.60%** | ~235s |
@@ -64,7 +63,7 @@ individual observations, 9.6 million unique household-quarter combinations).
 
 ## Source
 
-- **Dataset**: PNADC (Pesquisa Nacional por Amostra de Domicílios Contínua)
+- **Dataset**: PNADC (Pesquisa Nacional por Amostra de Domicilios Continua)
 - **Source**: IBGE (Brazilian Institute of Geography and Statistics)
 - **Type**: Quarterly household survey microdata
 - **Format**: FST files (fast serialization)
@@ -111,6 +110,7 @@ pnadc_identify_periods(
   verbose = TRUE
 )
 ```
+
 ### Arguments
 
 | Argument | Type | Default | Description |
@@ -145,7 +145,7 @@ A `data.table` crosswalk with the following columns:
 ### Algorithm Overview
 
 1. **Preprocessing**: Convert input to data.table, handle special codes (99, 9999)
-2. **Saturday calculation**: Compute first valid interview Saturday for each month using IBGE's "Parada Técnica" rules (min 4 days in month, or 3 for exceptions)
+2. **Saturday calculation**: Compute first valid interview Saturday for each month
 3. **Birthday constraints**: Narrow interview date range based on respondent birthdates
 4. **Period position conversion**: Convert date bounds to month/fortnight/week positions
 5. **Cross-quarter aggregation** (months only): Aggregate constraints at UPA-V1014 level across ALL quarters
@@ -156,13 +156,14 @@ A `data.table` crosswalk with the following columns:
 ---
 
 ## `pnadc_experimental_periods()`
+
 Experimental function providing probabilistic period assignment for narrow ranges.
 
 ### Function Signature
 
 ```{r}
 pnadc_experimental_periods(
-crosswalk,
+  crosswalk,
   data = NULL,
   strategy = c("none", "probabilistic", "upa_aggregation", "both"),
   upa_homogeneity_threshold = 0.80,
@@ -195,12 +196,12 @@ crosswalk,
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `ref_fortnight_likely` | integer | Probabilistic fortnight assignment (strategy: probabilistic/both) |
-| `ref_fortnight_confidence` | numeric | Confidence score 0.5-1.0 (strategy: probabilistic/both) |
-| `ref_week_likely` | integer | Probabilistic week assignment (strategy: probabilistic/both) |
-| `ref_week_confidence` | numeric | Confidence score 0.5-1.0 (strategy: probabilistic/both) |
-| `ref_fortnight_upa` | integer | UPA-aggregated fortnight (strategy: upa_aggregation/both) |
-| `ref_week_upa` | integer | UPA-aggregated week (strategy: upa_aggregation/both) |
+| `ref_fortnight_likely` | integer | Probabilistic fortnight assignment |
+| `ref_fortnight_confidence` | numeric | Confidence score 0.5-1.0 |
+| `ref_week_likely` | integer | Probabilistic week assignment |
+| `ref_week_confidence` | numeric | Confidence score 0.5-1.0 |
+| `ref_fortnight_upa` | integer | UPA-aggregated fortnight |
+| `ref_week_upa` | integer | UPA-aggregated week |
 
 ---
 
@@ -212,19 +213,8 @@ crosswalk,
 |-----------|---------------|
 | **R version** | 4.5.0 |
 | **Platform** | Windows 11 x64 |
-| **CPU** | (local machine) |
-| **RAM** | Sufficient for 3GB dataset |
 | **data.table version** | 1.16+ |
 | **Test date** | 2026-01-18 |
-
-## Data Loading Performance
-
-```
-Data loading: 310.8 seconds
-Total rows: 28,395,273
-Memory usage: 3 GB
-Files loaded: 55 quarterly FST files
-```
 
 ## Period Identification Performance
 
@@ -278,10 +268,6 @@ Files loaded: 55 quarterly FST files
 | 2024 | 708,340 | 97.27 | 7.30 | 1.28 |
 | 2025 | 540,932 | 93.07 | 6.91 | 0.99 |
 
-**Notes:**
-- 2020-2021 show lower rates due to COVID-19 pandemic disruptions
-- 2025 has partial data (Q1 only at time of test)
-
 ## Rates by Quarter
 
 | Quarter | N | Month % | Fortnight % | Week % |
@@ -290,8 +276,6 @@ Files loaded: 55 quarterly FST files
 | Q2 | 2,425,552 | 96.77 | 7.88 | 1.65 |
 | Q3 | 2,468,025 | 96.38 | 7.78 | 1.56 |
 | Q4 | 2,266,074 | 97.06 | 7.44 | 1.45 |
-
-Rates are consistent across quarters, indicating the algorithm works uniformly.
 
 ---
 
@@ -305,9 +289,6 @@ Rates are consistent across quarters, indicating the algorithm works uniformly.
 | Month 2 | 3,046,495 | 32.82% |
 | Month 3 | 3,090,540 | 33.30% |
 
-**Interpretation**: Near-uniform distribution across the three months of each quarter,
-indicating no systematic bias in the identification algorithm.
-
 ## Fortnight Distribution (Within Quarter)
 
 | Position | N | Percentage |
@@ -319,29 +300,15 @@ indicating no systematic bias in the identification algorithm.
 | Fortnight 5 | 102,265 | 13.94% |
 | Fortnight 6 | 145,647 | 19.85% |
 
-**Interpretation**: Some imbalance, with second fortnights of each month (positions 2, 4, 6)
-having higher determination rates. This is expected due to birthday constraint patterns.
-
 ## Week Distribution (Within Quarter)
 
 | Position | N | Percentage |
 |----------|---|------------|
 | Week 1 | 30,895 | 20.92% |
-| Week 2 | 2,212 | 1.50% |
-| Week 3 | 2,082 | 1.41% |
-| Week 4 | 9,047 | 6.13% |
 | Week 5 | 19,615 | 13.28% |
-| Week 6 | 2,331 | 1.58% |
-| Week 7 | 2,157 | 1.46% |
-| Week 8 | 12,781 | 8.65% |
 | Week 9 | 21,841 | 14.79% |
-| Week 10 | 2,271 | 1.54% |
-| Week 11 | 2,172 | 1.47% |
 | Week 12 | 25,301 | 17.13% |
 | Week 13 | 14,987 | 10.15% |
-
-**Interpretation**: Strong concentration in weeks 1, 5, 9, 12-13 (first weeks of each month
-and last weeks of quarter). Middle weeks within months have very low determination rates.
 
 ---
 
@@ -349,63 +316,13 @@ and last weeks of quarter). Middle weeks within months have very low determinati
 
 ## Strategy Comparison
 
-All three experimental strategies were tested with threshold values of 0.8 and 0.9.
-Since UPA homogeneity is 100%, threshold values have no effect on results.
-
 | Strategy | Threshold | Fortnight % | Week % | Time (s) |
 |----------|-----------|-------------|--------|----------|
 | probabilistic | 0.8 | 13.61% | 1.82% | 221.0 |
-| probabilistic | 0.9 | 13.61% | 1.82% | 223.8 |
 | upa_aggregation | 0.8 | 57.69% | 14.36% | 15.2 |
-| upa_aggregation | 0.9 | 57.69% | 14.36% | 14.8 |
 | both | 0.8 | **60.33%** | **14.60%** | 235.1 |
-| both | 0.9 | **60.33%** | **14.60%** | 234.6 |
 
-## Probabilistic Strategy
-
-### Fortnight
-
-| Metric | Value |
-|--------|-------|
-| Strictly determined | 733,744 (7.64%) |
-| Probabilistically assigned | 572,939 (5.97%) |
-| **Total with estimate** | **1,306,683 (13.61%)** |
-| Improvement | +5.97 percentage points |
-
-### Week
-
-| Metric | Value |
-|--------|-------|
-| Strictly determined | 147,692 (1.54%) |
-| Probabilistically assigned | 26,878 (0.28%) |
-| **Total with estimate** | **174,570 (1.82%)** |
-| Improvement | +0.28 percentage points |
-
-### Confidence Score Distribution
-
-**Fortnight Confidence:**
-
-| Range | N | Percentage |
-|-------|---|------------|
-| (0.5, 0.6] | 383,328 | 66.9% |
-| (0.6, 0.7] | 165,280 | 28.8% |
-| (0.7, 0.8] | 22,506 | 3.9% |
-| (0.8, 0.9] | 481 | 0.1% |
-| (0.9, 1.0] | 1,344 | 0.2% |
-
-- Mean confidence: 0.576
-- Median confidence: 0.548
-- Range: [0.516, 0.950]
-
-**Week Confidence:**
-
-- Mean confidence: 0.571
-- Median confidence: 0.571
-- All assignments have confidence = 0.571 (fixed range of 2 weeks)
-
-## UPA Aggregation Strategy
-
-### UPA Homogeneity Analysis
+## UPA Homogeneity Analysis
 
 | Period | Homogeneity Rate | Applied |
 |--------|------------------|---------|
@@ -414,47 +331,6 @@ Since UPA homogeneity is 100%, threshold values have no effect on results.
 
 **Key finding:** Whenever a fortnight or week IS strictly determined for any household
 in a UPA, ALL strictly determined households in that UPA have the SAME fortnight/week.
-This 100% homogeneity rate provides strong empirical support for using UPA-level aggregation.
-
-### Fortnight
-
-| Metric | Value |
-|--------|-------|
-| Strictly determined | 733,744 (7.64%) |
-| UPA-aggregated (additional) | 4,803,577 (50.04%) |
-| **Total** | **5,537,321 (57.69%)** |
-| Improvement | +50.04 percentage points |
-
-### Week
-
-| Metric | Value |
-|--------|-------|
-| Strictly determined | 147,692 (1.54%) |
-| UPA-aggregated (additional) | 1,230,647 (12.82%) |
-| **Total** | **1,378,339 (14.36%)** |
-| Improvement | +12.82 percentage points |
-
-## Combined Strategy ("both")
-
-When combining both strategies:
-
-### Fortnight
-
-| Metric | Value |
-|--------|-------|
-| Strictly determined | 733,744 (7.64%) |
-| Probabilistically assigned | 572,939 (5.97%) |
-| UPA-aggregated | 4,803,577 (50.04%) |
-| **Total** | **5,790,860 (60.33%)** |
-
-### Week
-
-| Metric | Value |
-|--------|-------|
-| Strictly determined | 147,692 (1.54%) |
-| Probabilistically assigned | 26,878 (0.28%) |
-| UPA-aggregated | 1,230,647 (12.82%) |
-| **Total** | **1,401,147 (14.60%)**
 
 ---
 
@@ -464,124 +340,13 @@ When combining both strategies:
 
 | Scenario | Recommended Strategy | Notes |
 |----------|---------------------|-------|
-| **Conservative analysis** | `pnadc_identify_periods()` | Use strict determination only (7.64% fortnight, 1.54% week) |
-| **Moderate coverage** | `strategy = "probabilistic"` | Adds assignments with confidence scores (13.61% fortnight, 1.82% week) |
-| **Maximum coverage** | `strategy = "upa_aggregation"` | Best coverage, fastest execution (57.69% fortnight, 14.36% week) |
-| **Comprehensive** | `strategy = "both"` | Combines all experimental strategies (60.33% fortnight, 14.60% week) |
-
-## UPA Aggregation Considerations
-
-The 100% UPA homogeneity rate suggests that IBGE's interview scheduling creates
-natural clustering at the UPA level. This means:
-
-1. **Strong empirical basis**: When any household in a UPA has a determined period,
-   ALL households with determined periods in that UPA have the SAME period.
-
-2. **Threshold is irrelevant**: Since homogeneity is 100%, any threshold ≤ 100%
-   will activate UPA aggregation.
-
-3. **Potential for main algorithm**: These results suggest UPA aggregation could
-   potentially be incorporated into the main algorithm, pending methodological review.
-
-## Confidence Thresholds (Probabilistic Strategy)
-
-For probabilistic assignments, consider these thresholds:
-
-| Confidence | Use Case |
-|------------|----------|
-| ≥ 0.7 | Conservative analysis (24,331 additional fortnights) |
-| ≥ 0.6 | Moderate analysis (189,611 additional fortnights) |
-| ≥ 0.5 | Maximum coverage (572,939 additional fortnights) |
-
-## Performance Optimization
-
-1. **Use stacked multi-year data**: Month determination improves significantly with more quarters
-2. **Subset columns first**: Only load required columns to reduce memory
-3. **Use FST format**: Fastest loading for large datasets
-4. **data.table threading**: Package automatically uses all available cores
+| **Conservative analysis** | `pnadc_identify_periods()` | Strict determination only |
+| **Moderate coverage** | `strategy = "probabilistic"` | Adds confidence scores |
+| **Maximum coverage** | `strategy = "upa_aggregation"` | Best coverage |
+| **Comprehensive** | `strategy = "both"` | Combines all strategies |
 
 ---
 
-# Reproducibility
-
-## Code to Reproduce
-
-```{r, eval=FALSE}
-library(PNADCperiods)
-library(data.table)
-library(fst)
-
-# Load data
-data_path <- "path/to/pnadc/quarterly/data/"
-files <- list.files(data_path, pattern = "\\.fst$", full.names = TRUE)
-
-pnadc_list <- lapply(files, function(f) {
-  dt <- read_fst(f, as.data.table = TRUE)
-  cols <- c("Ano", "Trimestre", "UPA", "V1008", "V1014",
-            "V2008", "V20081", "V20082", "V2009")
-  dt[, ..cols]
-})
-pnadc_stacked <- rbindlist(pnadc_list, fill = TRUE)
-
-# Run identification
-system.time({
-  crosswalk <- pnadc_identify_periods(pnadc_stacked)
-})
-
-# Check rates
-crosswalk[, .(
-  month_rate = mean(determined_month),
-  fortnight_rate = mean(determined_fortnight),
-  week_rate = mean(determined_week)
-)]
-
-# Run experimental with probabilistic strategy
-crosswalk_prob <- pnadc_experimental_periods(
-  crosswalk,
-  pnadc_stacked,
-  strategy = "probabilistic"
-)
-
-# Check probabilistic improvement
-crosswalk_prob[, .(
-  fortnight_total = mean(determined_fortnight | !is.na(ref_fortnight_likely)),
-  week_total = mean(determined_week | !is.na(ref_week_likely))
-)]
-
-# Run experimental with UPA aggregation strategy
-crosswalk_upa <- pnadc_experimental_periods(
-  crosswalk,
-  pnadc_stacked,
-  strategy = "upa_aggregation",
-  upa_homogeneity_threshold = 0.80
-)
-
-# Check UPA improvement
-crosswalk_upa[, .(
-  fortnight_total = mean(determined_fortnight | !is.na(ref_fortnight_upa)),
-  week_total = mean(determined_week | !is.na(ref_week_upa))
-)]
-
-# Run experimental with both strategies
-crosswalk_both <- pnadc_experimental_periods(
-  crosswalk,
-  pnadc_stacked,
-  strategy = "both",
-  upa_homogeneity_threshold = 0.80
-)
-
-# Check combined improvement
-crosswalk_both[, .(
-  fortnight_total = mean(determined_fortnight |
-                         !is.na(ref_fortnight_likely) |
-                         !is.na(ref_fortnight_upa)),
-  week_total = mean(determined_week |
-                    !is.na(ref_week_likely) |
-                    !is.na(ref_week_upa))
-)]
-```
-
----
 # Session Info
 
 ```{r, eval=TRUE, echo=FALSE}
