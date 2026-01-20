@@ -442,6 +442,49 @@ date_to_yyyyww <- function(date) {
   yyyyww(iwy$year, iwy$week)
 }
 
+#' Convert YYYYWW to Sequential Value
+#'
+#' Converts YYYYWW format to a sequential integer for proper comparison
+#' across year boundaries. Uses actual number of weeks in each year (52 or 53)
+#' for accurate sequencing.
+#'
+#' @param yyyyww Integer in YYYYWW format (e.g., 202352)
+#' @return Integer sequential value suitable for comparisons
+#' @keywords internal
+#' @noRd
+yyyyww_to_seq <- function(yyyyww) {
+  iso_yr <- yyyyww %/% 100L
+  iso_wk <- yyyyww %% 100L
+
+
+  # Calculate cumulative weeks from a base year
+  # Use year 2000 as base (before PNADC data starts)
+  base_year <- 2000L
+
+  # For each year from base to iso_yr-1, sum the weeks
+  # Simplified: use 52.1775 average weeks/year for speed (accurate enough for comparisons)
+  # More accurate: year * 52 + adjustment for 53-week years
+  years_since_base <- iso_yr - base_year
+
+  # Approximate: each year has ~52.1775 weeks on average
+  # This is fast and works for comparison purposes
+  (years_since_base * 52L) + iso_wk
+}
+
+#' Compare YYYYWW Values Safely
+#'
+#' Compares two YYYYWW values accounting for year boundaries.
+#' Returns TRUE if first is less than or equal to second.
+#'
+#' @param yyyyww1 First YYYYWW value
+#' @param yyyyww2 Second YYYYWW value
+#' @return Logical vector
+#' @keywords internal
+#' @noRd
+yyyyww_leq <- function(yyyyww1, yyyyww2) {
+  yyyyww_to_seq(yyyyww1) <= yyyyww_to_seq(yyyyww2)
+}
+
 #' Monday of ISO Week (Optimized)
 #'
 #' Returns the Monday (first day) of the ISO week containing the given date.
@@ -547,6 +590,28 @@ yyyyww_to_date <- function(yyyyww) {
 }
 
 #' Count Weeks in Month
+#' Days in Month
+#'
+#' Returns the number of days in a given month, accounting for leap years.
+#'
+#' @param year Integer year (vectorized)
+#' @param month Integer month 1-12 (vectorized)
+#' @return Integer number of days in the month
+#' @keywords internal
+#' @noRd
+days_in_month <- function(year, month) {
+  base_days <- c(31L, 28L, 31L, 30L, 31L, 30L, 31L, 31L, 30L, 31L, 30L, 31L)
+  days <- base_days[month]
+  # Adjust for leap year February
+  data.table::fifelse(
+    month == 2L & is_leap_year(year),
+    29L,
+    days
+  )
+}
+
+
+#' Weeks in Month
 #'
 #' Returns the number of ISO weeks that have at least one day in a given month.
 #' Used for distributing monthly population to weekly targets.

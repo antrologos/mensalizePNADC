@@ -84,6 +84,9 @@ utils::globalVariables(c(
   "week_min_yyyyww", "week_max_yyyyww", "week_min_pos", "week_max_pos",
   "alt_week_min_yyyyww", "alt_week_max_yyyyww",
   "hh_week_min", "hh_week_max", "alt_hh_week_min", "alt_hh_week_max",
+  # Sequential week values for year boundary comparisons
+  "week_min_seq", "week_max_seq", "hh_week_min_seq", "hh_week_max_seq",
+  "alt_week_min_seq", "alt_week_max_seq", "alt_hh_week_min_seq", "alt_hh_week_max_seq",
   "trim_has_exception",
   "determined_month", "determined_week",
   # Computed variables - weight calibration (monthly, fortnightly, and weekly)
@@ -123,7 +126,15 @@ utils::globalVariables(c(
   "i.final_factor",
   # Month-conditional refinement variables
   "month_num_temp", "last_day_temp", "month_start_yyyyww", "month_end_yyyyww",
-  # Experimental period identification variables
+  # Nested fortnight/week identification variables (Phase 2 & 3)
+  "fortnight_lower", "fortnight_upper",
+  "fortnight_month", "fortnight_half", "fortnight_month_num",
+  "fortnight_start_day", "fortnight_end_day",
+  "fortnight_start_yyyyww", "fortnight_end_yyyyww",
+  # Experimental period identification variables (restructured nested strategies)
+  "ref_month_exp", "ref_month_exp_confidence",
+  "ref_fortnight_exp", "ref_fortnight_exp_confidence",
+  "ref_week_exp", "ref_week_exp_confidence",
   "hh_date_min", "hh_date_max", "fortnight_range", "date_midpoint",
   "midpoint_day", "boundary_distance",
   "ref_fortnight_likely", "ref_fortnight_confidence",
@@ -133,8 +144,35 @@ utils::globalVariables(c(
   "i.hh_date_min", "i.hh_date_max", "i.hh_fortnight_min", "i.hh_fortnight_max",
   "i.fortnight_range", "i.consensus_fortnight", "i.consensus_week",
   "needs_reagg",
-  # Week probabilistic strategy variables
+  # Probabilistic strategy variables
   "hh_week_min_yyyyww", "hh_week_max_yyyyww",
   "hh_week_min_seq", "hh_week_max_seq", "week_range",
-  "midpoint_week_yyyyww", "week_boundary_distance"
+  "midpoint_week_yyyyww", "week_boundary_distance",
+  "upa_date_min", "upa_date_max",
+  "upa_month_min_pos", "upa_month_max_pos", "month_range",
+  "month1_start", "month2_start", "month3_start",
+  "boundary_date", "days_before_boundary", "days_after_boundary", "total_days",
+  "month_identified", "effective_month",
+  "hh_date_midpoint", "boundary_day_15",
+  "days_in_first_fortnight", "days_in_second_fortnight", "total_interval_days",
+  "fortnight_identified", "effective_fortnight",
+  "fortnight_start_date", "fortnight_end_date",
+  "week_date_midpoint", "week_boundary_date",
+  "days_in_first_week", "days_in_second_week", "total_week_interval",
+  # UPA aggregation strategy variables
+  "n_total", "n_strict", "n_narrow", "consensus_month", "prop_strict",
+  "has_narrow_month_range", "has_narrow_fortnight_range", "has_narrow_week_range",
+  "prop_narrow", "likely_month", "likely_fortnight", "likely_week",
+  "days_before", "days_after", "confidence",
+  "upa_fortnight_min", "upa_fortnight_max", "upa_fortnight_range",
+  "upa_week_min", "upa_week_max", "upa_week_range",
+  "upa_week_min_seq", "upa_week_max_seq",
+  "week_min", "week_max", "week_min_seq", "week_max_seq",
+  "midpoint_week_seq",
+  # data.table join prefix variables for experimental strategies
+  "i.consensus_month", "i.likely_month", "i.likely_fortnight", "i.likely_week",
+  "i.confidence", "i.month_identified", "i.effective_month",
+  "i.fortnight_identified", "i.effective_fortnight",
+  "i.upa_date_min", "i.upa_date_max", "i.upa_month_min_pos", "i.upa_month_max_pos",
+  "i.month_range", "upa_month_min", "upa_month_max", "upa_month_range"
 ))

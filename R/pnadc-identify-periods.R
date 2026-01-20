@@ -9,13 +9,25 @@
 #' fortnight (quinzena), and week each observation belongs to, enabling
 #' sub-quarterly time series analysis.
 #'
-#' The algorithm uses:
+#' The algorithm uses a **nested identification approach**:
 #' \itemize{
-#'   \item IBGE's reference week timing rules (first Saturday with sufficient days in month)
-#'   \item Respondent birthdates to constrain possible interview dates
-#'   \item UPA-panel level aggregation for months (across quarters - panel design)
-#'   \item Household-level aggregation for fortnights and weeks (within each quarter only)
-#'   \item Dynamic exception detection (identifies quarters needing relaxed rules)
+#'   \item \strong{Phase 1}: Identify MONTHS for all observations using:
+#'     \itemize{
+#'       \item IBGE's reference week timing rules (first Saturday with sufficient days)
+#'       \item Respondent birthdates to constrain possible interview dates
+#'       \item UPA-panel level aggregation across ALL quarters (panel design)
+#'       \item Dynamic exception detection (identifies quarters needing relaxed rules)
+#'     }
+#'   \item \strong{Phase 2}: Identify FORTNIGHTS only for month-determined observations:
+#'     \itemize{
+#'       \item Search space constrained to 2 fortnights within determined month
+#'       \item Household-level aggregation within each quarter
+#'     }
+#'   \item \strong{Phase 3}: Identify WEEKS only for fortnight-determined observations:
+#'     \itemize{
+#'       \item Search space constrained to ~2 weeks within determined fortnight
+#'       \item Household-level aggregation within each quarter
+#'     }
 #' }
 #'
 #' @param data A data.frame or data.table with PNADC microdata. Required columns:
@@ -54,16 +66,24 @@
 #'   }
 #'
 #' @note
+#' ## Nested Identification Hierarchy
+#'
+#' The algorithm enforces strict nesting by construction:
+#' \itemize{
+#'   \item Fortnights can ONLY be identified for observations with determined months
+#'   \item Weeks can ONLY be identified for observations with determined fortnights
+#' }
+#'
+#' This guarantees: \code{determined_week => determined_fortnight => determined_month}
+#'
 #' ## Aggregation Levels
 #'
 #' The crosswalk aggregates at different levels:
 #' \itemize{
-#'   \item \strong{Months}: Can aggregate across quarters at UPA-V1014 level
+#'   \item \strong{Months}: UPA-V1014 level across ALL quarters
 #'     (PNADC panel design ensures same month position)
 #'   \item \strong{Fortnights}: Household level within quarter only
-#'     (no consistent position across quarterly visits)
 #'   \item \strong{Weeks}: Household level within quarter only
-#'     (no consistent position across quarterly visits)
 #' }
 #'
 #' @details
@@ -72,25 +92,16 @@
 #' The crosswalk contains three levels of temporal granularity:
 #' \itemize{
 #'   \item \strong{Month}: 3 per quarter, ~97% determination rate (aggregates across quarters)
-#'   \item \strong{Fortnight (quinzena)}: 6 per quarter, ~2-5% determination rate (within-quarter only)
+#'   \item \strong{Fortnight (quinzena)}: 6 per quarter, ~2-8% determination rate (within-quarter only)
 #'   \item \strong{Week}: 13-14 per quarter, ~1-2% determination rate (within-quarter only)
 #' }
-#'
-#' \strong{Why are fortnight/week rates so low?} Only months can aggregate at
-#' UPA-V1014 level across ALL quarters (leveraging the panel design where the
-#' same units are interviewed in consistent relative positions). Fortnights
-#' and weeks are determined only from birthday constraints within a single
-#' quarter, which rarely narrows the interview window to a single 15-day or
-#' 7-day period.
 #'
 #' ## Cross-Quarter Aggregation (Important!)
 #'
 #' **For optimal month determination rates, input data should be stacked across
 #' multiple quarters** (ideally 4+ years). The algorithm leverages PNADC's
 #' rotating panel design where the same UPA-V1014 is interviewed in the same
-#' relative position across quarterly visits. This cross-quarter aggregation
-#' only applies to months - fortnight and week determination is based on
-#' within-quarter constraints only.
+#' relative position across quarterly visits.
 #'
 #' ## Fortnight Definition
 #'
@@ -101,12 +112,6 @@
 #'   \item Fortnight 03: Feb 1-15
 #'   \item ... and so on
 #' }
-#'
-#' ## Important Note
-#'
-#' This function returns only the crosswalk (identification keys + reference
-#' periods). To apply the crosswalk to a dataset and optionally calibrate
-#' weights, use \code{\link{pnadc_apply_periods}}.
 #'
 #' @examples
 #' \dontrun{
@@ -119,6 +124,10 @@
 #'   fortnight_rate = mean(determined_fortnight),
 #'   week_rate = mean(determined_week)
 #' )]
+#'
+#' # Verify nesting (always TRUE by construction)
+#' crosswalk[determined_fortnight, all(determined_month)]
+#' crosswalk[determined_week, all(determined_fortnight)]
 #'
 #' # Apply to a specific dataset
 #' result <- pnadc_apply_periods(pnadc_2023, crosswalk,
@@ -137,7 +146,7 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   # ============================================================================
 
   if (verbose) {
-    cat("Building reference period crosswalk...\n")
+    cat("Building reference period crosswalk (nested identification)...\n")
   }
 
   # Validate required columns
@@ -147,11 +156,24 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   dt <- ensure_data_table(data, copy = TRUE)
 
   # ============================================================================
-  # SHARED PREPROCESSING (Steps 1-3)
-  # These steps are identical for month, fortnight, and week identification
+  # PHASE 1: MONTH IDENTIFICATION (ALL observations)
+  # ============================================================================
+  #
+  # This phase identifies the reference MONTH for each observation using:
+  # - IBGE's reference week timing rules (parada técnica)
+  # - Birthday constraints to narrow possible interview dates
+  # - Cross-quarter aggregation at UPA-V1014 level (panel design)
+  # - Dynamic exception detection for edge cases
+  #
   # ============================================================================
 
-  if (verbose) cat("  Preprocessing data (shared computation)...\n")
+  if (verbose) cat("\nPhase 1: Identifying MONTHS (all observations)...\n")
+
+  # --------------------------------------------------------------------------
+  # STEP 1.1: Preprocessing - Convert columns and handle special codes
+  # --------------------------------------------------------------------------
+
+  if (verbose) cat("  Step 1.1: Preprocessing data...\n")
 
   # Batch convert character columns using set() for efficiency
   int_cols <- c("Ano", "Trimestre", "V2008", "V20081", "V20082")
@@ -170,8 +192,10 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   dt[V20082 == 9999L, V20082 := NA_integer_]
 
   # --------------------------------------------------------------------------
-  # STEP 1: Pre-compute first valid Saturdays for each unique (year, quarter)
+  # STEP 1.2: Pre-compute first valid Saturdays for each unique (year, quarter)
   # --------------------------------------------------------------------------
+
+  if (verbose) cat("  Step 1.2: Computing valid interview Saturdays...\n")
 
   unique_quarters <- unique(dt[, .(Ano, Trimestre)])
   unique_quarters[, `:=`(
@@ -204,8 +228,10 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
           alt_sat_m3 = i.alt_sat_m3)]
 
   # --------------------------------------------------------------------------
-  # STEP 2: Calculate birthday and first Saturday after birthday
+  # STEP 1.3: Calculate birthday constraints
   # --------------------------------------------------------------------------
+
+  if (verbose) cat("  Step 1.3: Applying birthday constraints...\n")
 
   dt[, birthday := make_birthday(V20081, V2008, Ano)]
   dt[, first_sat_after_birthday := first_saturday_on_or_after(birthday)]
@@ -215,7 +241,7 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   dt[!is.na(V20082), visit_before_birthday := as.integer((Ano - V20082) - V2009)]
 
   # --------------------------------------------------------------------------
-  # STEP 3: Calculate date bounds using STANDARD rules
+  # STEP 1.4: Calculate date bounds using STANDARD rules
   # --------------------------------------------------------------------------
 
   dt[, `:=`(
@@ -236,7 +262,7 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
        (first_sat_after_birthday - 7L) >= date_min,
      date_max := first_sat_after_birthday - 7L]
 
-  # Calculate alternative bounds
+  # Calculate alternative bounds (for exception handling)
   dt[, `:=`(
     alt_date_min = make_date(Ano, month1, alt_sat_m1),
     alt_date_max = make_date(Ano, month3, alt_sat_m3) + 21L
@@ -258,15 +284,12 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   # Clean up birthday column
   dt[, birthday := NULL]
 
-  # ============================================================================
-  # STEP 4: Convert date bounds to position types (PHASED for memory efficiency)
-  # ============================================================================
-
-  if (verbose) cat("  Converting date bounds to period positions...\n")
-
   # --------------------------------------------------------------------------
-  # PHASE 4a: MONTH positions (needed first for month aggregation)
+  # STEP 1.5: Convert date bounds to MONTH positions
   # --------------------------------------------------------------------------
+
+  if (verbose) cat("  Step 1.5: Converting to month positions...\n")
+
   dt[, `:=`(
     month_min_pos = calculate_month_position_min(date_min, Ano, Trimestre, day_threshold = 3L),
     month_max_pos = calculate_month_position_max(date_max, Ano, Trimestre, day_threshold = 3L),
@@ -274,17 +297,11 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
     alt_month_max_pos = calculate_month_position_max(alt_date_max, Ano, Trimestre, day_threshold = 2L)
   )]
 
-  # ============================================================================
-  # STEP 5: Aggregate and determine reference periods
-  # ============================================================================
-
-  if (verbose) cat("  Aggregating constraints and determining periods...\n")
-
   # --------------------------------------------------------------------------
-  # 5a: MONTH - Aggregate at UPA-V1014 level ACROSS ALL quarters
-  # OPTIMIZATION: Removed setkey() - using keyless by= is equally efficient
-  # for one-time aggregation and avoids O(n log n) sorting overhead
- # --------------------------------------------------------------------------
+  # STEP 1.6: MONTH aggregation at UPA-V1014 level ACROSS ALL quarters
+  # --------------------------------------------------------------------------
+
+  if (verbose) cat("  Step 1.6: Aggregating at UPA-panel level (cross-quarter)...\n")
 
   dt[, `:=`(
     upa_month_min = max(month_min_pos, na.rm = TRUE),
@@ -293,7 +310,7 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
     alt_upa_month_max = min(alt_month_max_pos, na.rm = TRUE)
   ), by = .(UPA, V1014)]
 
-  # OPTIMIZATION: Handle infinite values with vectorized set() instead of 4 separate subset operations
+  # Handle infinite values
   for (col in c("upa_month_min", "upa_month_max", "alt_upa_month_min", "alt_upa_month_max")) {
     inf_idx <- which(is.infinite(dt[[col]]))
     if (length(inf_idx) > 0L) {
@@ -302,66 +319,11 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   }
 
   # --------------------------------------------------------------------------
-  # PHASE 4b: FORTNIGHT and WEEK positions (computed now, after month aggregation)
-  # This phased approach reduces peak memory by ~400MB for 10M row datasets
+  # STEP 1.7: Dynamic exception detection for MONTHS
   # --------------------------------------------------------------------------
 
-  # Fortnight positions (1-6 per quarter)
-  dt[, `:=`(
-    fortnight_min_pos = date_to_fortnight_in_quarter(date_min, Trimestre),
-    fortnight_max_pos = date_to_fortnight_in_quarter(date_max, Trimestre),
-    alt_fortnight_min_pos = date_to_fortnight_in_quarter(alt_date_min, Trimestre),
-    alt_fortnight_max_pos = date_to_fortnight_in_quarter(alt_date_max, Trimestre)
-  )]
+  if (verbose) cat("  Step 1.7: Detecting exception cases...\n")
 
-  # Week positions (ISO YYYYWW)
-  dt[, `:=`(
-    week_min_yyyyww = date_to_yyyyww(date_min),
-    week_max_yyyyww = date_to_yyyyww(date_max),
-    alt_week_min_yyyyww = date_to_yyyyww(alt_date_min),
-    alt_week_max_yyyyww = date_to_yyyyww(alt_date_max)
-  )]
-
-  # --------------------------------------------------------------------------
-  # 5b+5c: FORTNIGHT and WEEK - Combined aggregation (SAME grouping key)
-  # OPTIMIZATION: Single groupby pass instead of two separate passes
-  # Both use household-quarter level: (Ano, Trimestre, UPA, V1008)
-  # --------------------------------------------------------------------------
-
-  dt[, `:=`(
-    # Fortnight aggregation
-    hh_fortnight_min = max(fortnight_min_pos, na.rm = TRUE),
-    hh_fortnight_max = min(fortnight_max_pos, na.rm = TRUE),
-    alt_hh_fortnight_min = max(alt_fortnight_min_pos, na.rm = TRUE),
-    alt_hh_fortnight_max = min(alt_fortnight_max_pos, na.rm = TRUE),
-    # Week aggregation (same grouping key - combined for efficiency)
-    hh_week_min = max(week_min_yyyyww, na.rm = TRUE),
-    hh_week_max = min(week_max_yyyyww, na.rm = TRUE),
-    alt_hh_week_min = max(alt_week_min_yyyyww, na.rm = TRUE),
-    alt_hh_week_max = min(alt_week_max_yyyyww, na.rm = TRUE)
-  ), by = .(Ano, Trimestre, UPA, V1008)]
-
-  # OPTIMIZATION: Handle infinite values with vectorized set() for all 8 columns
-  hh_cols <- c("hh_fortnight_min", "hh_fortnight_max", "alt_hh_fortnight_min", "alt_hh_fortnight_max",
-               "hh_week_min", "hh_week_max", "alt_hh_week_min", "alt_hh_week_max")
-  for (col in hh_cols) {
-    inf_idx <- which(is.infinite(dt[[col]]))
-    if (length(inf_idx) > 0L) {
-      data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
-    }
-  }
-
-  # ============================================================================
-  # STEP 6: Dynamic exception detection for MONTHS
-  # (Months have the most complex exception logic)
-  # ============================================================================
-
-  if (verbose) cat("  Applying exception rules...\n")
-
-  # An observation requires exception if:
-  # 1. Standard rules produce impossible result (upa_month_min > upa_month_max)
-  # 2. Alternative rules would produce valid result (alt_upa_month_min <= alt_upa_month_max)
-  # 3. The individual's constraint is the binding one that could be relaxed
   dt[, requires_exception := (
     upa_month_min > upa_month_max &
     alt_upa_month_min <= alt_upa_month_max &
@@ -389,12 +351,14 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   has_any_exception <- any(exc_condition)
 
   if (has_any_exception) {
+    if (verbose) cat("  Step 1.7b: Applying exception rules...\n")
+
     # Update first Saturday values where exceptions are needed
     dt[trim_exc_m1 == 1L, first_sat_m1 := alt_sat_m1]
     dt[trim_exc_m2 == 1L, first_sat_m2 := alt_sat_m2]
     dt[trim_exc_m3 == 1L, first_sat_m3 := alt_sat_m3]
 
-    # Recalculate date bounds ONLY for exception rows
+    # Recalculate date bounds for exception rows
     dt[exc_condition, `:=`(
       date_min = make_date(Ano, month1, first_sat_m1),
       date_max = make_date(Ano, month3, first_sat_m3) + 21L
@@ -425,243 +389,358 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
       )
     )]
 
-    # --------------------------------------------------------------------------
-    # UNIFIED EXCEPTION HANDLING: Recalculate fortnight/week positions using
-    # corrected dates (same exception rules as months)
-    # --------------------------------------------------------------------------
-    #
-    # KEY PRINCIPLE: When a month requires an exception (fallback to min_days=3
-    # rule), the same corrected date bounds should be used for determining
-    # fortnights and weeks. This ensures consistency across all three time
-    # granularities.
-    #
-    # Without this, we would have contradictory results where a month is
-    # determined using exception rules but the corresponding fortnight/week
-    # calculations still use standard rules with invalid bounds.
-    #
-    # After recalculating positions, we re-aggregate at household level for
-    # all households in affected quarters (not just the exception rows, since
-    # household members share interview timing constraints).
-
-    # Recalculate fortnight positions for exception rows using corrected dates
-    dt[exc_condition, `:=`(
-      fortnight_min_pos = date_to_fortnight_in_quarter(date_min, Trimestre),
-      fortnight_max_pos = date_to_fortnight_in_quarter(date_max, Trimestre)
-    )]
-
-    # Recalculate week positions for exception rows using corrected dates
-    dt[exc_condition, `:=`(
-      week_min_yyyyww = date_to_yyyyww(date_min),
-      week_max_yyyyww = date_to_yyyyww(date_max)
-    )]
-
-    # Re-aggregate fortnight/week at household level for affected quarters
-    # Must aggregate ALL households in the affected quarters (not just exc_condition rows)
-    # because some household members may have different positions
-    affected_quarters <- unique(dt[exc_condition, .(Ano, Trimestre)])
-
-    for (i in seq_len(nrow(affected_quarters))) {
-      aq <- affected_quarters[i]
-      dt[Ano == aq$Ano & Trimestre == aq$Trimestre, `:=`(
-        hh_fortnight_min = max(fortnight_min_pos, na.rm = TRUE),
-        hh_fortnight_max = min(fortnight_max_pos, na.rm = TRUE),
-        hh_week_min = max(week_min_yyyyww, na.rm = TRUE),
-        hh_week_max = min(week_max_yyyyww, na.rm = TRUE)
-      ), by = .(UPA, V1008)]
-    }
-
-    # Handle infinite values from re-aggregation
-    for (col in c("hh_fortnight_min", "hh_fortnight_max", "hh_week_min", "hh_week_max")) {
-      inf_idx <- which(is.infinite(dt[[col]]))
-      if (length(inf_idx) > 0L) {
-        data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
-      }
-    }
-  }
-
-  # --------------------------------------------------------------------------
-  # Final month aggregation to UPA-panel level ACROSS ALL QUARTERS
-  # CRITICAL: Must re-aggregate ALL UPA-V1014 when there are exceptions,
-  # because month_min_pos may have been updated for exception rows
-  # --------------------------------------------------------------------------
-  if (has_any_exception) {
-    # Re-aggregate ALL UPA-V1014 combinations (not just affected ones)
-    # This ensures updated positions from exception rows are combined with
-    # positions from other quarters for the same UPA-V1014
+    # Re-aggregate ALL UPA-V1014 combinations
     dt[, `:=`(
       upa_month_min_final = max(month_min_pos, na.rm = TRUE),
       upa_month_max_final = min(month_max_pos, na.rm = TRUE)
     ), by = .(UPA, V1014)]
   } else {
-    # No exceptions - reuse aggregation from Step 5a
+    # No exceptions - reuse aggregation
     dt[, `:=`(
       upa_month_min_final = upa_month_min,
       upa_month_max_final = upa_month_max
     )]
   }
 
-  # --------------------------------------------------------------------------
-  # 6b: FALLBACK exception detection for FORTNIGHT and WEEK
-  # --------------------------------------------------------------------------
-  #
-  # This handles rare edge cases where:
-  #   - Month bounds were valid with standard rules (no month exception)
-  #   - But fortnight/week bounds are invalid (min > max)
-  #   - And alternative bounds (min_days=3) would be valid
-  #
-  # This can occur because:
-  #   - Months aggregate at UPA-V1014 level across ALL quarters
-  #   - Fortnights/weeks aggregate at household level within SINGLE quarter
-  #   - The different aggregation scopes can produce different constraint sets
-  #
-  # The unified exception handling above (within has_any_exception block)
-  # is the PRIMARY source of consistency. This is a SAFETY NET for edge cases
-  # where month-level exception detection didn't trigger but fortnight/week
-  # still has invalid bounds.
-  #
-  # Uses same logic as standalone identify_reference_fortnight/week functions:
-  # propagate exception to entire quarter if any household requires it.
-
-  # Fortnight exceptions (fallback - applies min_days=3 rule)
-  dt[, requires_exc_fortnight := (
-    hh_fortnight_min > hh_fortnight_max &
-    alt_hh_fortnight_min <= alt_hh_fortnight_max
-  )]
-
-  dt[, trim_exc_fortnight := as.integer(sum(requires_exc_fortnight, na.rm = TRUE) > 0L),
-     by = .(Ano, Trimestre)]
-
-  dt[trim_exc_fortnight == 1L, `:=`(
-    hh_fortnight_min = alt_hh_fortnight_min,
-    hh_fortnight_max = alt_hh_fortnight_max
-  )]
-
-  # Week exceptions
-  dt[, requires_exc_week := (
-    hh_week_min > hh_week_max &
-    alt_hh_week_min <= alt_hh_week_max
-  )]
-
-  dt[, trim_exc_week := as.integer(sum(requires_exc_week, na.rm = TRUE) > 0L),
-     by = .(Ano, Trimestre)]
-
-  dt[trim_exc_week == 1L, `:=`(
-    hh_week_min = alt_hh_week_min,
-    hh_week_max = alt_hh_week_max
-  )]
-
-  # --------------------------------------------------------------------------
-  # MEMORY CLEANUP: Remove intermediate columns no longer needed
-  # This reduces memory footprint by ~500MB for 10M row datasets
-  # --------------------------------------------------------------------------
-  cleanup_cols <- c(
-    # Position calculation intermediates (no longer needed after aggregation)
-    "month_min_pos", "month_max_pos", "alt_month_min_pos", "alt_month_max_pos",
-    "fortnight_min_pos", "fortnight_max_pos", "alt_fortnight_min_pos", "alt_fortnight_max_pos",
-    "week_min_yyyyww", "week_max_yyyyww", "alt_week_min_yyyyww", "alt_week_max_yyyyww",
-    # Aggregated values (intermediate, final values are used for determination)
-    "upa_month_min", "upa_month_max",
-    "alt_upa_month_min", "alt_upa_month_max",
-    "alt_hh_fortnight_min", "alt_hh_fortnight_max",
-    "alt_hh_week_min", "alt_hh_week_max",
-    # Exception detection flags
-    "requires_exception", "requires_exc_m1", "requires_exc_m2", "requires_exc_m3",
-    "trim_exc_m1", "trim_exc_m2", "trim_exc_m3",
-    "requires_exc_fortnight", "trim_exc_fortnight",
-    "requires_exc_week", "trim_exc_week",
-    # Date calculation intermediates
-    "date_min", "date_max", "alt_date_min", "alt_date_max",
-    "first_sat_m1", "first_sat_m2", "first_sat_m3",
-    "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
-    "first_sat_after_birthday", "visit_before_birthday",
-    "month1", "month2", "month3"
-  )
-  # Only remove columns that exist (some may not exist if no exceptions)
-  existing_cleanup <- intersect(cleanup_cols, names(dt))
-  if (length(existing_cleanup) > 0L) {
-    dt[, (existing_cleanup) := NULL]
+  # Handle infinite values
+  for (col in c("upa_month_min_final", "upa_month_max_final")) {
+    inf_idx <- which(is.infinite(dt[[col]]))
+    if (length(inf_idx) > 0L) {
+      data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
+    }
   }
 
-  # ============================================================================
-  # STEP 7: Final determination
-  # ============================================================================
+  # --------------------------------------------------------------------------
+  # STEP 1.8: MONTH DETERMINATION
+  # --------------------------------------------------------------------------
 
-  if (verbose) cat("  Assigning reference periods...\n")
+  if (verbose) cat("  Step 1.8: Determining reference months...\n")
 
-  # Month: determined if min_final == max_final
   dt[, ref_month_in_quarter := NA_integer_]
   dt[upa_month_min_final == upa_month_max_final &
        upa_month_min_final >= 1L & upa_month_max_final <= 3L,
      ref_month_in_quarter := upa_month_min_final]
 
-  # --------------------------------------------------------------------------
-  # MONTH-CONDITIONAL REFINEMENT: Use determined month to constrain fortnights/weeks
-  # Key insight: Once month is determined (~97%), fortnight search reduces from
-  # 6 to 2 positions, and week search reduces from ~13 to ~4 positions.
-  # --------------------------------------------------------------------------
+  # Calculate month determination stats
+  n_total <- dt[, uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008), .SDcols = "V1014"][, .N]
+  n_month_determined <- dt[!is.na(ref_month_in_quarter),
+                           uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008), .SDcols = "V1014"][, .N]
+  month_rate <- n_month_determined / n_total
 
-  # Fortnight refinement based on determined month:
-  # Month 1 → fortnights 1-2; Month 2 → fortnights 3-4; Month 3 → fortnights 5-6
-  dt[!is.na(ref_month_in_quarter), `:=`(
-    hh_fortnight_min = pmax(hh_fortnight_min, (ref_month_in_quarter - 1L) * 2L + 1L, na.rm = TRUE),
-    hh_fortnight_max = pmin(hh_fortnight_max, ref_month_in_quarter * 2L, na.rm = TRUE)
-  )]
+  if (verbose) {
+    cat(sprintf("  -> Month determination: %.1f%% (%s of %s households)\n",
+                month_rate * 100,
+                format(n_month_determined, big.mark = ","),
+                format(n_total, big.mark = ",")))
+  }
 
-  # Week refinement based on determined month:
-  # Approximate mapping: Month 1 → weeks 1-4, Month 2 → weeks 5-9, Month 3 → weeks 10-14
-  # We constrain by converting month boundaries to YYYYWW format
-  # Use actual last day of month (not fixed 28) to handle all months correctly
-  days_in_month <- c(31L, 28L, 31L, 30L, 31L, 30L, 31L, 31L, 30L, 31L, 30L, 31L)
-  dt[!is.na(ref_month_in_quarter), `:=`(
-    month_num_temp = quarter_month_n(Trimestre, ref_month_in_quarter)
-  )]
-  dt[!is.na(ref_month_in_quarter), `:=`(
-    # Handle leap years for February using is_leap_year() utility
-    last_day_temp = fifelse(month_num_temp == 2L & is_leap_year(Ano),
-                            29L, days_in_month[month_num_temp])
-  )]
-  dt[!is.na(ref_month_in_quarter), `:=`(
-    month_start_yyyyww = date_to_yyyyww(make_date(Ano, month_num_temp, 1L)),
-    month_end_yyyyww = date_to_yyyyww(make_date(Ano, month_num_temp, last_day_temp))
-  )]
+  # ============================================================================
+  # PHASE 2: FORTNIGHT IDENTIFICATION (ONLY month-determined observations)
+  # ============================================================================
+  #
+  # Fortnights are identified ONLY for observations where the month is already
 
-  # Apply week constraints using YYYYWW format (lexicographically correct)
-  dt[!is.na(ref_month_in_quarter), `:=`(
-    hh_week_min = pmax(hh_week_min, month_start_yyyyww, na.rm = TRUE),
-    hh_week_max = pmin(hh_week_max, month_end_yyyyww, na.rm = TRUE)
-  )]
+  # determined. The search space is constrained to 2 fortnights within the
+  # determined month:
+  #   - Month 1 → fortnights 1-2
+  #   - Month 2 → fortnights 3-4
+  #   - Month 3 → fortnights 5-6
+  #
+  # ============================================================================
 
-  # Clean up temporary columns (use intersect pattern for robustness)
-  temp_week_cols <- c("month_start_yyyyww", "month_end_yyyyww", "month_num_temp", "last_day_temp")
-  dt[, (intersect(temp_week_cols, names(dt))) := NULL]
+  if (verbose) cat("\nPhase 2: Identifying FORTNIGHTS (within determined months)...\n")
 
-  # Fortnight: determined if min == max
+  # Initialize fortnight columns
   dt[, ref_fortnight_in_quarter := NA_integer_]
-  dt[hh_fortnight_min == hh_fortnight_max &
-       hh_fortnight_min >= 1L & hh_fortnight_max <= 6L,
-     ref_fortnight_in_quarter := hh_fortnight_min]
 
-  # Week: determined if min == max
+  # Work only with month-determined observations
+  month_determined_idx <- which(!is.na(dt$ref_month_in_quarter))
+  n_month_det <- length(month_determined_idx)
+
+  if (n_month_det == 0) {
+    if (verbose) cat("  -> No months determined - skipping fortnight identification\n")
+  } else {
+    if (verbose) cat(sprintf("  Processing %s observations with determined months...\n",
+                             format(n_month_det, big.mark = ",")))
+
+    # --------------------------------------------------------------------------
+    # STEP 2.1: Calculate fortnight bounds WITHIN the determined month
+    # --------------------------------------------------------------------------
+
+    # The fortnight position is determined by:
+    # 1. Which month (ref_month_in_quarter: 1, 2, or 3)
+    # 2. Whether the date falls in the 1st half (days 1-15) or 2nd half (days 16+)
+
+    # For month-determined rows, constrain the search to 2 fortnights
+    dt[!is.na(ref_month_in_quarter), `:=`(
+      fortnight_lower = (ref_month_in_quarter - 1L) * 2L + 1L,  # First fortnight of month
+      fortnight_upper = ref_month_in_quarter * 2L               # Second fortnight of month
+    )]
+
+    # Calculate actual fortnight positions from date bounds
+    dt[!is.na(ref_month_in_quarter), `:=`(
+      fortnight_min_pos = date_to_fortnight_in_quarter(date_min, Trimestre),
+      fortnight_max_pos = date_to_fortnight_in_quarter(date_max, Trimestre)
+    )]
+
+    # Constrain to the determined month's fortnights
+    dt[!is.na(ref_month_in_quarter), `:=`(
+      fortnight_min_pos = pmax(fortnight_min_pos, fortnight_lower, na.rm = TRUE),
+      fortnight_max_pos = pmin(fortnight_max_pos, fortnight_upper, na.rm = TRUE)
+    )]
+
+    # Also calculate alternative positions for exception handling
+    dt[!is.na(ref_month_in_quarter), `:=`(
+      alt_fortnight_min_pos = date_to_fortnight_in_quarter(alt_date_min, Trimestre),
+      alt_fortnight_max_pos = date_to_fortnight_in_quarter(alt_date_max, Trimestre)
+    )]
+
+    dt[!is.na(ref_month_in_quarter), `:=`(
+      alt_fortnight_min_pos = pmax(alt_fortnight_min_pos, fortnight_lower, na.rm = TRUE),
+      alt_fortnight_max_pos = pmin(alt_fortnight_max_pos, fortnight_upper, na.rm = TRUE)
+    )]
+
+    # --------------------------------------------------------------------------
+    # STEP 2.2: FORTNIGHT aggregation at household-quarter level
+    # --------------------------------------------------------------------------
+
+    if (verbose) cat("  Step 2.2: Aggregating at household level (within quarter)...\n")
+
+    # Aggregate ONLY for month-determined rows
+    dt[!is.na(ref_month_in_quarter), `:=`(
+      hh_fortnight_min = max(fortnight_min_pos, na.rm = TRUE),
+      hh_fortnight_max = min(fortnight_max_pos, na.rm = TRUE),
+      alt_hh_fortnight_min = max(alt_fortnight_min_pos, na.rm = TRUE),
+      alt_hh_fortnight_max = min(alt_fortnight_max_pos, na.rm = TRUE)
+    ), by = .(Ano, Trimestre, UPA, V1008)]
+
+    # Handle infinite values
+    for (col in c("hh_fortnight_min", "hh_fortnight_max",
+                  "alt_hh_fortnight_min", "alt_hh_fortnight_max")) {
+      if (col %in% names(dt)) {
+        inf_idx <- which(is.infinite(dt[[col]]))
+        if (length(inf_idx) > 0L) {
+          data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
+        }
+      }
+    }
+
+    # --------------------------------------------------------------------------
+    # STEP 2.3: Exception handling for fortnights
+    # --------------------------------------------------------------------------
+
+    dt[!is.na(ref_month_in_quarter), requires_exc_fortnight := (
+      hh_fortnight_min > hh_fortnight_max &
+      alt_hh_fortnight_min <= alt_hh_fortnight_max
+    )]
+
+    dt[!is.na(ref_month_in_quarter),
+       trim_exc_fortnight := as.integer(sum(requires_exc_fortnight, na.rm = TRUE) > 0L),
+       by = .(Ano, Trimestre)]
+
+    dt[!is.na(ref_month_in_quarter) & trim_exc_fortnight == 1L, `:=`(
+      hh_fortnight_min = alt_hh_fortnight_min,
+      hh_fortnight_max = alt_hh_fortnight_max
+    )]
+
+    # --------------------------------------------------------------------------
+    # STEP 2.4: FORTNIGHT DETERMINATION
+    # --------------------------------------------------------------------------
+
+    if (verbose) cat("  Step 2.4: Determining reference fortnights...\n")
+
+    dt[!is.na(ref_month_in_quarter) &
+         hh_fortnight_min == hh_fortnight_max &
+         hh_fortnight_min >= 1L & hh_fortnight_max <= 6L,
+       ref_fortnight_in_quarter := hh_fortnight_min]
+
+    # Calculate fortnight determination stats
+    n_fortnight_determined <- dt[!is.na(ref_fortnight_in_quarter),
+                                 uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008),
+                                 .SDcols = "V1014"][, .N]
+    fortnight_rate <- n_fortnight_determined / n_total
+
+    if (verbose) {
+      cat(sprintf("  -> Fortnight determination: %.1f%% (%s of %s households)\n",
+                  fortnight_rate * 100,
+                  format(n_fortnight_determined, big.mark = ","),
+                  format(n_total, big.mark = ",")))
+    }
+  }
+
+  # ============================================================================
+  # PHASE 3: WEEK IDENTIFICATION (ONLY fortnight-determined observations)
+  # ============================================================================
+  #
+  # Weeks are identified ONLY for observations where the fortnight is already
+  # determined. The search space is constrained to ~2 weeks within the
+  # determined fortnight (fortnights typically span 2-3 ISO weeks).
+  #
+  # ============================================================================
+
+  if (verbose) cat("\nPhase 3: Identifying WEEKS (within determined fortnights)...\n")
+
+  # Initialize week columns
   dt[, ref_week_yyyyww := NA_integer_]
-  dt[hh_week_min == hh_week_max & !is.infinite(hh_week_min),
-     ref_week_yyyyww := hh_week_min]
+
+  # Work only with fortnight-determined observations
+  fortnight_determined_idx <- which(!is.na(dt$ref_fortnight_in_quarter))
+  n_fortnight_det <- length(fortnight_determined_idx)
+
+  if (n_fortnight_det == 0) {
+    if (verbose) cat("  -> No fortnights determined - skipping week identification\n")
+  } else {
+    if (verbose) cat(sprintf("  Processing %s observations with determined fortnights...\n",
+                             format(n_fortnight_det, big.mark = ",")))
+
+    # --------------------------------------------------------------------------
+    # STEP 3.1: Calculate week bounds WITHIN the determined fortnight
+    # --------------------------------------------------------------------------
+
+    # Calculate fortnight start/end dates
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      fortnight_month = ((ref_fortnight_in_quarter - 1L) %/% 2L) + 1L,  # 1, 1, 2, 2, 3, 3
+      fortnight_half = ((ref_fortnight_in_quarter - 1L) %% 2L) + 1L     # 1, 2, 1, 2, 1, 2
+    )]
+
+    days_in_month_vec <- c(31L, 28L, 31L, 30L, 31L, 30L, 31L, 31L, 30L, 31L, 30L, 31L)
+
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      fortnight_month_num = quarter_month_n(Trimestre, fortnight_month)
+    )]
+
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      fortnight_start_day = fifelse(fortnight_half == 1L, 1L, 16L),
+      fortnight_end_day = fifelse(fortnight_half == 1L, 15L,
+                                  fifelse(fortnight_month_num == 2L & is_leap_year(Ano),
+                                          29L, days_in_month_vec[fortnight_month_num]))
+    )]
+
+    # Convert fortnight bounds to ISO weeks
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      fortnight_start_yyyyww = date_to_yyyyww(make_date(Ano, fortnight_month_num, fortnight_start_day)),
+      fortnight_end_yyyyww = date_to_yyyyww(make_date(Ano, fortnight_month_num, fortnight_end_day))
+    )]
+
+    # Calculate actual week positions from date bounds
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      week_min_yyyyww = date_to_yyyyww(date_min),
+      week_max_yyyyww = date_to_yyyyww(date_max)
+    )]
+
+    # Constrain to the determined fortnight's weeks
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      week_min_yyyyww = pmax(week_min_yyyyww, fortnight_start_yyyyww, na.rm = TRUE),
+      week_max_yyyyww = pmin(week_max_yyyyww, fortnight_end_yyyyww, na.rm = TRUE)
+    )]
+
+    # Also calculate alternative positions for exception handling
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      alt_week_min_yyyyww = date_to_yyyyww(alt_date_min),
+      alt_week_max_yyyyww = date_to_yyyyww(alt_date_max)
+    )]
+
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      alt_week_min_yyyyww = pmax(alt_week_min_yyyyww, fortnight_start_yyyyww, na.rm = TRUE),
+      alt_week_max_yyyyww = pmin(alt_week_max_yyyyww, fortnight_end_yyyyww, na.rm = TRUE)
+    )]
+
+    # --------------------------------------------------------------------------
+    # STEP 3.2: WEEK aggregation at household-quarter level
+    # --------------------------------------------------------------------------
+
+    if (verbose) cat("  Step 3.2: Aggregating at household level (within quarter)...\n")
+
+    # Convert to sequential for proper comparison (handles year boundaries)
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      week_min_seq = yyyyww_to_seq(week_min_yyyyww),
+      week_max_seq = yyyyww_to_seq(week_max_yyyyww),
+      alt_week_min_seq = yyyyww_to_seq(alt_week_min_yyyyww),
+      alt_week_max_seq = yyyyww_to_seq(alt_week_max_yyyyww)
+    )]
+
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      hh_week_min_seq = max(week_min_seq, na.rm = TRUE),
+      hh_week_max_seq = min(week_max_seq, na.rm = TRUE),
+      alt_hh_week_min_seq = max(alt_week_min_seq, na.rm = TRUE),
+      alt_hh_week_max_seq = min(alt_week_max_seq, na.rm = TRUE)
+    ), by = .(Ano, Trimestre, UPA, V1008)]
+
+    # Also store the YYYYWW format for final output
+    dt[!is.na(ref_fortnight_in_quarter), `:=`(
+      hh_week_min = max(week_min_yyyyww, na.rm = TRUE),
+      hh_week_max = min(week_max_yyyyww, na.rm = TRUE)
+    ), by = .(Ano, Trimestre, UPA, V1008)]
+
+    # Handle infinite values
+    for (col in c("hh_week_min", "hh_week_max", "hh_week_min_seq", "hh_week_max_seq",
+                  "alt_hh_week_min_seq", "alt_hh_week_max_seq")) {
+      if (col %in% names(dt)) {
+        inf_idx <- which(is.infinite(dt[[col]]))
+        if (length(inf_idx) > 0L) {
+          data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
+        }
+      }
+    }
+
+    # --------------------------------------------------------------------------
+    # STEP 3.3: Exception handling for weeks (using sequential values)
+    # --------------------------------------------------------------------------
+
+    dt[!is.na(ref_fortnight_in_quarter), requires_exc_week := (
+      hh_week_min_seq > hh_week_max_seq &
+      alt_hh_week_min_seq <= alt_hh_week_max_seq
+    )]
+
+    dt[!is.na(ref_fortnight_in_quarter),
+       trim_exc_week := as.integer(sum(requires_exc_week, na.rm = TRUE) > 0L),
+       by = .(Ano, Trimestre)]
+
+    dt[!is.na(ref_fortnight_in_quarter) & trim_exc_week == 1L, `:=`(
+      hh_week_min_seq = alt_hh_week_min_seq,
+      hh_week_max_seq = alt_hh_week_max_seq
+    )]
+
+    # --------------------------------------------------------------------------
+    # STEP 3.4: WEEK DETERMINATION (using sequential values for comparison)
+    # --------------------------------------------------------------------------
+
+    if (verbose) cat("  Step 3.4: Determining reference weeks...\n")
+
+    # Determine if min == max using sequential values (handles year boundaries)
+    dt[!is.na(ref_fortnight_in_quarter) &
+         hh_week_min_seq == hh_week_max_seq &
+         !is.na(hh_week_min_seq) & !is.infinite(hh_week_min_seq),
+       ref_week_yyyyww := hh_week_min]
+
+    # Calculate week determination stats
+    n_week_determined <- dt[!is.na(ref_week_yyyyww),
+                            uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008),
+                            .SDcols = "V1014"][, .N]
+    week_rate <- n_week_determined / n_total
+
+    if (verbose) {
+      cat(sprintf("  -> Week determination: %.1f%% (%s of %s households)\n",
+                  week_rate * 100,
+                  format(n_week_determined, big.mark = ","),
+                  format(n_total, big.mark = ",")))
+    }
+  }
 
   # ============================================================================
-  # STEP 8: Build crosswalk at household-quarter level
+  # PHASE 4: BUILD CROSSWALK
   # ============================================================================
 
-  if (verbose) cat("  Building crosswalk...\n")
+  if (verbose) cat("\nPhase 4: Building crosswalk...\n")
 
-  # OPTIMIZATION: Use first-per-group pattern instead of unique()
-  # This avoids O(n log n) hash-based deduplication and is more memory efficient
-  # Values are constant within each household-quarter, so [1] gives correct result
+  # Build crosswalk at household-quarter level
   crosswalk <- dt[, .(
     ref_month_in_quarter = ref_month_in_quarter[1L],
     ref_fortnight_in_quarter = ref_fortnight_in_quarter[1L],
     ref_week_yyyyww = ref_week_yyyyww[1L]
   ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
 
-  # Calculate derived month columns using crosswalk's Ano/Trimestre context
+  # Calculate derived month columns
   crosswalk[!is.na(ref_month_in_quarter), `:=`(
     ref_month = make_date(Ano, quarter_month_n(Trimestre, ref_month_in_quarter), 1L),
     ref_month_yyyymm = yyyymm(Ano, quarter_month_n(Trimestre, ref_month_in_quarter))
@@ -711,11 +790,14 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   week_rate <- mean(crosswalk$determined_week)
 
   if (verbose) {
-    cat("\nCrosswalk complete:\n")
-    cat(sprintf("  - %s unique household-quarter observations\n", format(nrow(crosswalk), big.mark = ",")))
-    cat(sprintf("  - Month determination: %.1f%%\n", month_rate * 100))
-    cat(sprintf("  - Fortnight determination: %.1f%%\n", fortnight_rate * 100))
-    cat(sprintf("  - Week determination: %.1f%%\n", week_rate * 100))
+    cat("\n========================================\n")
+    cat("Crosswalk complete (nested identification):\n")
+    cat(sprintf("  - %s unique household-quarter observations\n",
+                format(nrow(crosswalk), big.mark = ",")))
+    cat(sprintf("  - Month determination:    %6.2f%%\n", month_rate * 100))
+    cat(sprintf("  - Fortnight determination: %6.2f%% (nested within months)\n", fortnight_rate * 100))
+    cat(sprintf("  - Week determination:      %6.2f%% (nested within fortnights)\n", week_rate * 100))
+    cat("========================================\n")
   }
 
   # Store determination rates as attributes

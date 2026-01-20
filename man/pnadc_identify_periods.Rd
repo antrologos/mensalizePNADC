@@ -50,13 +50,25 @@ temporal period within the quarter. This function identifies which month,
 fortnight (quinzena), and week each observation belongs to, enabling
 sub-quarterly time series analysis.
 
-The algorithm uses:
+The algorithm uses a \strong{nested identification approach}:
 \itemize{
-\item IBGE's reference week timing rules (first Saturday with sufficient days in month)
+\item \strong{Phase 1}: Identify MONTHS for all observations using:
+\itemize{
+\item IBGE's reference week timing rules (first Saturday with sufficient days)
 \item Respondent birthdates to constrain possible interview dates
-\item UPA-panel level aggregation for months (across quarters - panel design)
-\item Household-level aggregation for fortnights and weeks (within each quarter only)
+\item UPA-panel level aggregation across ALL quarters (panel design)
 \item Dynamic exception detection (identifies quarters needing relaxed rules)
+}
+\item \strong{Phase 2}: Identify FORTNIGHTS only for month-determined observations:
+\itemize{
+\item Search space constrained to 2 fortnights within determined month
+\item Household-level aggregation within each quarter
+}
+\item \strong{Phase 3}: Identify WEEKS only for fortnight-determined observations:
+\itemize{
+\item Search space constrained to ~2 weeks within determined fortnight
+\item Household-level aggregation within each quarter
+}
 }
 }
 \details{
@@ -67,16 +79,9 @@ and week) for PNADC survey data based on IBGE's interview timing rules.
 The crosswalk contains three levels of temporal granularity:
 \itemize{
 \item \strong{Month}: 3 per quarter, ~97\% determination rate (aggregates across quarters)
-\item \strong{Fortnight (quinzena)}: 6 per quarter, ~2-5\% determination rate (within-quarter only)
+\item \strong{Fortnight (quinzena)}: 6 per quarter, ~2-8\% determination rate (within-quarter only)
 \item \strong{Week}: 13-14 per quarter, ~1-2\% determination rate (within-quarter only)
 }
-
-\strong{Why are fortnight/week rates so low?} Only months can aggregate at
-UPA-V1014 level across ALL quarters (leveraging the panel design where the
-same units are interviewed in consistent relative positions). Fortnights
-and weeks are determined only from birthday constraints within a single
-quarter, which rarely narrows the interview window to a single 15-day or
-7-day period.
 }
 
 \subsection{Cross-Quarter Aggregation (Important!)}{
@@ -84,9 +89,7 @@ quarter, which rarely narrows the interview window to a single 15-day or
 \strong{For optimal month determination rates, input data should be stacked across
 multiple quarters} (ideally 4+ years). The algorithm leverages PNADC's
 rotating panel design where the same UPA-V1014 is interviewed in the same
-relative position across quarterly visits. This cross-quarter aggregation
-only applies to months - fortnight and week determination is based on
-within-quarter constraints only.
+relative position across quarterly visits.
 }
 
 \subsection{Fortnight Definition}{
@@ -99,25 +102,27 @@ Fortnights are numbered 1-24 per year (2 per month):
 \item ... and so on
 }
 }
-
-\subsection{Important Note}{
-
-This function returns only the crosswalk (identification keys + reference
-periods). To apply the crosswalk to a dataset and optionally calibrate
-weights, use \code{\link{pnadc_apply_periods}}.
-}
 }
 \note{
+\subsection{Nested Identification Hierarchy}{
+
+The algorithm enforces strict nesting by construction:
+\itemize{
+\item Fortnights can ONLY be identified for observations with determined months
+\item Weeks can ONLY be identified for observations with determined fortnights
+}
+
+This guarantees: \code{determined_week => determined_fortnight => determined_month}
+}
+
 \subsection{Aggregation Levels}{
 
 The crosswalk aggregates at different levels:
 \itemize{
-\item \strong{Months}: Can aggregate across quarters at UPA-V1014 level
+\item \strong{Months}: UPA-V1014 level across ALL quarters
 (PNADC panel design ensures same month position)
 \item \strong{Fortnights}: Household level within quarter only
-(no consistent position across quarterly visits)
 \item \strong{Weeks}: Household level within quarter only
-(no consistent position across quarterly visits)
 }
 }
 }
@@ -132,6 +137,10 @@ crosswalk[, .(
   fortnight_rate = mean(determined_fortnight),
   week_rate = mean(determined_week)
 )]
+
+# Verify nesting (always TRUE by construction)
+crosswalk[determined_fortnight, all(determined_month)]
+crosswalk[determined_week, all(determined_fortnight)]
 
 # Apply to a specific dataset
 result <- pnadc_apply_periods(pnadc_2023, crosswalk,

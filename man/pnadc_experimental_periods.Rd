@@ -8,7 +8,8 @@ pnadc_experimental_periods(
   crosswalk,
   data = NULL,
   strategy = c("none", "probabilistic", "upa_aggregation", "both"),
-  upa_homogeneity_threshold = 0.8,
+  confidence_threshold = 0.9,
+  upa_proportion_threshold = 0.9,
   verbose = TRUE
 )
 }
@@ -18,70 +19,98 @@ pnadc_experimental_periods(
 \item{data}{The original PNADC data.table used to build the crosswalk
 (required for probabilistic strategy to access date bounds)}
 
-\item{strategy}{Character vector specifying which strategies to apply.
+\item{strategy}{Character specifying which strategy to apply.
 Options: "none", "probabilistic", "upa_aggregation", "both"}
 
-\item{upa_homogeneity_threshold}{Numeric. Only apply UPA aggregation if
-the measured UPA homogeneity rate exceeds this threshold. Default 0.80.}
+\item{confidence_threshold}{Numeric (0-1). Minimum confidence required to
+assign a probabilistic period. Used by probabilistic and combined strategies.
+Default 0.9.}
+
+\item{upa_proportion_threshold}{Numeric (0-1). Minimum proportion of UPA-V1014
+observations (within quarter) that must meet criteria for UPA-level assignment.
+Used by upa_aggregation and combined strategies. Default 0.9.}
 
 \item{verbose}{Logical. If TRUE, print progress information.}
 }
 \value{
 A modified crosswalk with additional columns:
 \itemize{
-\item \code{ref_fortnight_likely}: Probabilistic best guess (NA if range > 2)
-\item \code{ref_fortnight_confidence}: Probability of being correct (0.5-1.0)
-\item \code{ref_week_likely}: Probabilistic best guess (NA if range > 2)
-\item \code{ref_week_confidence}: Probability of being correct (0.5-1.0)
-\item \code{ref_fortnight_upa}: UPA-aggregated fortnight (if strategy enabled)
-\item \code{ref_week_upa}: UPA-aggregated week (if strategy enabled)
+\item \code{ref_month_exp}: Experimentally assigned month (NA if not assigned)
+\item \code{ref_month_exp_confidence}: Confidence of month assignment (0.5-1.0)
+\item \code{ref_fortnight_exp}: Experimentally assigned fortnight
+\item \code{ref_fortnight_exp_confidence}: Confidence of fortnight assignment
+\item \code{ref_week_exp}: Experimentally assigned week
+\item \code{ref_week_exp_confidence}: Confidence of week assignment
 }
 }
 \description{
-Two experimental strategies are available:
+Three experimental strategies are available, all properly nested by period:
 \itemize{
-\item \strong{probabilistic}: For narrow ranges (2 possible fortnights/weeks),
-calculates the probability-weighted best guess based on date position
-\item \strong{upa_aggregation}: Aggregates constraints at UPA level
-(experimental - IBGE does NOT interview UPAs together)
+\item \strong{probabilistic}: For narrow ranges (2 possible periods),
+classifies based on where most of the date interval falls. Assigns only
+when confidence exceeds threshold.
+\item \strong{upa_aggregation}: Extends strictly identified periods to other
+observations in the same UPA-V1014 within the quarter, if a sufficient
+proportion already have strict identification.
+\item \strong{both}: Combines both strategies - applies probabilistic rule
+at UPA-V1014 level when sufficient proportion have narrow ranges.
 }
 }
 \details{
-Provides experimental strategies for improving fortnight and week
-identification rates beyond the standard algorithm. These strategies
-are for research and testing purposes and should NOT replace the main
-identification logic.
+Provides experimental strategies for improving period identification rates
+beyond the standard deterministic algorithm. All strategies respect the nested
+identification hierarchy: weeks require fortnights, fortnights require months.
+\subsection{Nesting Enforcement}{
+
+All strategies enforce proper nesting:
+\itemize{
+\item Fortnights can only be assigned if month is identified (strictly OR experimentally)
+\item Weeks can only be assigned if fortnight is identified (strictly OR experimentally)
+}
+}
+
 \subsection{Probabilistic Strategy}{
 
-When the interview date range spans exactly 2 fortnights or weeks, we can
-calculate the probability that the interview occurred in the earlier vs later
-period based on the relative position of the date range boundaries.
-
-For example, if date_min is day 10 and date_max is day 20, and the fortnight
-boundary is day 15, then:
-\itemize{
-\item Days 10-15 (6 days) fall in fortnight 1
-\item Days 16-20 (5 days) fall in fortnight 2
-\item Probability of fortnight 1: 6/11 ≈ 55\%
+For each period type (processed in order: months, then fortnights, then weeks):
+\enumerate{
+\item Check that the required parent period is identified
+\item If bounds are narrowed to exactly 2 sequential periods, calculate
+which period contains most of the date interval
+\item Calculate confidence based on the proportion of interval in the likely period
+\item Only assign if confidence >= \code{confidence_threshold}
 }
+
+For months: aggregates at UPA-V1014 level (but within-quarter, unlike strict algorithm)
+For fortnights and weeks: works at household level
 }
 
 \subsection{UPA Aggregation Strategy}{
 
-This strategy tests whether aggregating constraints at UPA level (across all
-households in the same UPA) improves determination rates. This is EXPERIMENTAL
-because IBGE does NOT interview entire UPAs on the same day - interviews are
-spread across the quarter.
+Extends strictly identified periods to all observations in the same UPA-V1014
+within the quarter:
+\enumerate{
+\item Calculate proportion of UPA-V1014 observations with strictly identified period
+\item If proportion >= \code{upa_proportion_threshold}, extend to all observations
+\item Apply in nested order: months first, then fortnights, then weeks
+}
+}
 
-The UPA homogeneity rate (percentage of UPAs where all determined households
-have the same fortnight/week) is calculated first. Only if this exceeds the
-threshold is UPA aggregation applied.
+\subsection{Combined Strategy ("both")}{
+
+Applies probabilistic rule at UPA-V1014 level when sufficient observations
+have narrow ranges:
+\enumerate{
+\item For each UPA-V1014 within quarter, check if proportion >= threshold
+have bounds narrowed to 2 sequential periods
+\item If so, apply probabilistic classification at UPA-V1014 level
+\item Process in nested order: months, then fortnights, then weeks
+}
 }
 }
 \note{
-These strategies produce "likely" assignments, not definitive determinations.
+These strategies produce "experimental" assignments, not strict determinations.
 The standard \code{pnadc_identify_periods()} function should be used for
-rigorous analysis. These experimental outputs are useful for:
+rigorous analysis. Experimental outputs are useful for:
 \itemize{
 \item Sensitivity analysis
 \item Robustness checks
@@ -97,14 +126,15 @@ crosswalk <- pnadc_identify_periods(pnadc_data)
 crosswalk_exp <- pnadc_experimental_periods(
   crosswalk,
   pnadc_data,
-  strategy = "probabilistic"
+  strategy = "probabilistic",
+  confidence_threshold = 0.9
 )
 
-# Check how many additional "likely" assignments we get
+# Check how many additional assignments we get
 crosswalk_exp[, .(
-  determined = sum(!is.na(ref_fortnight_in_quarter)),
-  likely = sum(!is.na(ref_fortnight_likely)),
-  high_confidence = sum(ref_fortnight_confidence >= 0.7, na.rm = TRUE)
+  strict = sum(!is.na(ref_month_in_quarter)),
+  experimental = sum(!is.na(ref_month_exp)),
+  total = sum(!is.na(ref_month_in_quarter) | !is.na(ref_month_exp))
 )]
 }
 
