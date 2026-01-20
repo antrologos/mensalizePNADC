@@ -24,7 +24,8 @@ results in data/processed/ for faster subsequent runs.
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = FALSE
+  eval = FALSE,
+  purl = FALSE
 )
 ```
 
