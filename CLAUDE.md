@@ -170,6 +170,7 @@ Common git errors when using wrong directory:
 2. **Missing columns** → Use `validate_pnadc()` to check
 3. **SIDRA API errors** → Check internet; API has rate limits
 4. **Git errors (exit 128/129)** → Use `mensalizePNADC/` directory, not project root
+5. **Dropbox file locking** → If `devtools::document()` fails with "Invalid argument" error when writing to vignettes, pause Dropbox sync. All vignettes have `purl = FALSE` to prevent .R file creation, but Dropbox can still interfere.
 
 ### Local Data Paths (Rogerio's machine)
 
