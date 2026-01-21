@@ -32,13 +32,6 @@ test_that("required_vars_weights returns expected columns", {
   expect_true("posest_sxi" %in% vars)
 })
 
-test_that("required_vars_monthly_totals returns expected columns", {
-  vars <- required_vars_monthly_totals()
-  expect_type(vars, "character")
-  expect_true("ref_month_yyyymm" %in% vars)
-  expect_true("m_populacao" %in% vars)
-})
-
 test_that("validate_pnadc detects missing columns", {
   # Missing required columns
   bad_data <- data.frame(Ano = 2023, Trimestre = 1)

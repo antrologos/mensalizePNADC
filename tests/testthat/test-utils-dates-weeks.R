@@ -119,24 +119,6 @@ test_that("yyyyww_to_date converts correctly", {
   expect_equal(yyyyww_to_date(202501), as.Date("2024-12-30"))
 })
 
-test_that("weeks_in_month counts correctly", {
-  # January 2024: Jan 1 is Monday, Jan 31 is Wednesday
-  # Weeks: W01 (Jan 1-7), W02, W03, W04, W05 (Jan 29-Feb 4)
-  # 5 weeks touch January
-  expect_equal(weeks_in_month(2024, 1), 5L)
-
-  # February 2024 (leap year): Feb 1 is Thursday, Feb 29 is Thursday
-  # Weeks: W05 (Jan 29-Feb 4), W06, W07, W08, W09 (Feb 26-Mar 3)
-  # 5 weeks touch February
-  expect_equal(weeks_in_month(2024, 2), 5L)
-
-  # December 2024: Dec 1 is Sunday, Dec 31 is Tuesday
-  # First week touching Dec: W48 (Nov 25 - Dec 1)
-  # Last week touching Dec: W01 of 2025 (Dec 30 - Jan 5)
-  # This spans different ISO years
-  expect_equal(weeks_in_month(2024, 12), 6L)
-})
-
 test_that("vectorized ISO week functions work", {
   dates <- as.Date(c("2024-01-01", "2024-06-15", "2024-12-31"))
 

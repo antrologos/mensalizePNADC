@@ -502,20 +502,6 @@ yyyyww_to_seq <- function(yyyyww) {
   (years_since_base * 52L) + iso_wk
 }
 
-#' Compare YYYYWW Values Safely
-#'
-#' Compares two YYYYWW values accounting for year boundaries.
-#' Returns TRUE if first is less than or equal to second.
-#'
-#' @param yyyyww1 First YYYYWW value
-#' @param yyyyww2 Second YYYYWW value
-#' @return Logical vector
-#' @keywords internal
-#' @noRd
-yyyyww_leq <- function(yyyyww1, yyyyww2) {
-  yyyyww_to_seq(yyyyww1) <= yyyyww_to_seq(yyyyww2)
-}
-
 #' Monday of ISO Week (Optimized)
 #'
 #' Returns the Monday (first day) of the ISO week containing the given date.
@@ -638,53 +624,6 @@ days_in_month <- function(year, month) {
     month == 2L & is_leap_year(year),
     29L,
     days
-  )
-}
-
-
-#' Weeks in Month
-#'
-#' Returns the number of ISO weeks that have at least one day in a given month.
-#' Used for distributing monthly population to weekly targets.
-#'
-#' @param year Integer year
-#' @param month Integer month (1-12)
-#' @return Integer count of weeks touching this month
-#' @keywords internal
-#' @noRd
-weeks_in_month <- function(year, month) {
-  # First and last day of month
-  first_day <- make_date(year, month, 1L)
-
-  # Calculate last day of month
-  days_in_month <- c(31L, 28L, 31L, 30L, 31L, 30L, 31L, 31L, 30L, 31L, 30L, 31L)
-  last_day_num <- days_in_month[month]
-  # Adjust for leap year February
-  last_day_num <- data.table::fifelse(
-    month == 2L & is_leap_year(year),
-    29L,
-    last_day_num
-  )
-  last_day <- make_date(year, month, last_day_num)
-
-  # Get ISO weeks of first and last day
-  first_week <- date_to_yyyyww(first_day)
-  last_week <- date_to_yyyyww(last_day)
-
-  # Handle year boundary (e.g., Dec having weeks in next ISO year)
-  # We need to count distinct weeks, accounting for year wrap
-  first_yr <- first_week %/% 100L
-  first_wk <- first_week %% 100L
-  last_yr <- last_week %/% 100L
-  last_wk <- last_week %% 100L
-
-  # If same ISO year, simple subtraction
-  # If different years (Dec spanning into next year's week 1), adjust
-  data.table::fifelse(
-    first_yr == last_yr,
-    last_wk - first_wk + 1L,
-    # Different years: weeks from first to end of first_yr, plus weeks 1 to last_wk
-    (iso_weeks_in_year(first_yr) - first_wk + 1L) + last_wk
   )
 }
 
