@@ -10,6 +10,7 @@ pnadc_experimental_periods(
   strategy = c("none", "probabilistic", "upa_aggregation", "both"),
   confidence_threshold = 0.9,
   upa_proportion_threshold = 0.9,
+  include_derived = TRUE,
   verbose = TRUE
 )
 }
@@ -30,17 +31,41 @@ Default 0.9.}
 observations (within quarter) that must meet criteria for UPA-level assignment.
 Used by upa_aggregation and combined strategies. Default 0.9.}
 
+\item{include_derived}{Logical. If TRUE (default), output includes derived columns
+compatible with \code{pnadc_apply_periods()}: ref_month, ref_month_yyyymm,
+determined_month, etc. This allows experimental output to be used directly
+for weight calibration.}
+
 \item{verbose}{Logical. If TRUE, print progress information.}
 }
 \value{
-A modified crosswalk with additional columns:
+A modified crosswalk with additional columns. When \code{include_derived = TRUE}
+(default), output is directly compatible with \code{pnadc_apply_periods()}:
 \itemize{
-\item \code{ref_month_exp}: Experimentally assigned month (NA if not assigned)
-\item \code{ref_month_exp_confidence}: Confidence of month assignment (0.5-1.0)
-\item \code{ref_fortnight_exp}: Experimentally assigned fortnight
-\item \code{ref_fortnight_exp_confidence}: Confidence of fortnight assignment
-\item \code{ref_week_exp}: Experimentally assigned week
-\item \code{ref_week_exp_confidence}: Confidence of week assignment
+\item \strong{Experimental columns} (always included):
+\itemize{
+\item \code{ref_month_exp}: Experimentally assigned month position in quarter (1-3, or NA)
+\item \code{ref_month_exp_confidence}: Confidence of month assignment (0-1, proportion
+of date interval in assigned period; values below threshold are removed)
+\item \code{ref_fortnight_exp}: Experimentally assigned fortnight position in quarter (1-6, or NA)
+\item \code{ref_fortnight_exp_confidence}: Confidence of fortnight assignment (0-1)
+\item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-14, or NA)
+\item \code{ref_week_exp_confidence}: Confidence of week assignment (0-1)
+}
+\item \strong{Derived columns} (when \code{include_derived = TRUE}):
+\itemize{
+\item \code{ref_month}, \code{ref_month_in_quarter}, \code{ref_month_yyyymm}: Combined
+strict + experimental month (strict takes priority)
+\item \code{determined_month}: TRUE if month is assigned (strictly or experimentally)
+\item \code{ref_fortnight}, \code{ref_fortnight_in_quarter}, \code{ref_fortnight_yyyyff}:
+Combined strict + experimental fortnight
+\item \code{determined_fortnight}: TRUE if fortnight is assigned
+\item \code{ref_week}, \code{ref_week_in_quarter}, \code{ref_week_yyyyww}:
+Combined strict + experimental week
+\item \code{determined_week}: TRUE if week is assigned
+\item \code{probabilistic_assignment}: TRUE if any period was assigned experimentally
+(vs strictly deterministic)
+}
 }
 }
 \description{
@@ -52,8 +77,8 @@ when confidence exceeds threshold.
 \item \strong{upa_aggregation}: Extends strictly identified periods to other
 observations in the same UPA-V1014 within the quarter, if a sufficient
 proportion already have strict identification.
-\item \strong{both}: Combines both strategies - applies probabilistic rule
-at UPA-V1014 level when sufficient proportion have narrow ranges.
+\item \strong{both}: Sequentially applies probabilistic strategy first, then
+UPA aggregation on top. Guarantees identification rate >= max of individual strategies.
 }
 }
 \details{
@@ -76,7 +101,7 @@ For each period type (processed in order: months, then fortnights, then weeks):
 \item Check that the required parent period is identified
 \item If bounds are narrowed to exactly 2 sequential periods, calculate
 which period contains most of the date interval
-\item Calculate confidence based on the proportion of interval in the likely period
+\item Calculate confidence based on the proportion of interval in the likely period (0-1)
 \item Only assign if confidence >= \code{confidence_threshold}
 }
 
@@ -97,14 +122,26 @@ within the quarter:
 
 \subsection{Combined Strategy ("both")}{
 
-Applies probabilistic rule at UPA-V1014 level when sufficient observations
-have narrow ranges:
+Sequentially applies both strategies to maximize identification:
 \enumerate{
-\item For each UPA-V1014 within quarter, check if proportion >= threshold
-have bounds narrowed to 2 sequential periods
-\item If so, apply probabilistic classification at UPA-V1014 level
-\item Process in nested order: months, then fortnights, then weeks
+\item First, apply the probabilistic strategy (captures observations with
+narrow date ranges and high confidence)
+\item Then, apply UPA aggregation (extends based on strict consensus
+within UPA-V1014 groups)
 }
+
+This guarantees that "both" identifies at least as many observations as
+either individual strategy alone. The strategies operate independently
+(UPA aggregation considers only strict identifications), so the result
+is the union of both strategies.
+}
+
+\subsection{Integration with Weight Calibration}{
+
+With \code{include_derived = TRUE} (default), the output can be passed directly to
+\code{pnadc_apply_periods()} for weight calibration. The derived columns combine
+strict and experimental assignments, with strict taking priority. Use the
+\code{probabilistic_assignment} flag to filter if you only want strict determinations.
 }
 }
 \note{
@@ -132,14 +169,22 @@ crosswalk_exp <- pnadc_experimental_periods(
 
 # Check how many additional assignments we get
 crosswalk_exp[, .(
-  strict = sum(!is.na(ref_month_in_quarter)),
-  experimental = sum(!is.na(ref_month_exp)),
-  total = sum(!is.na(ref_month_in_quarter) | !is.na(ref_month_exp))
+  strict = sum(!is.na(ref_month_in_quarter) & !probabilistic_assignment),
+  experimental = sum(probabilistic_assignment, na.rm = TRUE),
+  total = sum(determined_month)
 )]
+
+# Use directly with calibration (experimental output is compatible)
+result <- pnadc_apply_periods(pnadc_data, crosswalk_exp,
+                              period = "month", calibrate = TRUE)
+
+# Or filter to only strict determinations
+strict_only <- crosswalk_exp[probabilistic_assignment == FALSE | is.na(probabilistic_assignment)]
 }
 
 }
 \seealso{
-\code{\link{pnadc_identify_periods}} to build the crosswalk that
-this function modifies.
+\code{\link{pnadc_identify_periods}} to build the crosswalk that this function modifies.
+\code{\link{pnadc_apply_periods}} to apply period crosswalk and calibrate weights.
+\code{\link{combine_period_crosswalks}} to merge strict and experimental crosswalks.
 }
