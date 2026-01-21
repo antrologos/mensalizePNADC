@@ -171,11 +171,24 @@ calibrate_monthly_weights <- function(data, monthly_totals, n_cells = 4L,
 #' @noRd
 create_calibration_cells <- function(dt) {
 
-  # Ensure numeric types for stratification variables (PNADC data may have character cols)
-  if (is.character(dt$V2009)) dt[, V2009 := as.numeric(V2009)]
-  if (is.character(dt$posest_sxi)) dt[, posest_sxi := as.integer(posest_sxi)]
-  if (is.character(dt$posest)) dt[, posest := as.integer(posest)]
-  if (is.character(dt$UF)) dt[, UF := as.integer(UF)]
+  # OPTIMIZATION: Use data.table::set() for more efficient by-reference updates
+  # Convert V2009 to integer (saves 4 bytes per row vs numeric, and age is always integer)
+  if ("V2009" %in% names(dt)) {
+    if (is.character(dt$V2009)) {
+      data.table::set(dt, j = "V2009", value = as.integer(dt$V2009))
+    } else if (!is.integer(dt$V2009)) {
+      data.table::set(dt, j = "V2009", value = as.integer(dt$V2009))
+    }
+  }
+  if ("posest_sxi" %in% names(dt) && !is.integer(dt$posest_sxi)) {
+    data.table::set(dt, j = "posest_sxi", value = as.integer(dt$posest_sxi))
+  }
+  if ("posest" %in% names(dt) && !is.integer(dt$posest)) {
+    data.table::set(dt, j = "posest", value = as.integer(dt$posest))
+  }
+  if ("UF" %in% names(dt) && !is.integer(dt$UF)) {
+    data.table::set(dt, j = "UF", value = as.integer(dt$UF))
+  }
 
   # Celula 1: Age groups
   # 0 = 0-13, 1 = 14-29, 2 = 30-59, 3 = 60+

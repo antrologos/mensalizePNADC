@@ -44,7 +44,7 @@ The algorithm uses:
 \itemize{
 \item IBGE's reference week timing rules (first Saturday with sufficient days in month)
 \item Respondent birthdates to constrain possible interview dates
-\item UPA-panel level aggregation (everyone in same sampling unit interviewed together)
+\item Household-level aggregation within quarter (all persons in same household interviewed on same day)
 \item Dynamic exception detection (identifies quarters needing relaxed rules)
 }
 }

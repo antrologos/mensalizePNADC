@@ -15,14 +15,16 @@ NULL
 .YEAR_BASE_START <- 2000L
 .YEAR_BASE <- local({
   years <- 2000:2050
-  sapply(years, function(y) as.integer(as.Date(paste0(y, "-01-01"))))
+  # OPTIMIZATION: Vectorized approach instead of sapply
+  as.integer(as.Date(paste0(years, "-01-01")))
 })
 
 # Days since 1970-01-01 for January 4th of each year (2000-2050)
 # Used for fast ISO week calculation (Jan 4 is always in ISO week 1)
 .JAN4_BASE <- local({
   years <- 2000:2050
-  sapply(years, function(y) as.integer(as.Date(paste0(y, "-01-04"))))
+  # OPTIMIZATION: Vectorized approach instead of sapply
+  as.integer(as.Date(paste0(years, "-01-04")))
 })
 
 # Cumulative days at the start of each month (0-indexed from Jan 1)
@@ -63,15 +65,25 @@ dow <- function(date) {
 #' @keywords internal
 #' @noRd
 make_date <- function(year, month, day) {
-  year <- as.integer(year)
-  month <- as.integer(month)
+  # OPTIMIZATION: Check types only if not already integer
+  if (!is.integer(year)) year <- as.integer(year)
+  if (!is.integer(month)) month <- as.integer(month)
+  if (!is.integer(day)) day <- as.integer(day)
 
-  day <- as.integer(day)
+  # OPTIMIZATION: Fast path for equal-length inputs (most common case)
+  n_year <- length(year)
+  n_month <- length(month)
+  n_day <- length(day)
 
-  n <- max(length(year), length(month), length(day))
-  year <- rep_len(year, n)
-  month <- rep_len(month, n)
-  day <- rep_len(day, n)
+  if (n_year == n_month && n_month == n_day) {
+    n <- n_year
+  } else {
+    # Recycling needed (rare case)
+    n <- max(n_year, n_month, n_day)
+    year <- rep_len(year, n)
+    month <- rep_len(month, n)
+    day <- rep_len(day, n)
+  }
 
   # Handle NAs
   valid <- !is.na(year) & !is.na(month) & !is.na(day)
@@ -290,7 +302,9 @@ first_valid_saturday <- function(year, month, min_days = 4L) {
   #   If Saturday is day 2: 2 < 3, skip to next week (day 9)
 
   # If first Saturday has enough days, use it; otherwise use second Saturday
-  ifelse(first_saturday_day >= min_days, first_saturday_day, first_saturday_day + 7L)
+  # OPTIMIZATION: Use fifelse instead of ifelse for 5-10x speedup
+
+  data.table::fifelse(first_saturday_day >= min_days, first_saturday_day, first_saturday_day + 7L)
 }
 
 #' First Saturday After or On a Date

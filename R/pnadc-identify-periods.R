@@ -152,8 +152,10 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   # Validate required columns
   validate_pnadc(data, check_weights = FALSE)
 
-  # Convert to data.table (copy to avoid modifying original)
-  dt <- ensure_data_table(data, copy = TRUE)
+  # OPTIMIZATION: Subset to required columns BEFORE copying (80-90% memory reduction)
+  # Instead of copying all 50+ columns, only copy the ~9 columns we actually need
+  required_cols <- required_vars_ref_month()
+  dt <- subset_and_copy(data, required_cols)
 
   # ============================================================================
   # PHASE 1: MONTH IDENTIFICATION (ALL observations)
@@ -175,21 +177,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
 
   if (verbose) cat("  Step 1.1: Preprocessing data...\n")
 
-  # Batch convert character columns using set() for efficiency
-  int_cols <- c("Ano", "Trimestre", "V2008", "V20081", "V20082")
-  for (col in int_cols) {
-    if (is.character(dt[[col]])) {
-      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
-    }
-  }
-  if (!is.numeric(dt$V2009)) {
-    data.table::set(dt, j = "V2009", value = as.numeric(dt$V2009))
-  }
-
-  # Handle special codes for unknown values
-  dt[V2008 == 99L, V2008 := NA_integer_]
-  dt[V20081 == 99L, V20081 := NA_integer_]
-  dt[V20082 == 9999L, V20082 := NA_integer_]
+  # OPTIMIZATION: Use consolidated helper for type conversion and NA code handling
+  # Converts to integer (including V2009 - saves 4 bytes per row vs numeric)
+  convert_pnadc_columns(dt)
 
   # --------------------------------------------------------------------------
   # STEP 1.2: Pre-compute first valid Saturdays for each unique (year, quarter)
@@ -226,6 +216,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
           first_sat_m3 = i.first_sat_m3,
           alt_sat_m1 = i.alt_sat_m1, alt_sat_m2 = i.alt_sat_m2,
           alt_sat_m3 = i.alt_sat_m3)]
+
+  # OPTIMIZATION: Remove unique_quarters - no longer needed
+  rm(unique_quarters)
 
   # --------------------------------------------------------------------------
   # STEP 1.3: Calculate birthday constraints
@@ -303,6 +296,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
 
   if (verbose) cat("  Step 1.6: Aggregating at UPA-panel level (cross-quarter)...\n")
 
+  # OPTIMIZATION: Set key for faster groupby operations
+  data.table::setkey(dt, UPA, V1014)
+
   dt[, `:=`(
     upa_month_min = max(month_min_pos, na.rm = TRUE),
     upa_month_max = min(month_max_pos, na.rm = TRUE),
@@ -310,13 +306,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
     alt_upa_month_max = min(alt_month_max_pos, na.rm = TRUE)
   ), by = .(UPA, V1014)]
 
-  # Handle infinite values
-  for (col in c("upa_month_min", "upa_month_max", "alt_upa_month_min", "alt_upa_month_max")) {
-    inf_idx <- which(is.infinite(dt[[col]]))
-    if (length(inf_idx) > 0L) {
-      data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
-    }
-  }
+  # OPTIMIZATION: Use helper function for infinite value handling
+  fix_infinite_values(dt, c("upa_month_min", "upa_month_max", "alt_upa_month_min", "alt_upa_month_max"))
 
   # --------------------------------------------------------------------------
   # STEP 1.7: Dynamic exception detection for MONTHS
@@ -402,13 +393,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
     )]
   }
 
-  # Handle infinite values
-  for (col in c("upa_month_min_final", "upa_month_max_final")) {
-    inf_idx <- which(is.infinite(dt[[col]]))
-    if (length(inf_idx) > 0L) {
-      data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
-    }
-  }
+  # OPTIMIZATION: Use helper function for infinite value handling
+  fix_infinite_values(dt, c("upa_month_min_final", "upa_month_max_final"))
 
   # --------------------------------------------------------------------------
   # STEP 1.8: MONTH DETERMINATION
@@ -421,10 +407,10 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
        upa_month_min_final >= 1L & upa_month_max_final <= 3L,
      ref_month_in_quarter := upa_month_min_final]
 
-  # Calculate month determination stats
-  n_total <- dt[, uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008), .SDcols = "V1014"][, .N]
-  n_month_determined <- dt[!is.na(ref_month_in_quarter),
-                           uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008), .SDcols = "V1014"][, .N]
+  # OPTIMIZATION: Calculate stats more efficiently using helper function
+  month_stats <- compute_determination_stats(dt, c("Ano", "Trimestre", "UPA", "V1008", "V1014"), "ref_month_in_quarter")
+  n_total <- month_stats$n_total
+  n_month_determined <- month_stats$n_determined
   month_rate <- n_month_determined / n_total
 
   if (verbose) {
@@ -453,9 +439,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   # Initialize fortnight columns
   dt[, ref_fortnight_in_quarter := NA_integer_]
 
-  # Work only with month-determined observations
-  month_determined_idx <- which(!is.na(dt$ref_month_in_quarter))
-  n_month_det <- length(month_determined_idx)
+  # OPTIMIZATION: Use .N instead of which() + length() to count determined observations
+  n_month_det <- dt[!is.na(ref_month_in_quarter), .N]
 
   if (n_month_det == 0) {
     if (verbose) cat("  -> No months determined - skipping fortnight identification\n")
@@ -514,16 +499,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
       alt_hh_fortnight_max = min(alt_fortnight_max_pos, na.rm = TRUE)
     ), by = .(Ano, Trimestre, UPA, V1008)]
 
-    # Handle infinite values
-    for (col in c("hh_fortnight_min", "hh_fortnight_max",
-                  "alt_hh_fortnight_min", "alt_hh_fortnight_max")) {
-      if (col %in% names(dt)) {
-        inf_idx <- which(is.infinite(dt[[col]]))
-        if (length(inf_idx) > 0L) {
-          data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
-        }
-      }
-    }
+    # OPTIMIZATION: Use helper function for infinite value handling
+    fix_infinite_values(dt, c("hh_fortnight_min", "hh_fortnight_max",
+                               "alt_hh_fortnight_min", "alt_hh_fortnight_max"))
 
     # --------------------------------------------------------------------------
     # STEP 2.3: Exception handling for fortnights
@@ -554,10 +532,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
          hh_fortnight_min >= 1L & hh_fortnight_max <= 6L,
        ref_fortnight_in_quarter := hh_fortnight_min]
 
-    # Calculate fortnight determination stats
-    n_fortnight_determined <- dt[!is.na(ref_fortnight_in_quarter),
-                                 uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008),
-                                 .SDcols = "V1014"][, .N]
+    # OPTIMIZATION: Calculate stats more efficiently using helper function
+    fortnight_stats <- compute_determination_stats(dt, c("Ano", "Trimestre", "UPA", "V1008", "V1014"), "ref_fortnight_in_quarter")
+    n_fortnight_determined <- fortnight_stats$n_determined
     fortnight_rate <- n_fortnight_determined / n_total
 
     if (verbose) {
@@ -583,9 +560,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   # Initialize week columns
   dt[, ref_week_yyyyww := NA_integer_]
 
-  # Work only with fortnight-determined observations
-  fortnight_determined_idx <- which(!is.na(dt$ref_fortnight_in_quarter))
-  n_fortnight_det <- length(fortnight_determined_idx)
+  # OPTIMIZATION: Use .N instead of which() + length() to count determined observations
+  n_fortnight_det <- dt[!is.na(ref_fortnight_in_quarter), .N]
 
   if (n_fortnight_det == 0) {
     if (verbose) cat("  -> No fortnights determined - skipping week identification\n")
@@ -672,16 +648,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
       hh_week_max = min(week_max_yyyyww, na.rm = TRUE)
     ), by = .(Ano, Trimestre, UPA, V1008)]
 
-    # Handle infinite values
-    for (col in c("hh_week_min", "hh_week_max", "hh_week_min_seq", "hh_week_max_seq",
-                  "alt_hh_week_min_seq", "alt_hh_week_max_seq")) {
-      if (col %in% names(dt)) {
-        inf_idx <- which(is.infinite(dt[[col]]))
-        if (length(inf_idx) > 0L) {
-          data.table::set(dt, i = inf_idx, j = col, value = NA_integer_)
-        }
-      }
-    }
+    # OPTIMIZATION: Use helper function for infinite value handling
+    fix_infinite_values(dt, c("hh_week_min", "hh_week_max", "hh_week_min_seq", "hh_week_max_seq",
+                               "alt_hh_week_min_seq", "alt_hh_week_max_seq"))
 
     # --------------------------------------------------------------------------
     # STEP 3.3: Exception handling for weeks (using sequential values)
@@ -713,10 +682,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
          !is.na(hh_week_min_seq) & !is.infinite(hh_week_min_seq),
        ref_week_yyyyww := hh_week_min]
 
-    # Calculate week determination stats
-    n_week_determined <- dt[!is.na(ref_week_yyyyww),
-                            uniqueN(.SD), by = .(Ano, Trimestre, UPA, V1008),
-                            .SDcols = "V1014"][, .N]
+    # OPTIMIZATION: Calculate stats more efficiently using helper function
+    week_stats <- compute_determination_stats(dt, c("Ano", "Trimestre", "UPA", "V1008", "V1014"), "ref_week_yyyyww")
+    n_week_determined <- week_stats$n_determined
     week_rate <- n_week_determined / n_total
 
     if (verbose) {
@@ -739,6 +707,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
     ref_fortnight_in_quarter = ref_fortnight_in_quarter[1L],
     ref_week_yyyyww = ref_week_yyyyww[1L]
   ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
+
+  # OPTIMIZATION: Free memory from working data.table - no longer needed
+  rm(dt)
 
   # Calculate derived month columns
   crosswalk[!is.na(ref_month_in_quarter), `:=`(

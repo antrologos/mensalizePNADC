@@ -168,15 +168,16 @@ pnadc_apply_periods <- function(data,
 
   # Ensure consistent types for join keys
   # PNADC data may have character or integer columns depending on source
+  # OPTIMIZATION: Use data.table::set() for more efficient by-reference updates
   type_coerce_cols <- c("Ano", "Trimestre", "UPA", "V1008", "V1014")
   for (col in type_coerce_cols) {
     if (col %in% names(dt) && col %in% names(xw)) {
       # Coerce both to integer for consistent joins
       if (!is.integer(dt[[col]])) {
-        dt[, (col) := as.integer(get(col))]
+        data.table::set(dt, j = col, value = as.integer(dt[[col]]))
       }
       if (!is.integer(xw[[col]])) {
-        xw[, (col) := as.integer(get(col))]
+        data.table::set(xw, j = col, value = as.integer(xw[[col]]))
       }
     }
   }
@@ -465,15 +466,20 @@ calibrate_weights_internal <- function(dt,
 #' @keywords internal
 #' @noRd
 create_calibration_cells_unified <- function(dt) {
-  # Ensure numeric types
+  # OPTIMIZATION: Use data.table::set() for more efficient by-reference updates
+  # Convert V2009/v2009 to integer (saves 4 bytes per row vs numeric, and age is always integer)
   for (col in c("V2009", "v2009")) {
-    if (col %in% names(dt) && is.character(dt[[col]])) {
-      dt[, (col) := as.numeric(get(col))]
+    if (col %in% names(dt)) {
+      if (is.character(dt[[col]])) {
+        data.table::set(dt, j = col, value = as.integer(dt[[col]]))
+      } else if (!is.integer(dt[[col]])) {
+        data.table::set(dt, j = col, value = as.integer(dt[[col]]))
+      }
     }
   }
   for (col in c("posest_sxi", "posest", "UF", "uf")) {
-    if (col %in% names(dt) && is.character(dt[[col]])) {
-      dt[, (col) := as.integer(get(col))]
+    if (col %in% names(dt) && !is.integer(dt[[col]])) {
+      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
     }
   }
 

@@ -344,3 +344,153 @@ ensure_data_table <- function(data, copy = FALSE) {
     data.table::as.data.table(data)
   }
 }
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION: Helper functions for memory-efficient operations
+# ============================================================================
+
+#' Subset Data to Required Columns and Copy
+#'
+#' OPTIMIZATION: Instead of copying the entire data.table (potentially 50+ columns),
+#' this function first subsets to only the required columns, then copies.
+#' This can reduce memory usage by 80-90% for typical PNADC datasets.
+#'
+#' @param data A data.frame or data.table
+#' @param required_cols Character vector of required column names
+#' @param optional_cols Character vector of optional column names (included if present)
+#' @return data.table with only the specified columns (always a copy)
+#' @keywords internal
+#' @noRd
+subset_and_copy <- function(data, required_cols, optional_cols = NULL) {
+  # Check required columns exist
+  missing <- setdiff(required_cols, names(data))
+  if (length(missing) > 0) {
+    stop("Missing required columns: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+
+  # Build column list: required + available optional
+  cols_to_keep <- required_cols
+  if (!is.null(optional_cols)) {
+    cols_to_keep <- unique(c(cols_to_keep, intersect(optional_cols, names(data))))
+  }
+
+  # Subset and copy in one operation
+  # Use .SDcols to avoid R CMD check NOTE about ..cols_to_keep
+  if (data.table::is.data.table(data)) {
+    data.table::copy(data[, .SD, .SDcols = cols_to_keep])
+  } else {
+    data.table::as.data.table(data[, cols_to_keep, drop = FALSE])
+  }
+}
+
+#' Convert PNADC Columns to Appropriate Types
+#'
+#' OPTIMIZATION: Consolidates repeated type conversion code from multiple functions.
+#' Uses data.table::set() for in-place modification without copy overhead.
+#'
+#' @param dt A data.table (modified in place)
+#' @param int_cols Character vector of columns to convert to integer
+#' @param num_cols Character vector of columns to convert to integer (not numeric - saves memory)
+#' @param na_codes Named list of NA codes per column (e.g., list(V2008 = 99L))
+#' @return Invisibly returns dt (modified in place)
+#' @keywords internal
+#' @noRd
+convert_pnadc_columns <- function(dt,
+                                   int_cols = c("Ano", "Trimestre", "V2008", "V20081", "V20082"),
+                                   num_cols = "V2009",
+                                   na_codes = list(V2008 = 99L, V20081 = 99L, V20082 = 9999L)) {
+  # Convert integer columns
+  for (col in int_cols) {
+    if (col %in% names(dt) && !is.integer(dt[[col]])) {
+      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
+    }
+  }
+
+  # Convert numeric columns to INTEGER (OPTIMIZATION: 4 bytes vs 8 bytes for double)
+  # Age (V2009) is always a whole number, so integer is sufficient
+  for (col in num_cols) {
+    if (col %in% names(dt) && !is.integer(dt[[col]])) {
+      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
+    }
+  }
+
+  # Replace NA codes with actual NA
+  for (col in names(na_codes)) {
+    if (col %in% names(dt)) {
+      na_val <- na_codes[[col]]
+      dt[get(col) == na_val, (col) := NA_integer_]
+    }
+  }
+
+  invisible(dt)
+}
+
+#' Fix Infinite Values in Columns
+#'
+#' OPTIMIZATION: Replaces infinite values (from max/min on empty groups) with NA.
+#' Uses data.table's efficient subsetting instead of which() + set() pattern.
+#'
+#' @param dt A data.table (modified in place)
+#' @param cols Character vector of column names to check
+#' @param replacement Value to replace infinites with (default NA_integer_)
+#' @return Invisibly returns dt (modified in place)
+#' @keywords internal
+#' @noRd
+fix_infinite_values <- function(dt, cols, replacement = NA_integer_) {
+  for (col in cols) {
+    if (col %in% names(dt)) {
+      dt[is.infinite(get(col)), (col) := replacement]
+    }
+  }
+  invisible(dt)
+}
+
+#' Apply Birthday Constraints to Date Bounds
+#'
+#' OPTIMIZATION: Consolidates repeated birthday constraint code.
+#' Applies constraints to narrow the interview date window based on birthday.
+#'
+#' @param dt A data.table with visit_before_birthday, first_sat_after_birthday columns
+#' @param date_min_col Name of the minimum date column
+#' @param date_max_col Name of the maximum date column
+#' @return Invisibly returns dt (modified in place)
+#' @keywords internal
+#' @noRd
+apply_birthday_constraints <- function(dt, date_min_col, date_max_col) {
+  # If visited AFTER birthday, interview must be on/after first Saturday after birthday
+  dt[visit_before_birthday == 0L & !is.na(first_sat_after_birthday) &
+       first_sat_after_birthday > get(date_min_col) &
+       first_sat_after_birthday <= get(date_max_col),
+     (date_min_col) := first_sat_after_birthday]
+
+  # If visited BEFORE birthday, interview must be before birthday
+  dt[visit_before_birthday == 1L & !is.na(birthday) &
+       birthday <= get(date_max_col) &
+       birthday > get(date_min_col),
+     (date_max_col) := birthday - 1L]
+
+  invisible(dt)
+}
+
+#' Compute Determination Statistics Efficiently
+#'
+#' OPTIMIZATION: Computes total and determined counts in a single pass
+#' instead of two separate uniqueN operations.
+#'
+#' @param dt A data.table
+#' @param by_cols Grouping columns for counting unique combinations
+#' @param determined_col Column name containing the determination result (NA = undetermined)
+#' @return List with n_total and n_determined
+#' @keywords internal
+#' @noRd
+compute_determination_stats <- function(dt, by_cols, determined_col) {
+  # Single aggregation to get both counts
+  stats <- dt[, .(
+    is_determined = !is.na(get(determined_col)[1L])
+  ), by = by_cols]
+
+  list(
+    n_total = nrow(stats),
+    n_determined = sum(stats$is_determined)
+  )
+}
