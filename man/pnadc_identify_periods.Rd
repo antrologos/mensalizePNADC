@@ -30,17 +30,21 @@ Optional but recommended:
 A data.table crosswalk with columns:
 \describe{
 \item{Ano, Trimestre, UPA, V1008, V1014}{Join keys (year, quarter, UPA, household, panel)}
-\item{ref_month}{Reference month as Date (1st of month)}
+\item{ref_month_start}{Sunday of first IBGE reference week of the month}
+\item{ref_month_end}{Saturday of last IBGE reference week of the month}
 \item{ref_month_in_quarter}{Position in quarter (1, 2, 3) or NA}
 \item{ref_month_yyyymm}{Integer YYYYMM format (e.g., 202301)}
+\item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
 \item{determined_month}{Logical: TRUE if month was determined}
-\item{ref_fortnight}{Reference fortnight as Date (1st or 16th)}
+\item{ref_fortnight_start}{Sunday of first IBGE week of the fortnight}
+\item{ref_fortnight_end}{Saturday of last IBGE week of the fortnight}
 \item{ref_fortnight_in_quarter}{Position in quarter (1-6) or NA}
 \item{ref_fortnight_yyyyff}{Integer YYYYFF format (1-24 per year)}
 \item{determined_fortnight}{Logical: TRUE if fortnight was determined}
-\item{ref_week}{Reference week as Date (Monday of week)}
+\item{ref_week_start}{Sunday of the IBGE reference week}
+\item{ref_week_end}{Saturday of the IBGE reference week}
 \item{ref_week_in_quarter}{Position in quarter (1-14) or NA}
-\item{ref_week_yyyyww}{Integer ISO YYYYWW format}
+\item{ref_week_yyyyww}{Integer IBGE YYYYWW format}
 \item{determined_week}{Logical: TRUE if week was determined}
 }
 }

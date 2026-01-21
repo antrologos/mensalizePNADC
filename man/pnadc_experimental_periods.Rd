@@ -9,7 +9,7 @@ pnadc_experimental_periods(
   data = NULL,
   strategy = c("none", "probabilistic", "upa_aggregation", "both"),
   confidence_threshold = 0.9,
-  upa_proportion_threshold = 0.9,
+  upa_proportion_threshold = 0.5,
   include_derived = TRUE,
   verbose = TRUE
 )
@@ -27,14 +27,14 @@ Options: "none", "probabilistic", "upa_aggregation", "both"}
 assign a probabilistic period. Used by probabilistic and combined strategies.
 Default 0.9.}
 
-\item{upa_proportion_threshold}{Numeric (0-1). Minimum proportion of UPA-V1014
-observations (within quarter) that must meet criteria for UPA-level assignment.
-Used by upa_aggregation and combined strategies. Default 0.9.}
+\item{upa_proportion_threshold}{Numeric (0-1). Minimum proportion of UPA
+observations (within quarter) that must have strict identification with consensus
+for extending to unidentified observations. Default 0.5.}
 
 \item{include_derived}{Logical. If TRUE (default), output includes derived columns
-compatible with \code{pnadc_apply_periods()}: ref_month, ref_month_yyyymm,
-determined_month, etc. This allows experimental output to be used directly
-for weight calibration.}
+compatible with \code{pnadc_apply_periods()}: ref_month_start, ref_month_end,
+ref_month_yyyymm, ref_month_weeks, determined_month, etc. This allows
+experimental output to be used directly for weight calibration.}
 
 \item{verbose}{Logical. If TRUE, print progress information.}
 }
@@ -54,14 +54,17 @@ of date interval in assigned period; values below threshold are removed)
 }
 \item \strong{Derived columns} (when \code{include_derived = TRUE}):
 \itemize{
-\item \code{ref_month}, \code{ref_month_in_quarter}, \code{ref_month_yyyymm}: Combined
-strict + experimental month (strict takes priority)
+\item \code{ref_month_start}, \code{ref_month_end}, \code{ref_month_in_quarter},
+\code{ref_month_yyyymm}, \code{ref_month_weeks}: Combined strict + experimental month
+(strict takes priority). Start/end are Sunday/Saturday of IBGE month boundaries.
 \item \code{determined_month}: TRUE if month is assigned (strictly or experimentally)
-\item \code{ref_fortnight}, \code{ref_fortnight_in_quarter}, \code{ref_fortnight_yyyyff}:
-Combined strict + experimental fortnight
+\item \code{ref_fortnight_start}, \code{ref_fortnight_end}, \code{ref_fortnight_in_quarter},
+\code{ref_fortnight_yyyyff}: Combined strict + experimental fortnight.
+Start/end are Sunday/Saturday of IBGE fortnight boundaries.
 \item \code{determined_fortnight}: TRUE if fortnight is assigned
-\item \code{ref_week}, \code{ref_week_in_quarter}, \code{ref_week_yyyyww}:
-Combined strict + experimental week
+\item \code{ref_week_start}, \code{ref_week_end}, \code{ref_week_in_quarter},
+\code{ref_week_yyyyww}: Combined strict + experimental week.
+Start/end are Sunday/Saturday of IBGE week boundaries.
 \item \code{determined_week}: TRUE if week is assigned
 \item \code{probabilistic_assignment}: TRUE if any period was assigned experimentally
 (vs strictly deterministic)

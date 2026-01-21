@@ -1,16 +1,17 @@
 #' Identify Reference Week in PNADC Data
 #'
-#' Determines which ISO week each survey observation corresponds to based on
-#' IBGE's interview timing rules and birthday constraints.
+#' Determines which IBGE reference week each survey observation corresponds to
+#' based on IBGE's interview timing rules and birthday constraints.
 #'
 #' @description
 #' PNADC is a quarterly survey where each interview occurs during a specific
-#' week within the quarter. This function identifies which ISO 8601 week that
-#' observation belongs to, enabling weekly time series analysis.
+#' week within the quarter. This function identifies which IBGE reference week
+#' that observation belongs to, enabling weekly time series analysis.
 #'
 #' The algorithm uses:
 #' \itemize{
 #'   \item IBGE's reference week timing rules (first Saturday with sufficient days in month)
+#'   \item IBGE week boundaries (Sunday-Saturday, not ISO Monday-Sunday)
 #'   \item Respondent birthdates to constrain possible interview dates
 #'   \item Household-level aggregation (all persons in same household interviewed on same day)
 #'   \item Dynamic exception detection (identifies quarters needing relaxed rules from the data)
@@ -45,9 +46,10 @@
 #'
 #' @return A data.table with the original key columns plus:
 #'   \itemize{
-#'     \item \code{ref_week}: Reference week as Date (Monday of that week)
+#'     \item \code{ref_week_start}: Reference week start (Sunday of IBGE week)
+#'     \item \code{ref_week_end}: Reference week end (Saturday of IBGE week)
 #'     \item \code{ref_week_in_quarter}: Position in quarter (1-14) or NA if indeterminate
-#'     \item \code{ref_week_yyyyww}: Integer YYYYWW format (e.g., 202301)
+#'     \item \code{ref_week_yyyyww}: Integer YYYYWW format (IBGE-based)
 #'   }
 #'
 #' @details
@@ -74,13 +76,13 @@
 #'   \item Birthday constraints rarely narrow the interview window to a single 7-day period
 #' }
 #'
-#' ## ISO 8601 Weeks
+#' ## IBGE Reference Weeks
 #'
-#' Weeks follow ISO 8601 standard:
+#' Weeks follow IBGE reference calendar:
 #' \itemize{
-#'   \item Week 1 is the week containing January 4th
-#'   \item Weeks start on Monday
-#'   \item Dec 31 may be in week 1 of the following year
+#'   \item Weeks start on Sunday and end on Saturday
+#'   \item A week belongs to the IBGE month where its Saturday falls
+#'   \item The first valid Saturday must have >= 4 days in the month
 #' }
 #'
 #' @examples
@@ -178,10 +180,14 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # STEP 3: Calculate date bounds using STANDARD rules
   # ============================================================================
 
+  # Calculate the last Saturday of the quarter using IBGE month end
+  # (handles 4 or 5 week months correctly)
+  dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
+
   # Initialize date bounds using standard Saturday values
   dt[, `:=`(
     date_min = make_date(Ano, month1, first_sat_m1),
-    date_max = make_date(Ano, month3, first_sat_m3) + 21L  # 4 interview weeks
+    date_max = quarter_end
   )]
 
   # Apply birthday constraints
@@ -203,25 +209,20 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   update_pb(3)
 
   # ============================================================================
-  # STEP 4: Convert date bounds to ISO weeks
+  # STEP 4: Convert date bounds to IBGE weeks
   # ============================================================================
 
-  # Convert to ISO week format
+  # Convert to IBGE week position within quarter (1-14 typically)
   dt[, `:=`(
-    week_min_yyyyww = date_to_yyyyww(date_min),
-    week_max_yyyyww = date_to_yyyyww(date_max)
-  )]
-
-  # Also calculate week position within quarter for output
-  dt[, `:=`(
-    week_min_pos = week_in_quarter(date_min, Trimestre, Ano),
-    week_max_pos = week_in_quarter(date_max, Trimestre, Ano)
+    week_min_pos = ibge_week_in_quarter(date_min, Trimestre, Ano, min_days = 4L),
+    week_max_pos = ibge_week_in_quarter(date_max, Trimestre, Ano, min_days = 4L)
   )]
 
   # Calculate alternative date bounds using EXCEPTION rule (min_days=3)
+  dt[, alt_quarter_end := ibge_month_end(Ano, month3, min_days = 3L)]
   dt[, `:=`(
     alt_date_min = make_date(Ano, month1, alt_sat_m1),
-    alt_date_max = make_date(Ano, month3, alt_sat_m3) + 21L
+    alt_date_max = alt_quarter_end
   )]
 
   # Apply birthday constraints to alternative bounds
@@ -237,10 +238,10 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
        (first_sat_after_birthday - 7L) >= alt_date_min,
      alt_date_max := first_sat_after_birthday - 7L]
 
-  # Convert alternative bounds to ISO weeks
+  # Convert alternative bounds to IBGE week positions
   dt[, `:=`(
-    alt_week_min_yyyyww = date_to_yyyyww(alt_date_min),
-    alt_week_max_yyyyww = date_to_yyyyww(alt_date_max)
+    alt_week_min_pos = ibge_week_in_quarter(alt_date_min, Trimestre, Ano, min_days = 3L),
+    alt_week_max_pos = ibge_week_in_quarter(alt_date_max, Trimestre, Ano, min_days = 3L)
   )]
 
   update_pb(4)
@@ -254,12 +255,12 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   data.table::setkey(dt, Ano, Trimestre, UPA, V1008)
 
   # Aggregate: max of mins (latest possible start), min of maxes (earliest possible end)
-  # For YYYYWW format, we compare as integers (works because format is lexicographically correct)
+  # Using week positions (integers) for comparison
   dt[, `:=`(
-    hh_week_min = max(week_min_yyyyww, na.rm = TRUE),
-    hh_week_max = min(week_max_yyyyww, na.rm = TRUE),
-    alt_hh_week_min = max(alt_week_min_yyyyww, na.rm = TRUE),
-    alt_hh_week_max = min(alt_week_max_yyyyww, na.rm = TRUE)
+    hh_week_min = max(week_min_pos, na.rm = TRUE),
+    hh_week_max = min(week_max_pos, na.rm = TRUE),
+    alt_hh_week_min = max(alt_week_min_pos, na.rm = TRUE),
+    alt_hh_week_max = min(alt_week_max_pos, na.rm = TRUE)
   ), by = .(Ano, Trimestre, UPA, V1008)]
 
   # Handle infinite values from all-NA groups (max returns -Inf, min returns Inf)
@@ -269,7 +270,8 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   dt[is.infinite(alt_hh_week_max), alt_hh_week_max := NA_integer_]
 
   # Clean up alternative date columns
-  dt[, c("alt_date_min", "alt_date_max", "alt_week_min_yyyyww", "alt_week_max_yyyyww") := NULL]
+  dt[, c("alt_date_min", "alt_date_max", "alt_week_min_pos", "alt_week_max_pos",
+         "alt_quarter_end") := NULL]
 
   update_pb(5)
 
@@ -329,19 +331,21 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # ============================================================================
 
   # Assign reference week: if min == max, that's the week; otherwise indeterminate
-  dt[, ref_week_yyyyww := NA_integer_]
-  dt[hh_week_min == hh_week_max & !is.infinite(hh_week_min),
-     ref_week_yyyyww := hh_week_min]
-
-  # Calculate final reference week Date (Monday of that week)
-  dt[, ref_week := as.Date(NA)]
-  dt[!is.na(ref_week_yyyyww),
-     ref_week := yyyyww_to_date(ref_week_yyyyww)]
-
-  # Calculate week position in quarter
   dt[, ref_week_in_quarter := NA_integer_]
-  dt[!is.na(ref_week),
-     ref_week_in_quarter := week_in_quarter(ref_week, Trimestre, Ano)]
+  dt[hh_week_min == hh_week_max & !is.na(hh_week_min) & hh_week_min >= 1L,
+     ref_week_in_quarter := hh_week_min]
+
+  # Calculate IBGE week dates from position (Sunday start, Saturday end)
+  dt[, `:=`(ref_week_start = as.Date(NA), ref_week_end = as.Date(NA))]
+  dt[!is.na(ref_week_in_quarter), `:=`(
+    ref_week_start = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter)$start,
+    ref_week_end = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter)$end
+  )]
+
+  # Calculate YYYYWW format from the Saturday of each week
+  dt[, ref_week_yyyyww := NA_integer_]
+  dt[!is.na(ref_week_end),
+     ref_week_yyyyww := date_to_ibge_yyyyww(ref_week_end)]
 
   # ============================================================================
   # STEP 8: Select output columns and return
@@ -353,17 +357,16 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
     "first_sat_m1", "first_sat_m2", "first_sat_m3",
     "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
     "first_sat_after_birthday", "visit_before_birthday",
-    "date_min", "date_max",
-    "week_min_yyyyww", "week_max_yyyyww",
+    "date_min", "date_max", "quarter_end",
     "week_min_pos", "week_max_pos",
     "hh_week_min", "hh_week_max"
   )
   dt[, (intersect(temp_cols, names(dt))) := NULL]
   # OPTIMIZATION: Removed explicit gc() call - R's garbage collector runs automatically
 
-  # Select output columns
+  # Select output columns - use new column names
   key_cols <- intersect(join_key_vars(), names(dt))
-  output_cols <- c(key_cols, "ref_week", "ref_week_in_quarter", "ref_week_yyyyww")
+  output_cols <- c(key_cols, "ref_week_start", "ref_week_end", "ref_week_in_quarter", "ref_week_yyyyww")
 
   result <- dt[, ..output_cols]
 

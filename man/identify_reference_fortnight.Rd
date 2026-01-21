@@ -29,40 +29,40 @@ identify_reference_fortnight(data, verbose = TRUE, .pb = NULL, .pb_offset = 0L)
 \value{
 A data.table with the original key columns plus:
 \itemize{
-\item \code{ref_fortnight}: Reference fortnight as Date (1st or 16th of month)
+\item \code{ref_fortnight_start}: Reference fortnight start (Sunday of first IBGE week)
+\item \code{ref_fortnight_end}: Reference fortnight end (Saturday of last IBGE week)
 \item \code{ref_fortnight_in_quarter}: Position in quarter (1-6) or NA
 \item \code{ref_fortnight_yyyyff}: Integer YYYYFF format (1-24 per year)
+\item \code{ref_fortnight_weeks}: Number of IBGE weeks in this fortnight (2 or 3)
 }
 }
 \description{
 PNADC is a quarterly survey where each interview occurs during a specific
-fortnight within the quarter. This function identifies which fortnight (1-6
-per quarter, 1-24 per year) that observation belongs to, enabling bi-weekly
-time series analysis.
+fortnight within the quarter. This function identifies which IBGE fortnight
+(1-6 per quarter, 1-24 per year) that observation belongs to, enabling
+bi-weekly time series analysis.
 
 The algorithm uses:
 \itemize{
 \item IBGE's reference week timing rules (first Saturday with sufficient days in month)
+\item IBGE week boundaries (Sunday-Saturday, not calendar days)
 \item Respondent birthdates to constrain possible interview dates
 \item Household-level aggregation within quarter (all persons in same household interviewed on same day)
 \item Dynamic exception detection (identifies quarters needing relaxed rules)
 }
 }
 \details{
-Determines which fortnight (quinzena - 15-day period) within each quarter
-corresponds to each survey observation based on IBGE's interview timing rules.
-\subsection{Fortnight Definition}{
+Determines which IBGE fortnight (quinzena) within each quarter corresponds
+to each survey observation based on IBGE's interview timing rules.
+\subsection{IBGE Fortnight Definition}{
 
-Each year has 24 fortnights (2 per month):
+IBGE fortnights are based on IBGE reference weeks, NOT calendar days:
 \itemize{
-\item Fortnight 01: Jan 1-15
-\item Fortnight 02: Jan 16-31
-\item Fortnight 03: Feb 1-15
-\item Fortnight 04: Feb 16-28/29
-\item ... and so on through fortnight 24 (Dec 16-31)
+\item Fortnight 1 of a month = IBGE weeks 1-2 of that month
+\item Fortnight 2 of a month = IBGE weeks 3-4 (or 3-5 for 5-week months)
 }
 
-Each quarter has 6 fortnights (e.g., Q1 = fortnights 01-06).
+Each quarter has 6 fortnights (2 per month).
 }
 
 \subsection{Expected Determination Rate}{
@@ -71,11 +71,11 @@ Fortnight determination rate is typically low (~2-5\%) because:
 \itemize{
 \item Unlike months, fortnights cannot aggregate across quarters
 \item Birthday constraints typically narrow the date range by only a few weeks
-\item A 15-day fortnight window is difficult to pinpoint without cross-quarter data
+\item An IBGE fortnight (2 weeks) is difficult to pinpoint without cross-quarter data
 }
 
 The algorithm determines fortnight when the interview date range falls
-entirely within a single 15-day period.
+entirely within a single IBGE fortnight (weeks 1-2 or weeks 3+).
 
 \strong{Note}: The month algorithm achieves ~97\% determination by aggregating
 at UPA-V1014 level across ALL quarters (leveraging the panel design where

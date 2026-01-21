@@ -35,19 +35,21 @@ progress bar. Default is 0.}
 \value{
 A data.table with the original key columns plus:
 \itemize{
-\item \code{ref_week}: Reference week as Date (Monday of that week)
+\item \code{ref_week_start}: Reference week start (Sunday of IBGE week)
+\item \code{ref_week_end}: Reference week end (Saturday of IBGE week)
 \item \code{ref_week_in_quarter}: Position in quarter (1-14) or NA if indeterminate
-\item \code{ref_week_yyyyww}: Integer YYYYWW format (e.g., 202301)
+\item \code{ref_week_yyyyww}: Integer YYYYWW format (IBGE-based)
 }
 }
 \description{
 PNADC is a quarterly survey where each interview occurs during a specific
-week within the quarter. This function identifies which ISO 8601 week that
-observation belongs to, enabling weekly time series analysis.
+week within the quarter. This function identifies which IBGE reference week
+that observation belongs to, enabling weekly time series analysis.
 
 The algorithm uses:
 \itemize{
 \item IBGE's reference week timing rules (first Saturday with sufficient days in month)
+\item IBGE week boundaries (Sunday-Saturday, not ISO Monday-Sunday)
 \item Respondent birthdates to constrain possible interview dates
 \item Household-level aggregation (all persons in same household interviewed on same day)
 \item Dynamic exception detection (identifies quarters needing relaxed rules from the data)
@@ -59,8 +61,8 @@ This is because households are interviewed in the same month position across
 quarterly visits, but NOT in the same week position.
 }
 \details{
-Determines which ISO week each survey observation corresponds to based on
-IBGE's interview timing rules and birthday constraints.
+Determines which IBGE reference week each survey observation corresponds to
+based on IBGE's interview timing rules and birthday constraints.
 \subsection{Household Aggregation}{
 
 All persons in the same household (UPA + V1008) are interviewed on the same day.
@@ -86,13 +88,13 @@ The weekly determination rate (~1-2\%) is much lower than monthly (~97\%) becaus
 }
 }
 
-\subsection{ISO 8601 Weeks}{
+\subsection{IBGE Reference Weeks}{
 
-Weeks follow ISO 8601 standard:
+Weeks follow IBGE reference calendar:
 \itemize{
-\item Week 1 is the week containing January 4th
-\item Weeks start on Monday
-\item Dec 31 may be in week 1 of the following year
+\item Weeks start on Sunday and end on Saturday
+\item A week belongs to the IBGE month where its Saturday falls
+\item The first valid Saturday must have >= 4 days in the month
 }
 }
 }

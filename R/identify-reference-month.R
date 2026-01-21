@@ -41,9 +41,11 @@
 #'
 #' @return A data.table with the original key columns plus:
 #'   \itemize{
-#'     \item \code{ref_month}: Reference month as Date (first day of month, e.g., "2023-01-01")
+#'     \item \code{ref_month_start}: Reference month start (Sunday of first IBGE reference week)
+#'     \item \code{ref_month_end}: Reference month end (Saturday of last IBGE reference week)
 #'     \item \code{ref_month_in_quarter}: Position in quarter (1, 2, 3) or NA if indeterminate
 #'     \item \code{ref_month_yyyymm}: Integer YYYYMM format (e.g., 202301)
+#'     \item \code{ref_month_weeks}: Number of IBGE weeks in this month (4 or 5)
 #'   }
 #'
 #' @details
@@ -190,11 +192,15 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # STEP 3: Calculate date bounds and month positions using STANDARD rules
   # ============================================================================
 
+  # Calculate the last Saturday of the quarter using IBGE month end
+  # (handles 4 or 5 week months correctly)
+  dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
+
   # Initialize date bounds using standard Saturday values
   # OPTIMIZATION: Combined into single := call
   dt[, `:=`(
     date_min = make_date(Ano, month1, first_sat_m1),
-    date_max = make_date(Ano, month3, first_sat_m3) + 21L
+    date_max = quarter_end
   )]
 
   # Apply birthday constraints
@@ -227,11 +233,14 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # STEP 4: Calculate date bounds and month positions using ALTERNATIVE rules
   # ============================================================================
 
+  # Calculate alternative quarter end using EXCEPTION rule (min_days=3)
+  dt[, alt_quarter_end := ibge_month_end(Ano, month3, min_days = 3L)]
+
   # Initialize alternative date bounds using alternative Saturday values
   # OPTIMIZATION: Combined into single := call
   dt[, `:=`(
     alt_date_min = make_date(Ano, month1, alt_sat_m1),
-    alt_date_max = make_date(Ano, month3, alt_sat_m3) + 21L
+    alt_date_max = alt_quarter_end
   )]
 
   # Apply birthday constraints to alternative bounds
@@ -396,7 +405,7 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
     "first_sat_m1", "first_sat_m2", "first_sat_m3",
     "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
     "first_sat_after_birthday", "visit_before_birthday",
-    "date_min", "date_max",
+    "date_min", "date_max", "quarter_end", "alt_quarter_end",
     "month_min_pos", "month_max_pos",
     "upa_month_min", "upa_month_max",
     "alt_upa_month_min", "alt_upa_month_max",
@@ -416,26 +425,43 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # Assign reference month: if min == max, that's the month; otherwise indeterminate
   dt[, ref_month_in_quarter := NA_integer_]
   dt[upa_month_min_final == upa_month_max_final &
-       upa_month_min_final >= 1L & upa_month_max_final <= 3L,
+       !is.na(upa_month_min_final) & upa_month_min_final >= 1L & upa_month_max_final <= 3L,
      ref_month_in_quarter := upa_month_min_final]
 
-  # Calculate final reference month Date and YYYYMM
+  # Calculate the actual month number from position in quarter
   dt[!is.na(ref_month_in_quarter), `:=`(
-    ref_month = make_date(Ano, quarter_month_n(Trimestre, ref_month_in_quarter), 1L),
-    ref_month_yyyymm = yyyymm(Ano, quarter_month_n(Trimestre, ref_month_in_quarter))
+    temp_month = quarter_month_n(Trimestre, ref_month_in_quarter)
   )]
 
-  dt[is.na(ref_month_in_quarter), `:=`(
-    ref_month = as.Date(NA),
-    ref_month_yyyymm = NA_integer_
+  # Calculate IBGE month boundaries (start = Sunday, end = Saturday)
+  dt[, `:=`(ref_month_start = as.Date(NA), ref_month_end = as.Date(NA))]
+  dt[!is.na(ref_month_in_quarter), `:=`(
+    ref_month_start = ibge_month_start(Ano, temp_month, min_days = 4L),
+    ref_month_end = ibge_month_end(Ano, temp_month, min_days = 4L)
   )]
+
+  # Calculate number of IBGE weeks in this month (4 or 5)
+  dt[, ref_month_weeks := NA_integer_]
+  dt[!is.na(ref_month_in_quarter), `:=`(
+    ref_month_weeks = ibge_month_weeks(Ano, temp_month, min_days = 4L)
+  )]
+
+  # Calculate YYYYMM format
+  dt[, ref_month_yyyymm := NA_integer_]
+  dt[!is.na(ref_month_in_quarter), `:=`(
+    ref_month_yyyymm = yyyymm(Ano, temp_month)
+  )]
+
+  # Clean up temp_month
+  dt[, temp_month := NULL]
 
   # ============================================================================
   # STEP 8: Select output columns and return
   # ============================================================================
 
   key_cols <- intersect(join_key_vars(), names(dt))
-  output_cols <- c(key_cols, "ref_month", "ref_month_in_quarter", "ref_month_yyyymm")
+  output_cols <- c(key_cols, "ref_month_start", "ref_month_end",
+                   "ref_month_in_quarter", "ref_month_yyyymm", "ref_month_weeks")
 
   result <- dt[, ..output_cols]
 

@@ -128,20 +128,24 @@ test_that("pnadc_identify_periods returns correct crosswalk structure", {
   # Should NOT have person-level keys
   expect_false("V2003" %in% names(result))
 
-  # Should have month columns
-  expect_true("ref_month" %in% names(result))
+  # Should have month columns (IBGE-based)
+  expect_true("ref_month_start" %in% names(result))
+  expect_true("ref_month_end" %in% names(result))
   expect_true("ref_month_in_quarter" %in% names(result))
   expect_true("ref_month_yyyymm" %in% names(result))
+  expect_true("ref_month_weeks" %in% names(result))
   expect_true("determined_month" %in% names(result))
 
-  # Should have fortnight columns
-  expect_true("ref_fortnight" %in% names(result))
+  # Should have fortnight columns (IBGE-based)
+  expect_true("ref_fortnight_start" %in% names(result))
+  expect_true("ref_fortnight_end" %in% names(result))
   expect_true("ref_fortnight_in_quarter" %in% names(result))
   expect_true("ref_fortnight_yyyyff" %in% names(result))
   expect_true("determined_fortnight" %in% names(result))
 
-  # Should have week columns
-  expect_true("ref_week" %in% names(result))
+  # Should have week columns (IBGE-based)
+  expect_true("ref_week_start" %in% names(result))
+  expect_true("ref_week_end" %in% names(result))
   expect_true("ref_week_in_quarter" %in% names(result))
   expect_true("ref_week_yyyyww" %in% names(result))
   expect_true("determined_week" %in% names(result))

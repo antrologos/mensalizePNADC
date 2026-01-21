@@ -74,45 +74,53 @@ create_mock_crosswalk <- function(n_upas = 10, n_panels = 8) {
 
   n <- nrow(dt)
 
-  # Month info (high determination rate)
+  # Month info (high determination rate) - IBGE-based columns
   dt[, `:=`(
-    ref_month = as.Date("2023-01-01") + ((.I - 1L) %% 3L) * 30L,
+    ref_month_start = as.Date("2022-12-25") + ((.I - 1L) %% 3L) * 28L,  # Sunday (IBGE month start)
+    ref_month_end = as.Date("2022-12-25") + ((.I - 1L) %% 3L) * 28L + 27L,  # Saturday (4 weeks)
     ref_month_in_quarter = ((.I - 1L) %% 3L) + 1L,
     ref_month_yyyymm = 202301L + ((.I - 1L) %% 3L),
+    ref_month_weeks = 4L,
     determined_month = TRUE
   )]
 
   # Make some undetermined
   undetermined_idx <- sample(1:n, size = ceiling(n * 0.1))
   dt[undetermined_idx, `:=`(
-    ref_month = as.Date(NA),
+    ref_month_start = as.Date(NA),
+    ref_month_end = as.Date(NA),
     ref_month_in_quarter = NA_integer_,
     ref_month_yyyymm = NA_integer_,
+    ref_month_weeks = NA_integer_,
     determined_month = FALSE
   )]
 
-  # Fortnight info (medium determination rate)
+  # Fortnight info (medium determination rate) - IBGE-based columns
   dt[, `:=`(
-    ref_fortnight = as.Date("2023-01-01") + ((.I - 1L) %% 6L) * 15L,
+    ref_fortnight_start = as.Date("2022-12-25") + ((.I - 1L) %% 6L) * 14L,  # Sunday
+    ref_fortnight_end = as.Date("2022-12-25") + ((.I - 1L) %% 6L) * 14L + 13L,  # Saturday (2 weeks)
     ref_fortnight_in_quarter = ((.I - 1L) %% 6L) + 1L,
     ref_fortnight_yyyyff = 202301L + ((.I - 1L) %% 6L),
     determined_fortnight = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.85, 0.15))
   )]
   dt[determined_fortnight == FALSE, `:=`(
-    ref_fortnight = as.Date(NA),
+    ref_fortnight_start = as.Date(NA),
+    ref_fortnight_end = as.Date(NA),
     ref_fortnight_in_quarter = NA_integer_,
     ref_fortnight_yyyyff = NA_integer_
   )]
 
-  # Week info (low determination rate)
+  # Week info (low determination rate) - IBGE-based columns
   dt[, `:=`(
-    ref_week = as.Date("2023-01-02") + ((.I - 1L) %% 13L) * 7L,
+    ref_week_start = as.Date("2022-12-25") + ((.I - 1L) %% 13L) * 7L,  # Sunday
+    ref_week_end = as.Date("2022-12-25") + ((.I - 1L) %% 13L) * 7L + 6L,  # Saturday
     ref_week_in_quarter = ((.I - 1L) %% 13L) + 1L,
     ref_week_yyyyww = 202301L + ((.I - 1L) %% 13L),
     determined_week = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.6, 0.4))
   )]
   dt[determined_week == FALSE, `:=`(
-    ref_week = as.Date(NA),
+    ref_week_start = as.Date(NA),
+    ref_week_end = as.Date(NA),
     ref_week_in_quarter = NA_integer_,
     ref_week_yyyyww = NA_integer_
   )]
@@ -236,11 +244,11 @@ test_that("pnadc_apply_periods without calibration returns correct structure", {
   # Should be data.table
   expect_s3_class(result, "data.table")
 
-  # Should have reference period columns from crosswalk
-  expect_true("ref_month" %in% names(result))
+  # Should have reference period columns from crosswalk (IBGE-based)
+  expect_true("ref_month_start" %in% names(result))
   expect_true("ref_month_in_quarter" %in% names(result))
-  expect_true("ref_fortnight" %in% names(result))
-  expect_true("ref_week" %in% names(result))
+  expect_true("ref_fortnight_start" %in% names(result))
+  expect_true("ref_week_start" %in% names(result))
 
   # Should have determination flags
   expect_true("determined_month" %in% names(result))
@@ -521,8 +529,8 @@ test_that("pnadc_apply_periods works with real identify function output", {
     )
 
     expect_s3_class(result, "data.table")
-    expect_true("ref_month" %in% names(result))
-    expect_true("ref_fortnight" %in% names(result))
-    expect_true("ref_week" %in% names(result))
+    expect_true("ref_month_start" %in% names(result))
+    expect_true("ref_fortnight_start" %in% names(result))
+    expect_true("ref_week_start" %in% names(result))
   }
 })

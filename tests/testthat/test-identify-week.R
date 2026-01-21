@@ -17,13 +17,15 @@ test_that("identify_reference_week returns correct structure", {
 
   result <- identify_reference_week(test_data, verbose = FALSE)
 
-  # Check output columns exist
-  expect_true("ref_week" %in% names(result))
+  # Check output columns exist (new IBGE-based column names)
+  expect_true("ref_week_start" %in% names(result))
+  expect_true("ref_week_end" %in% names(result))
   expect_true("ref_week_in_quarter" %in% names(result))
   expect_true("ref_week_yyyyww" %in% names(result))
 
   # Check data types
-  expect_s3_class(result$ref_week, "Date")
+  expect_s3_class(result$ref_week_start, "Date")
+  expect_s3_class(result$ref_week_end, "Date")
   expect_type(result$ref_week_in_quarter, "integer")
   expect_type(result$ref_week_yyyyww, "integer")
 
@@ -83,7 +85,7 @@ test_that("household aggregation improves determination", {
 
   # Both rows should have same determination (same household)
   expect_equal(result$ref_week_yyyyww[1], result$ref_week_yyyyww[2])
-  expect_equal(result$ref_week[1], result$ref_week[2])
+  expect_equal(result$ref_week_start[1], result$ref_week_start[2])
 })
 
 test_that("different households in same UPA can have different weeks", {
@@ -113,8 +115,8 @@ test_that("different households in same UPA can have different weeks", {
   # This is not guaranteed, just possible
 })
 
-test_that("ISO year boundary is handled correctly", {
-  # Test with Q4 data that might span ISO year boundary
+test_that("IBGE year boundary is handled correctly", {
+  # Test with Q4 data that might span year boundary
   test_data <- data.table::data.table(
     Ano = c(2024L),
     Trimestre = c(4L),
@@ -133,11 +135,11 @@ test_that("ISO year boundary is handled correctly", {
   # Should not error
   expect_s3_class(result, "data.table")
 
-  # If determined, week could be in ISO year 2025 (e.g., Dec 30-31 2024 is week 2025-W01)
+  # If determined, week should be in valid IBGE range for Q4
   if (!is.na(result$ref_week_yyyyww[1])) {
-    iso_yr <- result$ref_week_yyyyww[1] %/% 100L
-    # ISO year should be 2024 or 2025 for Q4 2024
-    expect_true(iso_yr %in% c(2024L, 2025L))
+    ibge_yr <- result$ref_week_yyyyww[1] %/% 100L
+    # IBGE year should be 2024 or 2025 for Q4 2024
+    expect_true(ibge_yr %in% c(2024L, 2025L))
   }
 })
 
@@ -162,7 +164,7 @@ test_that("determination rate attribute is set", {
   expect_true(det_rate >= 0 && det_rate <= 1)
 })
 
-test_that("ref_week is Monday of the ISO week", {
+test_that("ref_week_start is Sunday of the IBGE week", {
   test_data <- data.table::data.table(
     Ano = c(2024L),
     Trimestre = c(1L),
@@ -178,15 +180,37 @@ test_that("ref_week is Monday of the ISO week", {
 
   result <- identify_reference_week(test_data, verbose = FALSE)
 
-  if (!is.na(result$ref_week[1])) {
-    # ref_week should be a Monday
-    # data.table::wday returns 1=Sun, 2=Mon, ..., 7=Sat
-    dow <- data.table::wday(result$ref_week[1])
-    expect_equal(dow, 2)  # Monday
+  if (!is.na(result$ref_week_start[1])) {
+    # ref_week_start should be a Sunday (day 7 in ISO %u format)
+    dow <- as.integer(format(result$ref_week_start[1], "%u"))
+    expect_equal(dow, 7L)  # Sunday
   }
 })
 
-test_that("ref_week_yyyyww matches ref_week", {
+test_that("ref_week_end is Saturday of the IBGE week", {
+  test_data <- data.table::data.table(
+    Ano = c(2024L),
+    Trimestre = c(1L),
+    UPA = c(1L),
+    V1008 = c(1L),
+    V1014 = c(1L),
+    V2003 = c(1L),
+    V2008 = c(15L),
+    V20081 = c(2L),    # Feb birthday
+    V20082 = c(1990L),
+    V2009 = c(34L)
+  )
+
+  result <- identify_reference_week(test_data, verbose = FALSE)
+
+  if (!is.na(result$ref_week_end[1])) {
+    # ref_week_end should be a Saturday (day 6 in ISO %u format)
+    dow <- as.integer(format(result$ref_week_end[1], "%u"))
+    expect_equal(dow, 6L)  # Saturday
+  }
+})
+
+test_that("ref_week_start and ref_week_end are 6 days apart", {
   test_data <- data.table::data.table(
     Ano = c(2024L),
     Trimestre = c(1L),
@@ -202,9 +226,32 @@ test_that("ref_week_yyyyww matches ref_week", {
 
   result <- identify_reference_week(test_data, verbose = FALSE)
 
-  if (!is.na(result$ref_week[1]) && !is.na(result$ref_week_yyyyww[1])) {
-    # Convert ref_week back to yyyyww and compare
-    expected_yyyyww <- PNADCperiods:::date_to_yyyyww(result$ref_week[1])
+  if (!is.na(result$ref_week_start[1]) && !is.na(result$ref_week_end[1])) {
+    # Week is Sunday to Saturday = 6 days apart
+    diff_days <- as.integer(result$ref_week_end[1] - result$ref_week_start[1])
+    expect_equal(diff_days, 6L)
+  }
+})
+
+test_that("ref_week_yyyyww matches ref_week_start", {
+  test_data <- data.table::data.table(
+    Ano = c(2024L),
+    Trimestre = c(1L),
+    UPA = c(1L),
+    V1008 = c(1L),
+    V1014 = c(1L),
+    V2003 = c(1L),
+    V2008 = c(15L),
+    V20081 = c(1L),
+    V20082 = c(1990L),
+    V2009 = c(34L)
+  )
+
+  result <- identify_reference_week(test_data, verbose = FALSE)
+
+  if (!is.na(result$ref_week_start[1]) && !is.na(result$ref_week_yyyyww[1])) {
+    # Convert ref_week_start back to IBGE yyyyww and compare
+    expected_yyyyww <- PNADCperiods:::date_to_ibge_yyyyww(result$ref_week_start[1])
     expect_equal(result$ref_week_yyyyww[1], expected_yyyyww)
   }
 })

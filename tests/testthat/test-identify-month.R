@@ -28,10 +28,12 @@ test_that("identify_reference_month returns correct structure", {
 
   result <- identify_reference_month(test_data)
 
-  # Check output columns exist
-  expect_true("ref_month" %in% names(result))
+  # Check output columns exist (new IBGE-based column names)
+  expect_true("ref_month_start" %in% names(result))
+  expect_true("ref_month_end" %in% names(result))
   expect_true("ref_month_in_quarter" %in% names(result))
   expect_true("ref_month_yyyymm" %in% names(result))
+  expect_true("ref_month_weeks" %in% names(result))
 
   # Check ref_month_in_quarter values are valid
   valid_values <- result$ref_month_in_quarter[!is.na(result$ref_month_in_quarter)]
@@ -78,8 +80,9 @@ test_that("identify_reference_month handles NA values", {
   # Should complete without error
   expect_s3_class(result, "data.table")
 
-  # Should have all output columns
-  expect_true(all(c("ref_month", "ref_month_in_quarter", "ref_month_yyyymm") %in% names(result)))
+  # Should have all output columns (new IBGE-based names)
+  expect_true(all(c("ref_month_start", "ref_month_end", "ref_month_in_quarter",
+                    "ref_month_yyyymm", "ref_month_weeks") %in% names(result)))
 })
 
 test_that("identify_reference_month handles all-NA groups", {
@@ -155,7 +158,8 @@ test_that("identify_reference_month returns data at expected granularity", {
 
   # Result should be a data.table with expected columns
   expect_s3_class(result, "data.table")
-  expect_true(all(c("ref_month", "ref_month_in_quarter", "ref_month_yyyymm") %in% names(result)))
+  expect_true(all(c("ref_month_start", "ref_month_end", "ref_month_in_quarter",
+                    "ref_month_yyyymm", "ref_month_weeks") %in% names(result)))
 
   # Should have at least one row
   expect_true(nrow(result) >= 1L)
@@ -219,6 +223,81 @@ test_that("identify_reference_month aggregates across quarters at UPA-V1014 leve
   # All rows should have same UPA-V1014
   expect_equal(length(unique(result$UPA)), 1L)
   expect_equal(length(unique(result$V1014)), 1L)
+})
+
+# =============================================================================
+# IBGE WEEK BOUNDARY TESTS
+# =============================================================================
+
+test_that("ref_month_start is always a Sunday", {
+  test_data <- data.frame(
+    Ano = c(2023, 2023, 2024, 2024),
+    Trimestre = c(1, 2, 3, 4),
+    UPA = c(1, 2, 3, 4),
+    V1008 = rep(1, 4),
+    V1014 = rep(1, 4),
+    V2003 = rep(1, 4),
+    V2008 = c(15, 20, 10, 5),
+    V20081 = c(1, 4, 7, 10),
+    V20082 = rep(1990, 4),
+    V2009 = rep(33, 4)
+  )
+
+  result <- identify_reference_month(test_data, verbose = FALSE)
+
+  # Check that ref_month_start dates are Sundays
+  valid_starts <- result$ref_month_start[!is.na(result$ref_month_start)]
+  if (length(valid_starts) > 0) {
+    dows <- as.integer(format(valid_starts, "%u"))
+    expect_true(all(dows == 7L))  # Sunday = 7 in ISO
+  }
+})
+
+test_that("ref_month_end is always a Saturday", {
+  test_data <- data.frame(
+    Ano = c(2023, 2023, 2024, 2024),
+    Trimestre = c(1, 2, 3, 4),
+    UPA = c(1, 2, 3, 4),
+    V1008 = rep(1, 4),
+    V1014 = rep(1, 4),
+    V2003 = rep(1, 4),
+    V2008 = c(15, 20, 10, 5),
+    V20081 = c(1, 4, 7, 10),
+    V20082 = rep(1990, 4),
+    V2009 = rep(33, 4)
+  )
+
+  result <- identify_reference_month(test_data, verbose = FALSE)
+
+  # Check that ref_month_end dates are Saturdays
+  valid_ends <- result$ref_month_end[!is.na(result$ref_month_end)]
+  if (length(valid_ends) > 0) {
+    dows <- as.integer(format(valid_ends, "%u"))
+    expect_true(all(dows == 6L))  # Saturday = 6 in ISO
+  }
+})
+
+test_that("ref_month_weeks is always 4 or 5", {
+  test_data <- data.frame(
+    Ano = c(2023, 2023, 2024, 2024),
+    Trimestre = c(1, 2, 3, 4),
+    UPA = c(1, 2, 3, 4),
+    V1008 = rep(1, 4),
+    V1014 = rep(1, 4),
+    V2003 = rep(1, 4),
+    V2008 = c(15, 20, 10, 5),
+    V20081 = c(1, 4, 7, 10),
+    V20082 = rep(1990, 4),
+    V2009 = rep(33, 4)
+  )
+
+  result <- identify_reference_month(test_data, verbose = FALSE)
+
+  # Check that ref_month_weeks is 4 or 5
+  valid_weeks <- result$ref_month_weeks[!is.na(result$ref_month_weeks)]
+  if (length(valid_weeks) > 0) {
+    expect_true(all(valid_weeks %in% c(4L, 5L)))
+  }
 })
 
 # =============================================================================

@@ -39,9 +39,12 @@
 #'
 #' @return A data.table with the input data plus:
 #'   \describe{
-#'     \item{ref_month, ref_fortnight, ref_week}{Reference period as Date}
-#'     \item{ref_month_in_quarter, etc.}{Position within quarter (1-3, 1-6, 1-14)}
+#'     \item{ref_month_start, ref_month_end}{IBGE month boundaries (Sunday/Saturday)}
+#'     \item{ref_fortnight_start, ref_fortnight_end}{IBGE fortnight boundaries (Sunday/Saturday)}
+#'     \item{ref_week_start, ref_week_end}{IBGE week boundaries (Sunday/Saturday)}
+#'     \item{ref_month_in_quarter, ref_fortnight_in_quarter, ref_week_in_quarter}{Position within quarter (1-3, 1-6, 1-14)}
 #'     \item{ref_month_yyyymm, ref_fortnight_yyyyff, ref_week_yyyyww}{Integer period codes}
+#'     \item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
 #'     \item{determined_month, determined_fortnight, determined_week}{Logical determination flags}
 #'     \item{weight_monthly, weight_fortnight, or weight_weekly}{Calibrated weights (if calibrate=TRUE)}
 #'   }
@@ -221,9 +224,9 @@ pnadc_apply_periods <- function(data,
   # Select crosswalk columns to merge
   xw_cols <- intersect(
     c("Ano", "Trimestre", "UPA", "V1008", "V1014",
-      "ref_month", "ref_month_in_quarter", "ref_month_yyyymm", "determined_month",
-      "ref_fortnight", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff", "determined_fortnight",
-      "ref_week", "ref_week_in_quarter", "ref_week_yyyyww", "determined_week"),
+      "ref_month_start", "ref_month_end", "ref_month_in_quarter", "ref_month_yyyymm", "ref_month_weeks", "determined_month",
+      "ref_fortnight_start", "ref_fortnight_end", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff", "determined_fortnight",
+      "ref_week_start", "ref_week_end", "ref_week_in_quarter", "ref_week_yyyyww", "determined_week"),
     names(xw)
   )
 
@@ -782,12 +785,14 @@ derive_fortnight_population <- function(monthly_pop) {
 }
 
 
-#' Derive Weekly Population from Monthly
+#' Derive Weekly Population from Monthly (IBGE Calendar)
 #'
-#' Each week receives the FULL month's population as its calibration target.
-#' For weeks that span two months, the population from the month with the
-#' majority of days is used. This ensures that weights for each week sum to
-#' the actual Brazilian population, consistent with the monthly calibration approach.
+#' Each IBGE week receives the FULL month's population as its calibration target.
+#' In the IBGE calendar, each week belongs to exactly one IBGE month (the month
+#' where the week's Saturday falls with >= 4 days), so there is no ambiguity.
+#' This ensures that weights for each week sum to the actual Brazilian population.
+#'
+#' Uses integer arithmetic for performance - avoids creating Date objects.
 #'
 #' @keywords internal
 #' @noRd
@@ -800,49 +805,47 @@ derive_weekly_population <- function(monthly_pop) {
     mt[, ref_month_yyyymm := anomesexato]
   }
 
-  # Generate weeks for each month with FULL population
-  weeks_list <- lapply(seq_len(nrow(mt)), function(i) {
-    yyyymm <- mt$ref_month_yyyymm[i]
-    pop <- mt$m_populacao[i]
+  # Get unique years to process
 
-    year <- yyyymm %/% 100
-    month <- yyyymm %% 100
+  years <- unique(mt$ref_month_yyyymm %/% 100L)
 
-    # Get all days in month
-    first_day <- make_date(year, month, 1L)
-    if (month == 12) {
-      last_day <- make_date(year + 1L, 1L, 1L) - 1L
-    } else {
-      last_day <- make_date(year, month + 1L, 1L) - 1L
-    }
+  # For each year, compute weeks per month and cumulative offsets using integer arithmetic
+  weeks_list <- lapply(years, function(yr) {
 
-    days <- seq(first_day, last_day, by = 1)
-    weeks <- unique(date_to_yyyyww(days))
+    # Get number of IBGE weeks per month for this year (4 or 5 each)
+    # This calls ibge_month_weeks only 12 times per year (fast)
+    n_weeks_per_month <- vapply(1L:12L, function(m) {
+      ibge_month_weeks(yr, m, min_days = 4L)
+    }, integer(1))
 
-    # Count days per week in this month (for determining majority month later)
-    days_per_week <- sapply(weeks, function(wk) {
-      wk_days <- days[date_to_yyyyww(days) == wk]
-      length(wk_days)
-    })
+    # Cumulative weeks at START of each month (0-indexed)
+    # Month 1 starts at week 1, month 2 starts at week (1 + n_weeks[1]), etc.
+    cum_weeks_before <- c(0L, cumsum(n_weeks_per_month[-12L]))
 
-    # Each week gets FULL population and days count for majority selection
-    data.table(
-      ref_week_yyyyww = weeks,
-      ref_month_yyyymm = yyyymm,
-      days_in_month = days_per_week,
-      w_populacao = pop  # FULL population for each week
-    )
+    # Get population data for this year
+    year_data <- mt[ref_month_yyyymm %/% 100L == yr]
+
+    if (nrow(year_data) == 0L) return(NULL)
+
+    # Generate week entries for each month using integer arithmetic
+    rbindlist(lapply(seq_len(nrow(year_data)), function(i) {
+      yyyymm <- year_data$ref_month_yyyymm[i]
+      pop <- year_data$m_populacao[i]
+      month <- yyyymm %% 100L
+
+      # Number of weeks in this IBGE month
+      n_weeks <- n_weeks_per_month[month]
+
+      # Week positions within the year (1-indexed)
+      week_positions <- cum_weeks_before[month] + seq_len(n_weeks)
+
+      # Create yyyyww format: year * 100 + week_in_year
+      data.table(
+        ref_week_yyyyww = yr * 100L + week_positions,
+        w_populacao = pop  # FULL population for each week
+      )
+    }))
   })
 
-  weeks <- rbindlist(weeks_list)
-
-  # For weeks spanning multiple months, keep the population from the month
-
-  # with the majority of days (this handles boundary weeks correctly)
-  weeks <- weeks[weeks[, .I[which.max(days_in_month)], by = ref_week_yyyyww]$V1]
-
-  # Clean up - keep only needed columns
-  weeks <- weeks[, .(ref_week_yyyyww, w_populacao)]
-
-  weeks
+  rbindlist(weeks_list)
 }

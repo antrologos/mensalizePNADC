@@ -51,17 +51,21 @@
 #' @return A data.table crosswalk with columns:
 #'   \describe{
 #'     \item{Ano, Trimestre, UPA, V1008, V1014}{Join keys (year, quarter, UPA, household, panel)}
-#'     \item{ref_month}{Reference month as Date (1st of month)}
+#'     \item{ref_month_start}{Sunday of first IBGE reference week of the month}
+#'     \item{ref_month_end}{Saturday of last IBGE reference week of the month}
 #'     \item{ref_month_in_quarter}{Position in quarter (1, 2, 3) or NA}
 #'     \item{ref_month_yyyymm}{Integer YYYYMM format (e.g., 202301)}
+#'     \item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
 #'     \item{determined_month}{Logical: TRUE if month was determined}
-#'     \item{ref_fortnight}{Reference fortnight as Date (1st or 16th)}
+#'     \item{ref_fortnight_start}{Sunday of first IBGE week of the fortnight}
+#'     \item{ref_fortnight_end}{Saturday of last IBGE week of the fortnight}
 #'     \item{ref_fortnight_in_quarter}{Position in quarter (1-6) or NA}
 #'     \item{ref_fortnight_yyyyff}{Integer YYYYFF format (1-24 per year)}
 #'     \item{determined_fortnight}{Logical: TRUE if fortnight was determined}
-#'     \item{ref_week}{Reference week as Date (Monday of week)}
+#'     \item{ref_week_start}{Sunday of the IBGE reference week}
+#'     \item{ref_week_end}{Saturday of the IBGE reference week}
 #'     \item{ref_week_in_quarter}{Position in quarter (1-14) or NA}
-#'     \item{ref_week_yyyyww}{Integer ISO YYYYWW format}
+#'     \item{ref_week_yyyyww}{Integer IBGE YYYYWW format}
 #'     \item{determined_week}{Logical: TRUE if week was determined}
 #'   }
 #'
@@ -464,8 +468,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
 
     # Calculate actual fortnight positions from date bounds
     dt[!is.na(ref_month_in_quarter), `:=`(
-      fortnight_min_pos = date_to_fortnight_in_quarter(date_min, Trimestre),
-      fortnight_max_pos = date_to_fortnight_in_quarter(date_max, Trimestre)
+      fortnight_min_pos = ibge_fortnight_in_quarter(date_min, Trimestre, Ano, min_days = 4L),
+      fortnight_max_pos = ibge_fortnight_in_quarter(date_max, Trimestre, Ano, min_days = 4L)
     )]
 
     # Constrain to the determined month's fortnights
@@ -476,8 +480,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
 
     # Also calculate alternative positions for exception handling
     dt[!is.na(ref_month_in_quarter), `:=`(
-      alt_fortnight_min_pos = date_to_fortnight_in_quarter(alt_date_min, Trimestre),
-      alt_fortnight_max_pos = date_to_fortnight_in_quarter(alt_date_max, Trimestre)
+      alt_fortnight_min_pos = ibge_fortnight_in_quarter(alt_date_min, Trimestre, Ano, min_days = 4L),
+      alt_fortnight_max_pos = ibge_fortnight_in_quarter(alt_date_max, Trimestre, Ano, min_days = 4L)
     )]
 
     dt[!is.na(ref_month_in_quarter), `:=`(
@@ -712,30 +716,47 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   rm(dt)
 
   # Calculate derived month columns
+  crosswalk[, `:=`(
+    ref_month_start = as.Date(NA),
+    ref_month_end = as.Date(NA),
+    ref_month_yyyymm = NA_integer_,
+    ref_month_weeks = NA_integer_
+  )]
   crosswalk[!is.na(ref_month_in_quarter), `:=`(
-    ref_month = make_date(Ano, quarter_month_n(Trimestre, ref_month_in_quarter), 1L),
-    ref_month_yyyymm = yyyymm(Ano, quarter_month_n(Trimestre, ref_month_in_quarter))
+    temp_month = quarter_month_n(Trimestre, ref_month_in_quarter)
   )]
-  crosswalk[is.na(ref_month_in_quarter), `:=`(
-    ref_month = as.Date(NA),
-    ref_month_yyyymm = NA_integer_
+  crosswalk[!is.na(temp_month), `:=`(
+    ref_month_start = ibge_month_start(Ano, temp_month, min_days = 4L),
+    ref_month_end = ibge_month_end(Ano, temp_month, min_days = 4L),
+    ref_month_yyyymm = yyyymm(Ano, temp_month),
+    ref_month_weeks = ibge_month_weeks(Ano, temp_month, min_days = 4L)
   )]
+  crosswalk[, temp_month := NULL]
 
   # Calculate derived fortnight columns
   crosswalk[, ref_fortnight_yyyyff := NA_integer_]
   crosswalk[!is.na(ref_fortnight_in_quarter), `:=`(
-    ref_fortnight_yyyyff = fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter)
+    ref_fortnight_yyyyff = ibge_fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter)
   )]
 
-  crosswalk[, ref_fortnight := as.Date(NA)]
-  crosswalk[!is.na(ref_fortnight_yyyyff), ref_fortnight := yyyyff_to_date(ref_fortnight_yyyyff)]
+  crosswalk[, ref_fortnight_start := as.Date(NA)]
+  crosswalk[, ref_fortnight_end := as.Date(NA)]
+  crosswalk[!is.na(ref_fortnight_yyyyff), ref_fortnight_start := ibge_yyyyff_to_date(ref_fortnight_yyyyff)]
+  crosswalk[!is.na(ref_fortnight_start), ref_fortnight_end := ref_fortnight_start + ibge_fortnight_weeks(
+    fast_year(ref_fortnight_start),
+    fast_month(ref_fortnight_start),
+    fifelse(fast_mday(ref_fortnight_start) <= 14L, 1L, 2L),
+    min_days = 4L
+  ) * 7L - 1L]
 
   # Calculate derived week columns
-  crosswalk[, ref_week := as.Date(NA)]
-  crosswalk[!is.na(ref_week_yyyyww), ref_week := yyyyww_to_date(ref_week_yyyyww)]
+  crosswalk[, ref_week_start := as.Date(NA)]
+  crosswalk[, ref_week_end := as.Date(NA)]
+  crosswalk[!is.na(ref_week_yyyyww), ref_week_start := ibge_yyyyww_to_date(ref_week_yyyyww)]
+  crosswalk[!is.na(ref_week_start), ref_week_end := ref_week_start + 6L]
 
   crosswalk[, ref_week_in_quarter := NA_integer_]
-  crosswalk[!is.na(ref_week), ref_week_in_quarter := week_in_quarter(ref_week, Trimestre, Ano)]
+  crosswalk[!is.na(ref_week_start), ref_week_in_quarter := ibge_week_in_quarter(ref_week_start, Trimestre, Ano, min_days = 4L)]
 
   # Add determination flags
   crosswalk[, `:=`(
@@ -747,9 +768,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
   # Reorder columns for clarity
   setcolorder(crosswalk, c(
     "Ano", "Trimestre", "UPA", "V1008", "V1014",
-    "ref_month", "ref_month_in_quarter", "ref_month_yyyymm", "determined_month",
-    "ref_fortnight", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff", "determined_fortnight",
-    "ref_week", "ref_week_in_quarter", "ref_week_yyyyww", "determined_week"
+    "ref_month_start", "ref_month_end", "ref_month_in_quarter", "ref_month_yyyymm", "ref_month_weeks", "determined_month",
+    "ref_fortnight_start", "ref_fortnight_end", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff", "determined_fortnight",
+    "ref_week_start", "ref_week_end", "ref_week_in_quarter", "ref_week_yyyyww", "determined_week"
   ))
 
   # ============================================================================

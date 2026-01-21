@@ -1,17 +1,18 @@
 #' Identify Reference Fortnight in PNADC Data
 #'
-#' Determines which fortnight (quinzena - 15-day period) within each quarter
-#' corresponds to each survey observation based on IBGE's interview timing rules.
+#' Determines which IBGE fortnight (quinzena) within each quarter corresponds
+#' to each survey observation based on IBGE's interview timing rules.
 #'
 #' @description
 #' PNADC is a quarterly survey where each interview occurs during a specific
-#' fortnight within the quarter. This function identifies which fortnight (1-6
-#' per quarter, 1-24 per year) that observation belongs to, enabling bi-weekly
-#' time series analysis.
+#' fortnight within the quarter. This function identifies which IBGE fortnight
+#' (1-6 per quarter, 1-24 per year) that observation belongs to, enabling
+#' bi-weekly time series analysis.
 #'
 #' The algorithm uses:
 #' \itemize{
 #'   \item IBGE's reference week timing rules (first Saturday with sufficient days in month)
+#'   \item IBGE week boundaries (Sunday-Saturday, not calendar days)
 #'   \item Respondent birthdates to constrain possible interview dates
 #'   \item Household-level aggregation within quarter (all persons in same household interviewed on same day)
 #'   \item Dynamic exception detection (identifies quarters needing relaxed rules)
@@ -35,24 +36,23 @@
 #'
 #' @return A data.table with the original key columns plus:
 #'   \itemize{
-#'     \item \code{ref_fortnight}: Reference fortnight as Date (1st or 16th of month)
+#'     \item \code{ref_fortnight_start}: Reference fortnight start (Sunday of first IBGE week)
+#'     \item \code{ref_fortnight_end}: Reference fortnight end (Saturday of last IBGE week)
 #'     \item \code{ref_fortnight_in_quarter}: Position in quarter (1-6) or NA
 #'     \item \code{ref_fortnight_yyyyff}: Integer YYYYFF format (1-24 per year)
+#'     \item \code{ref_fortnight_weeks}: Number of IBGE weeks in this fortnight (2 or 3)
 #'   }
 #'
 #' @details
-#' ## Fortnight Definition
+#' ## IBGE Fortnight Definition
 #'
-#' Each year has 24 fortnights (2 per month):
+#' IBGE fortnights are based on IBGE reference weeks, NOT calendar days:
 #' \itemize{
-#'   \item Fortnight 01: Jan 1-15
-#'   \item Fortnight 02: Jan 16-31
-#'   \item Fortnight 03: Feb 1-15
-#'   \item Fortnight 04: Feb 16-28/29
-#'   \item ... and so on through fortnight 24 (Dec 16-31)
+#'   \item Fortnight 1 of a month = IBGE weeks 1-2 of that month
+#'   \item Fortnight 2 of a month = IBGE weeks 3-4 (or 3-5 for 5-week months)
 #' }
 #'
-#' Each quarter has 6 fortnights (e.g., Q1 = fortnights 01-06).
+#' Each quarter has 6 fortnights (2 per month).
 #'
 #' ## Expected Determination Rate
 #'
@@ -60,11 +60,11 @@
 #' \itemize{
 #'   \item Unlike months, fortnights cannot aggregate across quarters
 #'   \item Birthday constraints typically narrow the date range by only a few weeks
-#'   \item A 15-day fortnight window is difficult to pinpoint without cross-quarter data
+#'   \item An IBGE fortnight (2 weeks) is difficult to pinpoint without cross-quarter data
 #' }
 #'
 #' The algorithm determines fortnight when the interview date range falls
-#' entirely within a single 15-day period.
+#' entirely within a single IBGE fortnight (weeks 1-2 or weeks 3+).
 #'
 #' \strong{Note}: The month algorithm achieves ~97% determination by aggregating
 #' at UPA-V1014 level across ALL quarters (leveraging the panel design where
@@ -170,9 +170,13 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
   # STEP 3: Calculate date bounds using STANDARD rules
   # ============================================================================
 
+  # Calculate the last Saturday of the quarter using IBGE month end
+  # (handles 4 or 5 week months correctly)
+  dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
+
   dt[, `:=`(
     date_min = make_date(Ano, month1, first_sat_m1),
-    date_max = make_date(Ano, month3, first_sat_m3) + 21L
+    date_max = quarter_end
   )]
 
   # Apply birthday constraints
@@ -193,21 +197,20 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
   update_pb(3)
 
   # ============================================================================
-  # STEP 4: Convert date bounds to fortnight positions
+  # STEP 4: Convert date bounds to IBGE fortnight positions
   # ============================================================================
 
-  # Calculate fortnight position within quarter (1-6)
+  # Calculate IBGE fortnight position within quarter (1-6) using IBGE weeks
   dt[, `:=`(
-    fortnight_min_pos = date_to_fortnight_in_quarter(date_min, Trimestre),
-    fortnight_max_pos = date_to_fortnight_in_quarter(date_max, Trimestre),
-    fortnight_min_yyyyff = date_to_yyyyff(date_min),
-    fortnight_max_yyyyff = date_to_yyyyff(date_max)
+    fortnight_min_pos = ibge_fortnight_in_quarter(date_min, Trimestre, Ano, min_days = 4L),
+    fortnight_max_pos = ibge_fortnight_in_quarter(date_max, Trimestre, Ano, min_days = 4L)
   )]
 
-  # Calculate alternative bounds
+  # Calculate alternative bounds using EXCEPTION rule (min_days=3)
+  dt[, alt_quarter_end := ibge_month_end(Ano, month3, min_days = 3L)]
   dt[, `:=`(
     alt_date_min = make_date(Ano, month1, alt_sat_m1),
-    alt_date_max = make_date(Ano, month3, alt_sat_m3) + 21L
+    alt_date_max = alt_quarter_end
   )]
 
   # Apply birthday constraints to alternative bounds
@@ -223,10 +226,10 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
        (first_sat_after_birthday - 7L) >= alt_date_min,
      alt_date_max := first_sat_after_birthday - 7L]
 
-  # Convert alternative bounds to fortnight positions
+  # Convert alternative bounds to IBGE fortnight positions
   dt[, `:=`(
-    alt_fortnight_min_pos = date_to_fortnight_in_quarter(alt_date_min, Trimestre),
-    alt_fortnight_max_pos = date_to_fortnight_in_quarter(alt_date_max, Trimestre)
+    alt_fortnight_min_pos = ibge_fortnight_in_quarter(alt_date_min, Trimestre, Ano, min_days = 3L),
+    alt_fortnight_max_pos = ibge_fortnight_in_quarter(alt_date_max, Trimestre, Ano, min_days = 3L)
   )]
 
   update_pb(4)
@@ -254,7 +257,8 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
 
   # Clean up alternative date columns
   dt[, c("alt_date_min", "alt_date_max",
-         "alt_fortnight_min_pos", "alt_fortnight_max_pos") := NULL]
+         "alt_fortnight_min_pos", "alt_fortnight_max_pos",
+         "alt_quarter_end") := NULL]
 
   update_pb(5)
 
@@ -315,20 +319,39 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
   # Assign if min == max
   dt[, ref_fortnight_in_quarter := NA_integer_]
   dt[hh_fortnight_min == hh_fortnight_max &
-       hh_fortnight_min >= 1L & hh_fortnight_max <= 6L,
+       !is.na(hh_fortnight_min) & hh_fortnight_min >= 1L & hh_fortnight_max <= 6L,
      ref_fortnight_in_quarter := hh_fortnight_min]
 
-  # Calculate YYYYFF (1-24 per year)
+  # Calculate YYYYFF (1-24 per year) using IBGE format
   dt[, ref_fortnight_yyyyff := NA_integer_]
   dt[!is.na(ref_fortnight_in_quarter), `:=`(
-    ref_fortnight_yyyyff = fortnight_in_quarter_to_yyyyff(
+    ref_fortnight_yyyyff = ibge_fortnight_in_quarter_to_yyyyff(
       Ano, Trimestre, ref_fortnight_in_quarter
     )
   )]
 
-  # Calculate ref_fortnight Date (1st or 16th of month)
-  dt[, ref_fortnight := as.Date(NA)]
-  dt[!is.na(ref_fortnight_yyyyff), ref_fortnight := yyyyff_to_date(ref_fortnight_yyyyff)]
+  # Calculate fortnight start/end dates (Sunday/Saturday of IBGE weeks)
+  # First, derive month and fortnight within month from fortnight_in_quarter
+  dt[!is.na(ref_fortnight_in_quarter), `:=`(
+    temp_month_in_q = ((ref_fortnight_in_quarter - 1L) %/% 2L) + 1L,
+    temp_fortnight_in_month = ((ref_fortnight_in_quarter - 1L) %% 2L) + 1L
+  )]
+  dt[!is.na(ref_fortnight_in_quarter), `:=`(
+    temp_month = quarter_month_n(Trimestre, temp_month_in_q)
+  )]
+
+  # Get start (Sunday) and end (Saturday) dates
+  dt[, `:=`(ref_fortnight_start = as.Date(NA), ref_fortnight_end = as.Date(NA))]
+  dt[!is.na(ref_fortnight_in_quarter), `:=`(
+    ref_fortnight_start = ibge_fortnight_start(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
+    ref_fortnight_end = ibge_fortnight_end(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
+  )]
+
+  # Calculate number of weeks in this fortnight (2 or 3)
+  dt[, ref_fortnight_weeks := NA_integer_]
+  dt[!is.na(ref_fortnight_in_quarter), `:=`(
+    ref_fortnight_weeks = ibge_fortnight_weeks(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
+  )]
 
   # Clean up intermediate columns
   temp_cols <- c(
@@ -336,17 +359,18 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
     "first_sat_m1", "first_sat_m2", "first_sat_m3",
     "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
     "first_sat_after_birthday", "visit_before_birthday",
-    "date_min", "date_max",
+    "date_min", "date_max", "quarter_end",
     "fortnight_min_pos", "fortnight_max_pos",
-    "fortnight_min_yyyyff", "fortnight_max_yyyyff",
-    "hh_fortnight_min", "hh_fortnight_max"
+    "hh_fortnight_min", "hh_fortnight_max",
+    "temp_month_in_q", "temp_fortnight_in_month", "temp_month"
   )
   dt[, (intersect(temp_cols, names(dt))) := NULL]
   # OPTIMIZATION: Removed explicit gc() call - R's garbage collector runs automatically
 
   # Select output columns - include quarter/household keys for within-quarter aggregation
   key_cols <- intersect(c("Ano", "Trimestre", "UPA", "V1008", "V1014"), names(dt))
-  output_cols <- c(key_cols, "ref_fortnight", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff")
+  output_cols <- c(key_cols, "ref_fortnight_start", "ref_fortnight_end",
+                   "ref_fortnight_in_quarter", "ref_fortnight_yyyyff", "ref_fortnight_weeks")
 
   result <- unique(dt[, ..output_cols])
 
@@ -363,91 +387,6 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
   result
 }
 
-
-#' Convert Date to Fortnight Position in Quarter
-#'
-#' @param date Date vector
-#' @param quarter Integer quarter vector (1-4)
-#' @return Integer fortnight position (1-6) within the quarter
-#' @keywords internal
-#' @noRd
-date_to_fortnight_in_quarter <- function(date, quarter) {
-  month <- fast_month(date)
-  day <- fast_mday(date)
-
-  # First and last month of quarter
-  first_month <- quarter_first_month(quarter)
-  last_month <- first_month + 2L
-
-  # Check if date is within the quarter
-  in_quarter <- month >= first_month & month <= last_month
-
-  # Month position in quarter (1, 2, or 3)
-  month_in_quarter <- month - first_month + 1L
-
-  # Fortnight within month (1 if day 1-15, 2 if day 16+)
-  fortnight_in_month <- fifelse(day <= 15L, 1L, 2L)
-
-  # Position in quarter (1-6)
-  pos <- (month_in_quarter - 1L) * 2L + fortnight_in_month
-
-  # Return NA for dates outside the quarter
-  fifelse(in_quarter, pos, NA_integer_)
-}
-
-
-#' Convert Date to YYYYFF Format
-#'
-#' @param date Date vector
-#' @return Integer YYYYFF (e.g., 202301 for first fortnight of Jan 2023)
-#' @keywords internal
-#' @noRd
-date_to_yyyyff <- function(date) {
-  year <- fast_year(date)
-  month <- fast_month(date)
-  day <- fast_mday(date)
-
-  # Fortnight number in year (1-24)
-  ff <- (month - 1L) * 2L + fifelse(day <= 15L, 1L, 2L)
-
-  year * 100L + ff
-}
-
-
-#' Convert Fortnight Position in Quarter to YYYYFF
-#'
-#' @param year Integer year
-#' @param quarter Integer quarter (1-4)
-#' @param pos Integer position in quarter (1-6)
-#' @return Integer YYYYFF
-#' @keywords internal
-#' @noRd
-fortnight_in_quarter_to_yyyyff <- function(year, quarter, pos) {
-  # First fortnight of quarter
-  first_ff <- (quarter - 1L) * 6L + 1L
-
-  # Fortnight number in year (1-24)
-  ff <- first_ff + pos - 1L
-
-  year * 100L + ff
-}
-
-
-#' Convert YYYYFF to Date
-#'
-#' @param yyyyff Integer YYYYFF format
-#' @return Date (1st or 16th of month)
-#' @keywords internal
-#' @noRd
-yyyyff_to_date <- function(yyyyff) {
-  year <- yyyyff %/% 100L
-  ff <- yyyyff %% 100L
-
-  # Month (1-12)
-  month <- (ff - 1L) %/% 2L + 1L
-
-  # Day (1 or 16)
-  day <- fifelse(ff %% 2L == 1L, 1L, 16L)
-
-  make_date(year, month, day)
-}
+# NOTE: The helper functions for IBGE fortnight calculations (date_to_fortnight_in_quarter,
+# ibge_fortnight_in_quarter, ibge_fortnight_start, ibge_fortnight_end, etc.) are now
+# located in utils-dates.R as part of the IBGE Calendar Utilities section.

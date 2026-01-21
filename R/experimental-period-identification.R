@@ -25,13 +25,13 @@
 #' @param confidence_threshold Numeric (0-1). Minimum confidence required to
 #'   assign a probabilistic period. Used by probabilistic and combined strategies.
 #'   Default 0.9.
-#' @param upa_proportion_threshold Numeric (0-1). Minimum proportion of UPA-V1014
-#'   observations (within quarter) that must meet criteria for UPA-level assignment.
-#'   Used by upa_aggregation and combined strategies. Default 0.9.
+#' @param upa_proportion_threshold Numeric (0-1). Minimum proportion of UPA
+#'   observations (within quarter) that must have strict identification with consensus
+#'   for extending to unidentified observations. Default 0.5.
 #' @param include_derived Logical. If TRUE (default), output includes derived columns
-#'   compatible with \code{pnadc_apply_periods()}: ref_month, ref_month_yyyymm,
-#'   determined_month, etc. This allows experimental output to be used directly
-#'   for weight calibration.
+#'   compatible with \code{pnadc_apply_periods()}: ref_month_start, ref_month_end,
+#'   ref_month_yyyymm, ref_month_weeks, determined_month, etc. This allows
+#'   experimental output to be used directly for weight calibration.
 #' @param verbose Logical. If TRUE, print progress information.
 #'
 #' @return A modified crosswalk with additional columns. When \code{include_derived = TRUE}
@@ -49,14 +49,17 @@
 #'     }
 #'     \item \strong{Derived columns} (when \code{include_derived = TRUE}):
 #'     \itemize{
-#'       \item \code{ref_month}, \code{ref_month_in_quarter}, \code{ref_month_yyyymm}: Combined
-#'         strict + experimental month (strict takes priority)
+#'       \item \code{ref_month_start}, \code{ref_month_end}, \code{ref_month_in_quarter},
+#'         \code{ref_month_yyyymm}, \code{ref_month_weeks}: Combined strict + experimental month
+#'         (strict takes priority). Start/end are Sunday/Saturday of IBGE month boundaries.
 #'       \item \code{determined_month}: TRUE if month is assigned (strictly or experimentally)
-#'       \item \code{ref_fortnight}, \code{ref_fortnight_in_quarter}, \code{ref_fortnight_yyyyff}:
-#'         Combined strict + experimental fortnight
+#'       \item \code{ref_fortnight_start}, \code{ref_fortnight_end}, \code{ref_fortnight_in_quarter},
+#'         \code{ref_fortnight_yyyyff}: Combined strict + experimental fortnight.
+#'         Start/end are Sunday/Saturday of IBGE fortnight boundaries.
 #'       \item \code{determined_fortnight}: TRUE if fortnight is assigned
-#'       \item \code{ref_week}, \code{ref_week_in_quarter}, \code{ref_week_yyyyww}:
-#'         Combined strict + experimental week
+#'       \item \code{ref_week_start}, \code{ref_week_end}, \code{ref_week_in_quarter},
+#'         \code{ref_week_yyyyww}: Combined strict + experimental week.
+#'         Start/end are Sunday/Saturday of IBGE week boundaries.
 #'       \item \code{determined_week}: TRUE if week is assigned
 #'       \item \code{probabilistic_assignment}: TRUE if any period was assigned experimentally
 #'         (vs strictly deterministic)
@@ -171,7 +174,7 @@ pnadc_experimental_periods <- function(
     data = NULL,
     strategy = c("none", "probabilistic", "upa_aggregation", "both"),
     confidence_threshold = 0.9,
-    upa_proportion_threshold = 0.9,
+    upa_proportion_threshold = 0.5,
     include_derived = TRUE,
     verbose = TRUE
 ) {
@@ -331,10 +334,13 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
   dt[, visit_before_birthday := NA_integer_]
   dt[!is.na(V20082), visit_before_birthday := as.integer((Ano - V20082) - V2009)]
 
+  # Calculate the last Saturday of the quarter using IBGE month end
+  dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
+
   # Date bounds
   dt[, `:=`(
     date_min = make_date(Ano, month1, first_sat_m1),
-    date_max = make_date(Ano, month3, first_sat_m3) + 21L
+    date_max = quarter_end
   )]
 
   # Apply birthday constraints
@@ -358,10 +364,11 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     upa_date_max = fifelse(all(is.na(date_max)), as.Date(NA), min(date_max, na.rm = TRUE))
   ), by = .(Ano, Trimestre, UPA, V1014)]
 
-  # Calculate month positions
+  # Calculate month positions using IBGE calendar
+  # The IBGE month is determined by which month's Saturday boundary contains the Saturday
   dt[, `:=`(
-    upa_month_min_pos = month_in_quarter(upa_date_min),
-    upa_month_max_pos = month_in_quarter(upa_date_max)
+    upa_month_min_pos = calculate_ibge_month_position(upa_date_min, Trimestre, Ano),
+    upa_month_max_pos = calculate_ibge_month_position(upa_date_max, Trimestre, Ano)
   )]
 
   # Get bounds at UPA-V1014 level
@@ -489,10 +496,10 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     fortnight_upper = effective_month * 2L
   )]
 
-  # Calculate actual fortnight positions from dates
+  # Calculate actual fortnight positions from dates using IBGE fortnights
   crosswalk[month_identified == TRUE & !is.na(hh_date_min), `:=`(
-    hh_fortnight_min = date_to_fortnight_in_quarter(hh_date_min, Trimestre),
-    hh_fortnight_max = date_to_fortnight_in_quarter(hh_date_max, Trimestre)
+    hh_fortnight_min = ibge_fortnight_in_quarter(hh_date_min, Trimestre, Ano, min_days = 4L),
+    hh_fortnight_max = ibge_fortnight_in_quarter(hh_date_max, Trimestre, Ano, min_days = 4L)
   )]
 
   # Constrain to within the identified month
@@ -514,32 +521,33 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     hh_date_midpoint = hh_date_min + as.integer((hh_date_max - hh_date_min) / 2)
   )]
 
-  # Determine fortnight from midpoint
+  # Determine fortnight from midpoint using IBGE fortnights
   crosswalk[!is.na(hh_date_midpoint), `:=`(
-    ref_fortnight_exp = date_to_fortnight_in_quarter(hh_date_midpoint, Trimestre)
+    ref_fortnight_exp = ibge_fortnight_in_quarter(hh_date_midpoint, Trimestre, Ano, min_days = 4L)
   )]
 
   # Calculate confidence: proportion of interval in the likely fortnight
-  # Fortnight boundary is at day 15/16 of each month
+  # IBGE fortnight boundary is at the start of IBGE week 3 of each month (Sunday after week 2)
   crosswalk[!is.na(ref_fortnight_exp) & fortnight_range == 2L, `:=`(
     fortnight_month_num = ((hh_fortnight_min - 1L) %/% 2L) + 1L
   )]
 
+  # Get the IBGE fortnight boundary (start of fortnight 2 = Sunday of week 3)
   crosswalk[!is.na(fortnight_month_num), `:=`(
-    boundary_day_15 = make_date(Ano, quarter_month_n(Trimestre, fortnight_month_num), 16L)
+    fortnight_boundary = ibge_fortnight_start(Ano, quarter_month_n(Trimestre, fortnight_month_num), 2L, min_days = 4L)
   )]
 
-  # Calculate days in each fortnight - boundary_day_15 is day 16 (first day of second fortnight)
-  crosswalk[!is.na(boundary_day_15), `:=`(
+  # Calculate days in each fortnight - fortnight_boundary is first day of second fortnight (Sunday)
+  crosswalk[!is.na(fortnight_boundary), `:=`(
     total_interval_days = as.integer(hh_date_max - hh_date_min) + 1L
   )]
 
-  crosswalk[!is.na(boundary_day_15), `:=`(
+  crosswalk[!is.na(fortnight_boundary), `:=`(
     # Days in first fortnight: from hh_date_min to (boundary - 1), clamped to interval
-    days_in_first_fortnight = pmax(0L, as.integer(pmin(boundary_day_15 - 1L, hh_date_max) - hh_date_min + 1L))
+    days_in_first_fortnight = pmax(0L, as.integer(pmin(fortnight_boundary - 1L, hh_date_max) - hh_date_min + 1L))
   )]
 
-  crosswalk[!is.na(boundary_day_15), `:=`(
+  crosswalk[!is.na(fortnight_boundary), `:=`(
     # Days in second fortnight: remaining days
     days_in_second_fortnight = total_interval_days - days_in_first_fortnight
   )]
@@ -604,20 +612,14 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     fortnight_end_date = make_date(Ano, quarter_month_n(Trimestre, fortnight_month), fortnight_end_day)
   )]
 
-  # Calculate week bounds from dates
+  # Calculate IBGE week bounds from dates (week position within quarter)
   crosswalk[fortnight_identified == TRUE & !is.na(hh_date_min), `:=`(
-    hh_week_min = date_to_yyyyww(pmax(hh_date_min, fortnight_start_date)),
-    hh_week_max = date_to_yyyyww(pmin(hh_date_max, fortnight_end_date))
+    hh_week_min_pos = ibge_week_in_quarter(pmax(hh_date_min, fortnight_start_date), Trimestre, Ano, min_days = 4L),
+    hh_week_max_pos = ibge_week_in_quarter(pmin(hh_date_max, fortnight_end_date), Trimestre, Ano, min_days = 4L)
   )]
 
-  # Convert to sequential for range calculation
-  crosswalk[fortnight_identified == TRUE & !is.na(hh_week_min), `:=`(
-    hh_week_min_seq = (hh_week_min %/% 100L) * 53L + (hh_week_min %% 100L),
-    hh_week_max_seq = (hh_week_max %/% 100L) * 53L + (hh_week_max %% 100L)
-  )]
-
-  crosswalk[fortnight_identified == TRUE & !is.na(hh_week_min_seq), `:=`(
-    week_range = hh_week_max_seq - hh_week_min_seq + 1L
+  crosswalk[fortnight_identified == TRUE & !is.na(hh_week_min_pos), `:=`(
+    week_range = hh_week_max_pos - hh_week_min_pos + 1L
   )]
 
   # For range == 2 and not strictly determined, check if sequential
@@ -625,27 +627,23 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
               week_range == 2L &
               is.na(ref_week_in_quarter) &
               !is.na(hh_date_min) &
-              (hh_week_max_seq - hh_week_min_seq) == 1L, `:=`(
+              (hh_week_max_pos - hh_week_min_pos) == 1L, `:=`(
     week_date_midpoint = hh_date_min + as.integer((hh_date_max - hh_date_min) / 2)
   )]
 
-  # Determine week from midpoint
+  # Determine week from midpoint using IBGE weeks
   crosswalk[!is.na(week_date_midpoint), `:=`(
-    ref_week_exp = week_in_quarter(week_date_midpoint, Trimestre, Ano)
+    ref_week_exp = ibge_week_in_quarter(week_date_midpoint, Trimestre, Ano, min_days = 4L)
   )]
 
   # Calculate confidence: proportion of interval in the likely week
-  crosswalk[!is.na(ref_week_exp) & week_range == 2L, `:=`(
-    midpoint_week_yyyyww = date_to_yyyyww(week_date_midpoint)
-  )]
-
-  # Get week boundary date - Monday of the second week (hh_week_max)
+  # Get week boundary date - Sunday of the second week (start of hh_week_max_pos)
   # For a 2-week range, boundary is the start of the second week
-  crosswalk[!is.na(midpoint_week_yyyyww), `:=`(
-    week_boundary_date = yyyyww_to_date(hh_week_max)
+  crosswalk[!is.na(ref_week_exp) & week_range == 2L, `:=`(
+    week_boundary_date = ibge_week_dates_from_position(Ano, Trimestre, hh_week_max_pos, min_days = 4L)$start
   )]
 
-  # Calculate days in each week - week_boundary_date is Monday of second week
+  # Calculate days in each week - week_boundary_date is Sunday of second week
   crosswalk[!is.na(week_boundary_date) & !is.na(hh_date_min), `:=`(
     total_week_interval = as.integer(hh_date_max - hh_date_min) + 1L
   )]
@@ -665,7 +663,7 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     ref_week_exp_confidence = fifelse(
       total_week_interval > 0L & !is.na(days_in_first_week) & !is.na(days_in_second_week),
       fifelse(
-        midpoint_week_yyyyww == hh_week_min,
+        ref_week_exp == hh_week_min_pos,
         days_in_first_week / total_week_interval,
         days_in_second_week / total_week_interval
       ),
@@ -694,16 +692,17 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     "upa_date_min", "upa_date_max", "upa_month_min_pos", "upa_month_max_pos",
     "month_range", "date_midpoint", "month1_start", "month2_start", "month3_start",
     "boundary_date", "days_before_boundary", "days_after_boundary", "total_days",
+    "quarter_end",
     # Fortnight probabilistic
     "hh_date_min", "hh_date_max", "month_identified", "effective_month",
     "fortnight_lower", "fortnight_upper", "hh_fortnight_min", "hh_fortnight_max",
-    "fortnight_range", "hh_date_midpoint", "fortnight_month_num", "boundary_day_15",
+    "fortnight_range", "hh_date_midpoint", "fortnight_month_num", "fortnight_boundary",
     "days_in_first_fortnight", "days_in_second_fortnight", "total_interval_days",
     # Week probabilistic
     "fortnight_identified", "effective_fortnight", "fortnight_month", "fortnight_half",
     "fortnight_start_day", "fortnight_end_day", "fortnight_start_date", "fortnight_end_date",
-    "hh_week_min", "hh_week_max", "hh_week_min_seq", "hh_week_max_seq", "week_range",
-    "week_date_midpoint", "midpoint_week_yyyyww", "week_boundary_date",
+    "hh_week_min_pos", "hh_week_max_pos", "week_range",
+    "week_date_midpoint", "week_boundary_date",
     "days_in_first_week", "days_in_second_week", "total_week_interval"
   )
   .cleanup_temp_columns(crosswalk, temp_cols)
@@ -1022,10 +1021,13 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
   dt[, visit_before_birthday := NA_integer_]
   dt[!is.na(V20082), visit_before_birthday := as.integer((Ano - V20082) - V2009)]
 
+  # Calculate the last Saturday of the quarter using IBGE month end
+  dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
+
   # Date bounds
   dt[, `:=`(
     date_min = make_date(Ano, month1, first_sat_m1),
-    date_max = make_date(Ano, month3, first_sat_m3) + 21L
+    date_max = quarter_end
   )]
 
   # Apply birthday constraints
@@ -1094,14 +1096,16 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
     ref_month_yyyymm = yyyymm(Ano, quarter_month_n(Trimestre, ref_month_in_quarter))
   )]
 
-  # Derive ref_month (Date) from ref_month_yyyymm
-  crosswalk[!is.na(ref_month_yyyymm) & is.na(ref_month), `:=`(
-    ref_month = make_date(
-      ref_month_yyyymm %/% 100L,
-      ref_month_yyyymm %% 100L,
-      1L
-    )
+  # Derive IBGE month boundaries (start/end dates) for newly assigned months
+  crosswalk[!is.na(ref_month_yyyymm) & is.na(ref_month_start), `:=`(
+    temp_month = quarter_month_n(Trimestre, ref_month_in_quarter)
   )]
+  crosswalk[!is.na(temp_month), `:=`(
+    ref_month_start = ibge_month_start(Ano, temp_month, min_days = 4L),
+    ref_month_end = ibge_month_end(Ano, temp_month, min_days = 4L),
+    ref_month_weeks = ibge_month_weeks(Ano, temp_month, min_days = 4L)
+  )]
+  crosswalk[, temp_month := NULL]
 
   # Update determined_month flag
   crosswalk[, determined_month := !is.na(ref_month_in_quarter)]
@@ -1118,15 +1122,25 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
   crosswalk[is.na(ref_fortnight_in_quarter) & !is.na(ref_fortnight_exp),
             ref_fortnight_in_quarter := ref_fortnight_exp]
 
-  # Derive ref_fortnight_yyyyff from ref_fortnight_in_quarter
+  # Derive ref_fortnight_yyyyff from ref_fortnight_in_quarter using IBGE format
   crosswalk[!is.na(ref_fortnight_in_quarter), `:=`(
-    ref_fortnight_yyyyff = fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter)
+    ref_fortnight_yyyyff = ibge_fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter)
   )]
 
-  # Derive ref_fortnight (Date) from ref_fortnight_yyyyff
-  crosswalk[!is.na(ref_fortnight_yyyyff) & is.na(ref_fortnight), `:=`(
-    ref_fortnight = yyyyff_to_date(ref_fortnight_yyyyff)
+  # Derive IBGE fortnight boundaries (start/end dates) for newly assigned fortnights
+  crosswalk[!is.na(ref_fortnight_yyyyff) & is.na(ref_fortnight_start), `:=`(
+    temp_month_in_q = ((ref_fortnight_in_quarter - 1L) %/% 2L) + 1L,
+    temp_fortnight_in_month = ((ref_fortnight_in_quarter - 1L) %% 2L) + 1L
   )]
+  crosswalk[!is.na(temp_month_in_q), `:=`(
+    temp_month = quarter_month_n(Trimestre, temp_month_in_q)
+  )]
+  crosswalk[!is.na(temp_month), `:=`(
+    ref_fortnight_start = ibge_fortnight_start(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
+    ref_fortnight_end = ibge_fortnight_end(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
+    ref_fortnight_weeks = ibge_fortnight_weeks(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
+  )]
+  crosswalk[, c("temp_month_in_q", "temp_fortnight_in_month", "temp_month") := NULL]
 
   # Update determined_fortnight flag
   crosswalk[, determined_fortnight := !is.na(ref_fortnight_in_quarter)]
@@ -1143,17 +1157,16 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
   crosswalk[is.na(ref_week_in_quarter) & !is.na(ref_week_exp),
             ref_week_in_quarter := ref_week_exp]
 
-  # For weeks, we need to derive ref_week_yyyyww from the week position
-  # This requires the quarter context to get the actual ISO week
+  # For weeks, we need to derive IBGE week boundaries from the week position
   # The experimental ref_week_exp is a position in quarter (1-14)
-  # We need to convert this to YYYYWW format
-  crosswalk[!is.na(ref_week_in_quarter) & is.na(ref_week_yyyyww), `:=`(
-    ref_week_yyyyww = week_in_quarter_to_yyyyww(Ano, Trimestre, ref_week_in_quarter)
+  crosswalk[!is.na(ref_week_in_quarter) & is.na(ref_week_start), `:=`(
+    ref_week_start = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$start,
+    ref_week_end = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$end
   )]
 
-  # Derive ref_week (Date) from ref_week_yyyyww
-  crosswalk[!is.na(ref_week_yyyyww) & is.na(ref_week), `:=`(
-    ref_week = yyyyww_to_date(ref_week_yyyyww)
+  # Derive ref_week_yyyyww from the Saturday (end) of the IBGE week
+  crosswalk[!is.na(ref_week_end) & is.na(ref_week_yyyyww), `:=`(
+    ref_week_yyyyww = date_to_ibge_yyyyww(ref_week_end)
   )]
 
   # Update determined_week flag
@@ -1180,36 +1193,8 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
 }
 
 
-#' Convert Week Position in Quarter to YYYYWW Format
-#'
-#' Internal helper to convert a week-in-quarter position (1-14) to ISO YYYYWW format.
-#'
-#' @param year Integer year
-#' @param quarter Integer quarter (1-4)
-#' @param week_in_quarter Integer week position in quarter (1-14)
-#' @return Integer YYYYWW format
-#' @keywords internal
-#' @noRd
-week_in_quarter_to_yyyyww <- function(year, quarter, week_in_quarter) {
-  # Get the first day of the quarter
-  first_month <- quarter_month_n(quarter, 1L)
-  quarter_start <- make_date(year, first_month, 1L)
-
-  # Find the Monday of the first week that starts in this quarter
-  # ISO weeks start on Monday
-  dow_start <- as.integer(format(quarter_start, "%u"))  # 1=Mon, 7=Sun
-  days_to_monday <- fifelse(dow_start == 1L, 0L, 8L - dow_start)
-
-  # First Monday of the quarter
-  first_monday <- quarter_start + days_to_monday
-
-  # Target date is (week_in_quarter - 1) weeks after first Monday
-  target_date <- first_monday + (week_in_quarter - 1L) * 7L
-
-  # Convert to YYYYWW
-  date_to_yyyyww(target_date)
-}
-
+# NOTE: The week_in_quarter_to_yyyyww function has been replaced by IBGE-based functions
+# in utils-dates.R. Use ibge_week_dates_from_position() and date_to_ibge_yyyyww() instead.
 
 # =============================================================================
 # COMBINE CROSSWALKS FUNCTION
@@ -1377,27 +1362,43 @@ combine_period_crosswalks <- function(
     )]
   }
 
-  # Derive YYYYMM/YYYYFF/YYYYWW and Date columns for newly assigned periods
-  # Month
+  # Derive YYYYMM/YYYYFF/YYYYWW and IBGE boundary columns for newly assigned periods
+
+  # Month - derive IBGE boundaries
   result[probabilistic_assignment == TRUE & !is.na(ref_month_in_quarter), `:=`(
-    ref_month_yyyymm = yyyymm(Ano, quarter_month_n(Trimestre, ref_month_in_quarter)),
-    ref_month = make_date(Ano, quarter_month_n(Trimestre, ref_month_in_quarter), 1L)
+    temp_month = quarter_month_n(Trimestre, ref_month_in_quarter)
   )]
+  result[probabilistic_assignment == TRUE & !is.na(temp_month), `:=`(
+    ref_month_yyyymm = yyyymm(Ano, temp_month),
+    ref_month_start = ibge_month_start(Ano, temp_month, min_days = 4L),
+    ref_month_end = ibge_month_end(Ano, temp_month, min_days = 4L),
+    ref_month_weeks = ibge_month_weeks(Ano, temp_month, min_days = 4L)
+  )]
+  result[, temp_month := NULL]
 
-  # Fortnight
+  # Fortnight - derive IBGE boundaries
   result[probabilistic_assignment == TRUE & !is.na(ref_fortnight_in_quarter), `:=`(
-    ref_fortnight_yyyyff = fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter)
+    temp_month_in_q = ((ref_fortnight_in_quarter - 1L) %/% 2L) + 1L,
+    temp_fortnight_in_month = ((ref_fortnight_in_quarter - 1L) %% 2L) + 1L
   )]
-  result[probabilistic_assignment == TRUE & !is.na(ref_fortnight_yyyyff), `:=`(
-    ref_fortnight = yyyyff_to_date(ref_fortnight_yyyyff)
+  result[probabilistic_assignment == TRUE & !is.na(temp_month_in_q), `:=`(
+    temp_month = quarter_month_n(Trimestre, temp_month_in_q)
   )]
+  result[probabilistic_assignment == TRUE & !is.na(temp_month), `:=`(
+    ref_fortnight_yyyyff = ibge_fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter),
+    ref_fortnight_start = ibge_fortnight_start(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
+    ref_fortnight_end = ibge_fortnight_end(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
+    ref_fortnight_weeks = ibge_fortnight_weeks(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
+  )]
+  result[, c("temp_month_in_q", "temp_fortnight_in_month", "temp_month") := NULL]
 
-  # Week
+  # Week - derive IBGE boundaries
   result[probabilistic_assignment == TRUE & !is.na(ref_week_in_quarter), `:=`(
-    ref_week_yyyyww = week_in_quarter_to_yyyyww(Ano, Trimestre, ref_week_in_quarter)
+    ref_week_start = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$start,
+    ref_week_end = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$end
   )]
-  result[probabilistic_assignment == TRUE & !is.na(ref_week_yyyyww), `:=`(
-    ref_week = yyyyww_to_date(ref_week_yyyyww)
+  result[probabilistic_assignment == TRUE & !is.na(ref_week_end), `:=`(
+    ref_week_yyyyww = date_to_ibge_yyyyww(ref_week_end)
   )]
 
   # Update determination flags
@@ -1435,4 +1436,40 @@ combine_period_crosswalks <- function(
   }
 
   result
+}
+
+
+#' Calculate IBGE Month Position from Date
+#'
+#' Determines which month position (1, 2, or 3) within a quarter a date belongs to,
+#' using IBGE month boundaries. The IBGE month is determined by which month's
+#' Saturday boundary contains the Saturday of the date's week.
+#'
+#' @param date Date vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param year Integer year vector
+#' @return Integer month position (1, 2, or 3) within the quarter, or NA if out of range
+#' @keywords internal
+#' @noRd
+calculate_ibge_month_position <- function(date, quarter, year) {
+  # Get the Saturday of the date's IBGE week
+  sat_date <- ibge_week_saturday(date)
+  sat_month <- fast_month(sat_date)
+
+  # Get first month of quarter
+  first_month <- quarter_first_month(quarter)
+
+  # Calculate month position in quarter (1, 2, or 3)
+  month_pos <- sat_month - first_month + 1L
+
+  # Handle year boundary (e.g., Q4 spanning into January)
+  sat_year <- fast_year(sat_date)
+  month_pos <- data.table::fifelse(
+    sat_year > year,
+    sat_month + 12L - first_month + 1L,
+    month_pos
+  )
+
+  # Return NA for dates outside the quarter range
+  data.table::fifelse(month_pos >= 1L & month_pos <= 3L, month_pos, NA_integer_)
 }

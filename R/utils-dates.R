@@ -1,6 +1,23 @@
 #' @title Date Utility Functions
 #' @description Internal helper functions for date calculations. Optimized with
 #'   pre-computed lookup tables for fast date creation (~20x faster than ISOdate).
+#'
+#'   This file includes:
+#'   \itemize{
+#'     \item Fast date creation with lookup tables (make_date)
+#'     \item ISO 8601 week utilities (Monday-Sunday weeks)
+#'     \item IBGE reference calendar utilities (Sunday-Saturday weeks)
+#'   }
+#'
+#' @section IBGE Reference Calendar:
+#' The IBGE reference calendar differs from ISO 8601:
+#' \itemize{
+#'   \item Weeks start on Sunday and end on Saturday
+#'   \item A week belongs to the IBGE month where its Saturday falls
+#'   \item The first valid Saturday must have >= 4 days (or 3 as exception) in the month
+#'   \item IBGE months can have 4 or 5 reference weeks
+#' }
+#'
 #' @name utils-dates
 #' @keywords internal
 NULL
@@ -669,5 +686,505 @@ weeks_in_month <- function(year, month) {
     # Different years: weeks from first to end of first_yr, plus weeks 1 to last_wk
     (iso_weeks_in_year(first_yr) - first_wk + 1L) + last_wk
   )
+}
+
+
+# ============================================================================
+# IBGE Reference Calendar Utilities (Sunday-Saturday weeks)
+#
+# IBGE's reference calendar differs from ISO 8601:
+# - Weeks start on SUNDAY and end on SATURDAY (not Monday-Sunday)
+# - A week belongs to the IBGE month where its SATURDAY falls
+# - The first valid Saturday must have >= 4 days in the month
+# - IBGE months can have 4 or 5 reference weeks
+#
+# The IBGE calendar forms a partition: every day belongs to exactly one
+# IBGE week, and every week belongs to exactly one IBGE month.
+# ============================================================================
+
+#' Get Sunday Starting an IBGE Week
+#'
+#' Returns the Sunday that starts the IBGE reference week containing a date.
+#' IBGE weeks run Sunday-Saturday.
+#'
+#' @param date Date vector
+#' @return Date vector of Sundays
+#' @keywords internal
+#' @noRd
+ibge_week_sunday <- function(date) {
+  # Days since epoch
+  days <- as.integer(date)
+
+  # Day of week (0=Sun, 1=Mon, ..., 6=Sat)
+  date_dow <- (days + 4L) %% 7L
+
+  # Sunday of this week = date - dow
+  structure(days - date_dow, class = "Date")
+}
+
+
+#' Get Saturday Ending an IBGE Week
+#'
+#' Returns the Saturday that ends the IBGE reference week containing a date.
+#' IBGE weeks run Sunday-Saturday.
+#'
+#' @param date Date vector
+#' @return Date vector of Saturdays
+#' @keywords internal
+#' @noRd
+ibge_week_saturday <- function(date) {
+  # Days since epoch
+  days <- as.integer(date)
+
+  # Day of week (0=Sun, 1=Mon, ..., 6=Sat)
+  date_dow <- (days + 4L) %% 7L
+
+  # Saturday of this week = date + (6 - dow)
+  structure(days + (6L - date_dow), class = "Date")
+}
+
+
+#' First Sunday of an IBGE Month
+#'
+#' Returns the Sunday that starts the first reference week of an IBGE month.
+#' This is the Sunday before or on the first valid Saturday of the month.
+#'
+#' @param year Integer year (vectorized)
+#' @param month Integer month 1-12 (vectorized)
+#' @param min_days Integer minimum days required for first Saturday (default 4)
+#' @return Date vector
+#' @keywords internal
+#' @noRd
+ibge_month_start <- function(year, month, min_days = 4L) {
+  # Get first valid Saturday of the month
+  first_sat_day <- first_valid_saturday(year, month, min_days = min_days)
+  first_sat_date <- make_date(year, month, first_sat_day)
+
+  # Sunday of that week = Saturday - 6
+  first_sat_date - 6L
+}
+
+
+#' Last Saturday of an IBGE Month
+#'
+#' Returns the Saturday that ends the last reference week of an IBGE month.
+#' An IBGE month has 4 or 5 reference weeks, determined by whether the
+#' next month can claim the week following the 4th reference week.
+#'
+#' @param year Integer year (vectorized)
+#' @param month Integer month 1-12 (vectorized)
+#' @param min_days Integer minimum days required for first Saturday (default 4)
+#' @return Date vector
+#' @keywords internal
+#' @noRd
+ibge_month_end <- function(year, month, min_days = 4L) {
+  # Get number of weeks in this month
+  n_weeks <- ibge_month_weeks(year, month, min_days = min_days)
+
+  # Get first valid Saturday
+  first_sat_day <- first_valid_saturday(year, month, min_days = min_days)
+  first_sat_date <- make_date(year, month, first_sat_day)
+
+  # Last Saturday = first Saturday + (n_weeks - 1) * 7
+  first_sat_date + (n_weeks - 1L) * 7L
+}
+
+
+#' Number of IBGE Reference Weeks in a Month
+#'
+#' Determines if an IBGE month has 4 or 5 reference weeks. A month has 5 weeks
+#' when the week after its 4th reference week cannot start the next month
+#' (because that week's Saturday would have fewer than min_days in the next
+#' calendar month).
+#'
+#' @param year Integer year (vectorized)
+#' @param month Integer month 1-12 (vectorized)
+#' @param min_days Integer minimum days required for first Saturday (default 4)
+#' @return Integer vector (4 or 5)
+#' @keywords internal
+#' @noRd
+ibge_month_weeks <- function(year, month, min_days = 4L) {
+  # Get first valid Saturday of current month
+  first_sat_day <- first_valid_saturday(year, month, min_days = min_days)
+
+  # Saturday ending the 4th reference week = first Saturday + 21 days
+  sat_week4 <- make_date(year, month, first_sat_day) + 21L
+
+  # Sunday starting the next week (potential first week of next month)
+  next_week_saturday <- sat_week4 + 7L
+
+  # Get month and day of next_week_saturday
+  sat_month <- fast_month(next_week_saturday)
+  sat_day <- fast_mday(next_week_saturday)
+
+  # Calculate next month
+  next_month <- data.table::fifelse(month == 12L, 1L, month + 1L)
+
+  # If Saturday is in next month AND day >= min_days, then next month can claim this week
+  # Otherwise, current month gets the 5th week
+  data.table::fifelse(sat_month == next_month & sat_day >= min_days, 4L, 5L)
+}
+
+
+#' IBGE Week Number within a Month
+#'
+#' Returns which IBGE reference week (1-5) a date falls in within its IBGE month.
+#'
+#' @param date Date vector
+#' @param year Integer year vector (for determining IBGE month boundaries)
+#' @param month Integer month vector (1-12)
+#' @param min_days Integer minimum days required for first Saturday (default 4)
+#' @return Integer vector (1-5)
+#' @keywords internal
+#' @noRd
+ibge_week_of_month <- function(date, year, month, min_days = 4L) {
+  # Get Sunday of this date's week
+  week_sunday <- ibge_week_sunday(date)
+
+  # Get Sunday of the month's first reference week
+  month_start <- ibge_month_start(year, month, min_days = min_days)
+
+  # Calculate week number (1-indexed)
+  week_num <- as.integer(as.integer(week_sunday - month_start) / 7L) + 1L
+
+  # Constrain to valid range
+  n_weeks <- ibge_month_weeks(year, month, min_days = min_days)
+  data.table::fifelse(week_num >= 1L & week_num <= n_weeks, week_num, NA_integer_)
+}
+
+
+#' IBGE Fortnight of a Month
+#'
+#' Returns which IBGE fortnight (1 or 2) a date falls in within its IBGE month.
+#' Fortnight 1 = weeks 1-2, Fortnight 2 = weeks 3-4 (or 3-5 for 5-week months).
+#'
+#' @param date Date vector
+#' @param year Integer year vector
+#' @param month Integer month vector (1-12)
+#' @param min_days Integer minimum days required (default 4)
+#' @return Integer vector (1 or 2)
+#' @keywords internal
+#' @noRd
+ibge_fortnight_of_month <- function(date, year, month, min_days = 4L) {
+  week_num <- ibge_week_of_month(date, year, month, min_days = min_days)
+
+  # Fortnight 1 = weeks 1-2, Fortnight 2 = weeks 3+
+  data.table::fifelse(week_num <= 2L, 1L, 2L)
+}
+
+
+#' IBGE Week Number within a Quarter
+#'
+#' Returns which IBGE reference week (1-14 typically) a date falls in within
+#' its quarter, using IBGE week boundaries (Sunday-Saturday).
+#'
+#' @param date Date vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param year Integer year vector
+#' @param min_days Integer minimum days required (default 4)
+#' @return Integer vector (1-14 typically, or NA if out of range)
+#' @keywords internal
+#' @noRd
+ibge_week_in_quarter <- function(date, quarter, year, min_days = 4L) {
+  # Get first month of the quarter
+  first_month <- quarter_first_month(quarter)
+
+  # Get the start of the quarter's first IBGE month
+  quarter_start <- ibge_month_start(year, first_month, min_days = min_days)
+
+  # Get Sunday of the target date's week
+  week_sunday <- ibge_week_sunday(date)
+
+  # Calculate week position (1-indexed)
+  week_pos <- as.integer(as.integer(week_sunday - quarter_start) / 7L) + 1L
+
+  # Return NA for weeks before quarter start
+  data.table::fifelse(week_sunday >= quarter_start, week_pos, NA_integer_)
+}
+
+
+#' IBGE Fortnight Number within a Quarter
+#'
+#' Returns which IBGE fortnight (1-6 per quarter) a date falls in.
+#' Each month has 2 fortnights, so a quarter has 6.
+#'
+#' @param date Date vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param year Integer year vector
+#' @param min_days Integer minimum days required (default 4)
+#' @return Integer vector (1-6)
+#' @keywords internal
+#' @noRd
+ibge_fortnight_in_quarter <- function(date, quarter, year, min_days = 4L) {
+  # Get first month of the quarter
+  first_month <- quarter_first_month(quarter)
+
+  # Determine which month of the quarter this date's IBGE week belongs to
+  # by finding which month's Saturday boundary contains the date's Saturday
+  sat_date <- ibge_week_saturday(date)
+  sat_month <- fast_month(sat_date)
+  sat_year <- fast_year(sat_date)
+
+  # Calculate month position in quarter (1, 2, or 3)
+  month_in_quarter <- sat_month - first_month + 1L
+
+  # Handle year boundary (e.g., Q4 spanning into January)
+  month_in_quarter <- data.table::fifelse(
+    sat_year > year,
+    sat_month + 12L - first_month + 1L,
+    month_in_quarter
+  )
+
+  # Constrain to 1-3
+  month_in_quarter <- pmin(pmax(month_in_quarter, 1L), 3L)
+
+  # Get fortnight within that month (1 or 2)
+  fortnight_in_month <- ibge_fortnight_of_month(date, sat_year, sat_month, min_days = min_days)
+
+  # Calculate fortnight in quarter
+  (month_in_quarter - 1L) * 2L + fortnight_in_month
+}
+
+
+#' Convert IBGE Week in Quarter to Start/End Dates
+#'
+#' Given a week position within a quarter, returns the Sunday (start) and
+#' Saturday (end) of that IBGE reference week.
+#'
+#' @param year Integer year
+#' @param quarter Integer quarter (1-4)
+#' @param week_in_quarter Integer week position (1-14 typically)
+#' @param min_days Integer minimum days required (default 4)
+#' @return List with start (Sunday) and end (Saturday) Date vectors
+#' @keywords internal
+#' @noRd
+ibge_week_dates_from_position <- function(year, quarter, week_in_quarter, min_days = 4L) {
+  # Get first month of the quarter
+  first_month <- quarter_first_month(quarter)
+
+  # Get the start of the quarter's first IBGE month (Sunday)
+  quarter_start <- ibge_month_start(year, first_month, min_days = min_days)
+
+  # Calculate Sunday of the target week
+  week_sunday <- quarter_start + (week_in_quarter - 1L) * 7L
+  week_saturday <- week_sunday + 6L
+
+  list(start = week_sunday, end = week_saturday)
+}
+
+
+#' Create IBGE Week Integer (YYYYWW format, IBGE-based)
+#'
+#' Creates an integer in YYYYWW format from year and IBGE week number.
+#' This differs from ISO week numbers.
+#'
+#' @param year Integer year
+#' @param ibge_week Integer IBGE week number (1-53)
+#' @return Integer in YYYYWW format
+#' @keywords internal
+#' @noRd
+ibge_yyyyww <- function(year, ibge_week) {
+  as.integer(year * 100L + ibge_week)
+}
+
+
+#' Convert Date to IBGE YYYYWW Format
+#'
+#' Converts a date to IBGE week format (YYYYWW). The IBGE week year is the
+#' year of the Saturday ending that week.
+#'
+#' @param date Date vector
+#' @return Integer vector in YYYYWW format
+#' @keywords internal
+#' @noRd
+date_to_ibge_yyyyww <- function(date) {
+  # Get Saturday of this week
+  sat_date <- ibge_week_saturday(date)
+
+  # Year and month of Saturday
+  sat_year <- fast_year(sat_date)
+  sat_month <- fast_month(sat_date)
+
+  # Get the IBGE week number within that year
+  # For simplicity, calculate from the start of the year
+  jan_first_sat_day <- first_valid_saturday(sat_year, 1L, min_days = 4L)
+
+  # Check if Saturday of week containing Jan 1 is in previous year
+  # If so, that week belongs to the previous year
+  jan_first_sat <- make_date(sat_year, 1L, jan_first_sat_day)
+  year_start_sunday <- jan_first_sat - 6L  # Sunday of first week
+
+  # Get Sunday of the target date's week
+  week_sunday <- ibge_week_sunday(date)
+
+  # Calculate week number
+  week_num <- as.integer(as.integer(week_sunday - year_start_sunday) / 7L) + 1L
+
+  # Handle weeks before year start (belong to previous year)
+  prev_year <- sat_year - 1L
+  prev_year_weeks <- ibge_weeks_in_year(prev_year)
+
+  result_year <- data.table::fifelse(week_num < 1L, prev_year, sat_year)
+  result_week <- data.table::fifelse(week_num < 1L, prev_year_weeks + week_num, week_num)
+
+  ibge_yyyyww(result_year, result_week)
+}
+
+
+#' Number of IBGE Weeks in a Year
+#'
+#' Returns the number of IBGE reference weeks in a year. This is calculated
+#' by finding the distance between the start of January and the start of
+#' the following January.
+#'
+#' @param year Integer year (scalar only for efficiency)
+#' @return Integer (typically 52-53)
+#' @keywords internal
+#' @noRd
+ibge_weeks_in_year <- function(year) {
+  # For IBGE calendar, the number of weeks in a year is the number of weeks
+
+  # between the first Sunday of January year and first Sunday of January year+1
+  jan_start_this <- ibge_month_start(year, 1L, min_days = 4L)
+  jan_start_next <- ibge_month_start(year + 1L, 1L, min_days = 4L)
+
+  # Number of weeks = days between / 7
+  as.integer((jan_start_next - jan_start_this) / 7L)
+}
+
+
+#' Convert IBGE YYYYWW to Date (Sunday of that week)
+#'
+#' Converts an IBGE week number in YYYYWW format to the Sunday starting that week.
+#'
+#' @param yyyyww Integer in YYYYWW format
+#' @return Date vector (Sunday of the specified IBGE week)
+#' @keywords internal
+#' @noRd
+ibge_yyyyww_to_date <- function(yyyyww) {
+  ibge_year <- yyyyww %/% 100L
+  ibge_week <- yyyyww %% 100L
+
+  # Get the start of the year (Sunday of first IBGE week)
+  jan_first_sat_day <- first_valid_saturday(ibge_year, 1L, min_days = 4L)
+  jan_first_sat <- make_date(ibge_year, 1L, jan_first_sat_day)
+  year_start_sunday <- jan_first_sat - 6L  # Sunday of first week
+
+  # Add weeks to get target Sunday
+  year_start_sunday + (ibge_week - 1L) * 7L
+}
+
+
+#' IBGE Fortnight Start Date (Sunday of first week)
+#'
+#' Returns the Sunday that starts an IBGE fortnight.
+#' Fortnight 1 starts with week 1, Fortnight 2 starts with week 3.
+#'
+#' @param year Integer year
+#' @param month Integer month (1-12)
+#' @param fortnight Integer fortnight (1 or 2)
+#' @param min_days Integer minimum days required (default 4)
+#' @return Date vector (Sunday)
+#' @keywords internal
+#' @noRd
+ibge_fortnight_start <- function(year, month, fortnight, min_days = 4L) {
+  # Get month start (Sunday of week 1)
+  month_start <- ibge_month_start(year, month, min_days = min_days)
+
+  # Fortnight 1 starts at week 1 (offset 0), Fortnight 2 starts at week 3 (offset 14)
+  offset <- data.table::fifelse(fortnight == 1L, 0L, 14L)
+
+  month_start + offset
+}
+
+
+#' IBGE Fortnight End Date (Saturday of last week)
+#'
+#' Returns the Saturday that ends an IBGE fortnight.
+#' Fortnight 1 ends with week 2, Fortnight 2 ends with week 4 (or 5).
+#'
+#' @param year Integer year
+#' @param month Integer month (1-12)
+#' @param fortnight Integer fortnight (1 or 2)
+#' @param min_days Integer minimum days required (default 4)
+#' @return Date vector (Saturday)
+#' @keywords internal
+#' @noRd
+ibge_fortnight_end <- function(year, month, fortnight, min_days = 4L) {
+  n_weeks <- ibge_month_weeks(year, month, min_days = min_days)
+
+  # Get first valid Saturday
+  first_sat_day <- first_valid_saturday(year, month, min_days = min_days)
+  first_sat_date <- make_date(year, month, first_sat_day)
+
+  # Fortnight 1 ends with week 2 (offset 7), Fortnight 2 ends with last week
+  week_2_sat <- first_sat_date + 7L
+  last_sat <- first_sat_date + (n_weeks - 1L) * 7L
+
+  data.table::fifelse(fortnight == 1L, week_2_sat, last_sat)
+}
+
+
+#' Number of Weeks in an IBGE Fortnight
+#'
+#' Returns the number of IBGE weeks in a fortnight (2 or 3).
+#' Fortnight 1 always has 2 weeks. Fortnight 2 has 2 weeks in 4-week months,
+#' 3 weeks in 5-week months.
+#'
+#' @param year Integer year
+#' @param month Integer month (1-12)
+#' @param fortnight Integer fortnight (1 or 2)
+#' @param min_days Integer minimum days required (default 4)
+#' @return Integer vector (2 or 3)
+#' @keywords internal
+#' @noRd
+ibge_fortnight_weeks <- function(year, month, fortnight, min_days = 4L) {
+  n_weeks <- ibge_month_weeks(year, month, min_days = min_days)
+
+  # Fortnight 1 always has 2 weeks
+  # Fortnight 2 has (n_weeks - 2) weeks
+  data.table::fifelse(fortnight == 1L, 2L, n_weeks - 2L)
+}
+
+
+#' Convert IBGE Fortnight in Quarter to YYYYFF Format
+#'
+#' Converts a fortnight position within a quarter (1-6) to YYYYFF format
+#' where FF is the fortnight number within the year (1-24).
+#'
+#' @param year Integer year
+#' @param quarter Integer quarter (1-4)
+#' @param fortnight_in_quarter Integer fortnight position (1-6)
+#' @return Integer YYYYFF format
+#' @keywords internal
+#' @noRd
+ibge_fortnight_in_quarter_to_yyyyff <- function(year, quarter, fortnight_in_quarter) {
+  # First fortnight of quarter in year
+  first_ff <- (quarter - 1L) * 6L + 1L
+
+  # Fortnight number in year (1-24)
+  ff <- first_ff + fortnight_in_quarter - 1L
+
+  year * 100L + ff
+}
+
+
+#' Convert IBGE YYYYFF to Fortnight Start Date
+#'
+#' Converts a fortnight in YYYYFF format to its start date (Sunday of first week).
+#'
+#' @param yyyyff Integer YYYYFF format (year * 100 + fortnight 1-24)
+#' @return Date vector (Sunday)
+#' @keywords internal
+#' @noRd
+ibge_yyyyff_to_date <- function(yyyyff) {
+  year <- yyyyff %/% 100L
+  ff <- yyyyff %% 100L
+
+  # Month (1-12) and fortnight within month (1 or 2)
+  month <- (ff - 1L) %/% 2L + 1L
+  fortnight <- ((ff - 1L) %% 2L) + 1L
+
+  ibge_fortnight_start(year, month, fortnight, min_days = 4L)
 }
 

@@ -58,7 +58,7 @@ utils::globalVariables(c(
   "V2008", "V20081", "V20082", "V2009",
   "V1028", "V1032", "UF", "posest", "posest_sxi",
   # Computed variables - reference month identification
-  "ref_month", "ref_month_in_quarter", "ref_month_yyyymm",
+  "ref_month", "ref_month_start", "ref_month_end", "ref_month_in_quarter", "ref_month_yyyymm", "ref_month_weeks",
   "birthday", "first_sat_after_birthday",
   "visit_before_birthday", "month1", "month2", "month3",
   "first_sat_m1", "first_sat_m2", "first_sat_m3",
@@ -73,14 +73,14 @@ utils::globalVariables(c(
   "requires_exc_fortnight", "trim_exc_fortnight",
   "requires_exc_week", "trim_exc_week",
   # Computed variables - reference fortnight identification
-  "ref_fortnight", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff",
+  "ref_fortnight", "ref_fortnight_start", "ref_fortnight_end", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff",
   "fortnight_min_pos", "fortnight_max_pos", "fortnight_min_yyyyff", "fortnight_max_yyyyff",
   "alt_fortnight_min_pos", "alt_fortnight_max_pos",
   "hh_fortnight_min", "hh_fortnight_max",
   "alt_hh_fortnight_min", "alt_hh_fortnight_max",
   "determined_fortnight",
   # Computed variables - reference week identification
-  "ref_week", "ref_week_in_quarter", "ref_week_yyyyww",
+  "ref_week", "ref_week_start", "ref_week_end", "ref_week_in_quarter", "ref_week_yyyyww",
   "week_min_yyyyww", "week_max_yyyyww", "week_min_pos", "week_max_pos",
   "alt_week_min_yyyyww", "alt_week_max_yyyyww",
   "hh_week_min", "hh_week_max", "alt_hh_week_min", "alt_hh_week_max",
@@ -106,9 +106,9 @@ utils::globalVariables(c(
   "i.month1", "i.month2", "i.month3",
   "i.first_sat_m1", "i.first_sat_m2", "i.first_sat_m3",
   "i.alt_sat_m1", "i.alt_sat_m2", "i.alt_sat_m3",
-  "i.ref_month", "i.ref_month_in_quarter", "i.ref_month_yyyymm",
-  "i.ref_fortnight", "i.ref_fortnight_in_quarter", "i.ref_fortnight_yyyyff",
-  "i.ref_week", "i.ref_week_in_quarter", "i.ref_week_yyyyww",
+  "i.ref_month", "i.ref_month_start", "i.ref_month_end", "i.ref_month_in_quarter", "i.ref_month_yyyymm", "i.ref_month_weeks",
+  "i.ref_fortnight", "i.ref_fortnight_start", "i.ref_fortnight_end", "i.ref_fortnight_in_quarter", "i.ref_fortnight_yyyyff",
+  "i.ref_week", "i.ref_week_start", "i.ref_week_end", "i.ref_week_in_quarter", "i.ref_week_yyyyww",
   "i.determined_month", "i.determined_fortnight", "i.determined_week",
   "i.m_populacao", "i.f_populacao", "i.w_populacao",
   # data.table special symbols and output column reference
@@ -179,5 +179,12 @@ utils::globalVariables(c(
   "probabilistic_assignment",
   "i.ref_month_exp", "i.ref_month_exp_confidence",
   "i.ref_fortnight_exp", "i.ref_fortnight_exp_confidence",
-  "i.ref_week_exp", "i.ref_week_exp_confidence"
+  "i.ref_week_exp", "i.ref_week_exp_confidence",
+  # IBGE calendar variables (quarter/month/fortnight/week bounds)
+  "quarter_end", "alt_quarter_end",
+  "temp_month", "temp_month_in_q", "temp_fortnight_in_month",
+  "ref_fortnight_weeks",
+  "alt_week_min_pos", "alt_week_max_pos",
+  "hh_week_min_pos", "hh_week_max_pos",
+  "fortnight_boundary"
 ))

@@ -36,9 +36,11 @@ progress bar. Default is 0.}
 \value{
 A data.table with the original key columns plus:
 \itemize{
-\item \code{ref_month}: Reference month as Date (first day of month, e.g., "2023-01-01")
+\item \code{ref_month_start}: Reference month start (Sunday of first IBGE reference week)
+\item \code{ref_month_end}: Reference month end (Saturday of last IBGE reference week)
 \item \code{ref_month_in_quarter}: Position in quarter (1, 2, 3) or NA if indeterminate
 \item \code{ref_month_yyyymm}: Integer YYYYMM format (e.g., 202301)
+\item \code{ref_month_weeks}: Number of IBGE weeks in this month (4 or 5)
 }
 }
 \description{
