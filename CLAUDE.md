@@ -39,7 +39,7 @@ result <- pnadc_apply_periods(pnadc_2023, crosswalk, weight_var = "V1028", ancho
 | Period | Rate | Notes |
 |--------|------|-------|
 | Month | ~97% | Aggregates across quarters at UPA-V1014 level (panel design) |
-| Fortnight | ~2-5% | Within-quarter only; cannot aggregate across quarters |
+| Fortnight | ~7-8% | Within-quarter only; cannot aggregate across quarters |
 | Week | ~1-2% | Within-quarter only; cannot aggregate across quarters |
 
 **Always use stacked multi-quarter data for best month determination rate.**
