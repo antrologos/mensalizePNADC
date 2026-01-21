@@ -78,11 +78,11 @@
 <li>
 <strong>~97% monthly determination rate</strong> when using stacked multi-quarter data</li>
 <li>
-<strong>~7% strict fortnight rate</strong> (within-quarter constraints only)</li>
+<strong>~6% strict fortnight rate</strong> (within-quarter constraints only)</li>
 <li>
 <strong>~1.5% strict week rate</strong> (within-quarter constraints only)</li>
 <li>
-<strong>Experimental strategies</strong> boost fortnight to ~58-60% and week to ~14% via UPA aggregation</li>
+<strong>Experimental strategies</strong> boost fortnight to ~27-28% and week to ~2% via probabilistic + UPA aggregation</li>
 <li>
 <strong>IBGE-based calendar</strong>: All periods use IBGE’s official Sunday-Saturday week boundaries</li>
 <li>
@@ -359,26 +359,26 @@
 <tbody>
 <tr>
 <td>Strict only</td>
-<td>~7%</td>
+<td>~6%</td>
 <td>~1.5%</td>
 <td>Baseline (deterministic)</td>
 </tr>
 <tr>
 <td><code>"probabilistic"</code></td>
-<td>~14%</td>
-<td>~2%</td>
+<td>~21%</td>
+<td>~0.6%</td>
 <td>Assigns based on date interval midpoint</td>
 </tr>
 <tr>
 <td><code>"upa_aggregation"</code></td>
-<td>~58%</td>
-<td>~14%</td>
+<td>~22%</td>
+<td>~0.6%</td>
 <td>Extends via UPA consensus</td>
 </tr>
 <tr>
 <td><code>"both"</code></td>
-<td>~60%</td>
-<td>~15%</td>
+<td>~27-28%</td>
+<td>~2%</td>
 <td>Sequential: probabilistic then UPA</td>
 </tr>
 </tbody>

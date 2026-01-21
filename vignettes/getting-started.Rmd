@@ -353,10 +353,10 @@ Cross-quarter aggregation:
 
 | Processing Mode | Month Rate | Fortnight Rate | Week Rate |
 |-----------------|------------|----------------|-----------|
-| Single quarter | ~73% | ~7% | ~1.5% |
-| Stacked (2+ years) | **~97%** | ~7% | ~1.5% |
+| Single quarter | ~73% | ~6% | ~1.5% |
+| Stacked (2+ years) | **~97%** | ~6% | ~1.5% |
 
-**Important:** Strict fortnight and week determination rates remain at ~7% and ~1.5% regardless of stacking because their constraints cannot aggregate across quarters - each quarter's interview timing is independent at the sub-monthly level. Only month determination benefits from cross-quarter aggregation through the rotating panel design.
+**Important:** Strict fortnight and week determination rates remain at ~6% and ~1.5% regardless of stacking because their constraints cannot aggregate across quarters - each quarter's interview timing is independent at the sub-monthly level. Only month determination benefits from cross-quarter aggregation through the rotating panel design.
 
 ### What Makes Observations Indeterminate?
 
@@ -397,10 +397,10 @@ crosswalk_exp[, .(
 
 | Strategy | Fortnight % | Week % | Notes |
 |----------|-------------|--------|-------|
-| Strict only | ~7% | ~1.5% | Definitive determinations only |
-| + Probabilistic | ~14% | ~2% | Adds confidence scores |
-| + UPA aggregation | ~58% | ~14% | Leverages 100% UPA homogeneity |
-| + Both | **~60%** | **~15%** | Maximum coverage |
+| Strict only | ~6% | ~1.5% | Definitive determinations only |
+| + Probabilistic | ~21% | ~0.6% | Adds confidence scores |
+| + UPA aggregation | ~22% | ~0.6% | Leverages 100% UPA homogeneity |
+| + Both | **~27-28%** | **~2%** | Maximum coverage |
 
 **Note:** Experimental strategies are intended for sensitivity analysis and research purposes. For rigorous causal analysis, strict determination should be preferred.
 
@@ -462,10 +462,10 @@ pnadc_experimental_periods(
 | Metric | Value |
 |--------|-------|
 | Month determination rate | **~97%** (on stacked data) |
-| Fortnight determination rate (strict) | ~7% |
+| Fortnight determination rate (strict) | ~6% |
 | Week determination rate (strict) | ~1.5% |
-| Fortnight rate (+ experimental) | **~60%** |
-| Week rate (+ experimental) | **~15%** |
+| Fortnight rate (+ experimental) | **~27-28%** |
+| Week rate (+ experimental) | **~2%** |
 | Processing time (identification) | ~2.5 minutes for 28M rows |
 | Processing time (with calibration) | ~5 minutes for 28M rows |
 

@@ -94,31 +94,31 @@ unique household-quarter combinations).</p>
 <tbody>
 <tr class="odd">
 <td><strong>Total rows processed</strong></td>
-<td>28,395,273</td>
+<td>22,850,046</td>
 </tr>
 <tr class="even">
 <td><strong>Unique household-quarters</strong></td>
-<td>9,598,723</td>
+<td>9,598,695</td>
 </tr>
 <tr class="odd">
 <td><strong>Month determination rate</strong></td>
-<td>96.69%</td>
+<td>95.18%</td>
 </tr>
 <tr class="even">
 <td><strong>Fortnight determination rate</strong></td>
-<td>7.64%</td>
+<td>5.89%</td>
 </tr>
 <tr class="odd">
 <td><strong>Week determination rate</strong></td>
-<td>1.54%</td>
+<td>1.23%</td>
 </tr>
 <tr class="even">
 <td><strong>Processing time</strong></td>
-<td>160.2 seconds</td>
+<td>~160 seconds</td>
 </tr>
 <tr class="odd">
 <td><strong>Throughput</strong></td>
-<td>177,303 rows/sec</td>
+<td>~175,000 rows/sec</td>
 </tr>
 </tbody>
 </table>
@@ -136,26 +136,26 @@ unique household-quarter combinations).</p>
 <tbody>
 <tr class="odd">
 <td>Strict (baseline)</td>
-<td>7.64%</td>
-<td>1.54%</td>
+<td>5.89%</td>
+<td>1.23%</td>
 <td>-</td>
 </tr>
 <tr class="even">
 <td>+ Probabilistic</td>
-<td>13.61%</td>
-<td>1.82%</td>
+<td>~21%</td>
+<td>~0.6%</td>
 <td>~220s</td>
 </tr>
 <tr class="odd">
 <td>+ UPA Aggregation</td>
-<td>57.69%</td>
-<td>14.36%</td>
+<td>~22%</td>
+<td>~0.6%</td>
 <td>~15s</td>
 </tr>
 <tr class="even">
 <td>+ Both</td>
-<td><strong>60.33%</strong></td>
-<td><strong>14.60%</strong></td>
+<td><strong>~27.5%</strong></td>
+<td><strong>~1.9%</strong></td>
 <td>~235s</td>
 </tr>
 </tbody>
@@ -707,21 +707,21 @@ households in the same UPA.</p></li>
 <tbody>
 <tr class="odd">
 <td><strong>Month</strong></td>
-<td>9,281,135</td>
-<td>9,598,723</td>
-<td><strong>96.69%</strong></td>
+<td>9,135,906</td>
+<td>9,598,695</td>
+<td><strong>95.18%</strong></td>
 </tr>
 <tr class="even">
 <td><strong>Fortnight</strong></td>
-<td>733,744</td>
-<td>9,598,723</td>
-<td><strong>7.64%</strong></td>
+<td>565,479</td>
+<td>9,598,695</td>
+<td><strong>5.89%</strong></td>
 </tr>
 <tr class="odd">
 <td><strong>Week</strong></td>
-<td>147,692</td>
-<td>9,598,723</td>
-<td><strong>1.54%</strong></td>
+<td>117,860</td>
+<td>9,598,695</td>
+<td><strong>1.23%</strong></td>
 </tr>
 </tbody>
 </table>
@@ -1015,24 +1015,24 @@ households in the same UPA.</p></li>
 <tbody>
 <tr class="odd">
 <td>probabilistic</td>
-<td>0.8</td>
-<td>13.61%</td>
-<td>1.82%</td>
-<td>221.0</td>
+<td>0.9</td>
+<td>~21%</td>
+<td>~0.6%</td>
+<td>~221</td>
 </tr>
 <tr class="even">
 <td>upa_aggregation</td>
-<td>0.8</td>
-<td>57.69%</td>
-<td>14.36%</td>
-<td>15.2</td>
+<td>0.7</td>
+<td>~22%</td>
+<td>~0.6%</td>
+<td>~15</td>
 </tr>
 <tr class="odd">
 <td>both</td>
-<td>0.8</td>
-<td><strong>60.33%</strong></td>
-<td><strong>14.60%</strong></td>
-<td>235.1</td>
+<td>0.9/0.7</td>
+<td><strong>~27.5%</strong></td>
+<td><strong>~1.9%</strong></td>
+<td>~235</td>
 </tr>
 </tbody>
 </table>
@@ -1138,7 +1138,7 @@ households in that UPA have the SAME fortnight/week.</p>
 <span><span class="co">#&gt; [21] bslib_0.9.0       yaml_2.3.10       jsonlite_2.0.0    rlang_1.1.6      </span></span>
 <span><span class="co">#&gt; [25] fs_1.6.6          htmlwidgets_1.6.4</span></span></code></pre>
 <hr>
-<p><em>Report generated: 2026-01-21 09:40:49.940569</em></p>
+<p><em>Report generated: 2026-01-21 11:21:03.995586</em></p>
 <p><em>Package version: PNADCperiods 2.0.0</em></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

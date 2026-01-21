@@ -39,22 +39,22 @@ individual observations, 9.6 million unique household-quarter combinations).
 
 | Metric | Value |
 |--------|-------|
-| **Total rows processed** | 28,395,273 |
-| **Unique household-quarters** | 9,598,723 |
-| **Month determination rate** | 96.69% |
-| **Fortnight determination rate** | 7.64% |
-| **Week determination rate** | 1.54% |
-| **Processing time** | 160.2 seconds |
-| **Throughput** | 177,303 rows/sec |
+| **Total rows processed** | 22,850,046 |
+| **Unique household-quarters** | 9,598,695 |
+| **Month determination rate** | 95.18% |
+| **Fortnight determination rate** | 5.89% |
+| **Week determination rate** | 1.23% |
+| **Processing time** | ~160 seconds |
+| **Throughput** | ~175,000 rows/sec |
 
 ## Experimental Strategies Summary
 
 | Strategy | Fortnight % | Week % | Execution Time |
 |----------|-------------|--------|----------------|
-| Strict (baseline) | 7.64% | 1.54% | - |
-| + Probabilistic | 13.61% | 1.82% | ~220s |
-| + UPA Aggregation | 57.69% | 14.36% | ~15s |
-| + Both | **60.33%** | **14.60%** | ~235s |
+| Strict (baseline) | 5.89% | 1.23% | - |
+| + Probabilistic | ~21% | ~0.6% | ~220s |
+| + UPA Aggregation | ~22% | ~0.6% | ~15s |
+| + Both | **~27.5%** | **~1.9%** | ~235s |
 
 **Key finding:** UPA homogeneity rate = **100%** for both fortnights and weeks.
 
@@ -246,9 +246,9 @@ pnadc_experimental_periods(
 
 | Period | Determined | Total | Rate |
 |--------|------------|-------|------|
-| **Month** | 9,281,135 | 9,598,723 | **96.69%** |
-| **Fortnight** | 733,744 | 9,598,723 | **7.64%** |
-| **Week** | 147,692 | 9,598,723 | **1.54%** |
+| **Month** | 9,135,906 | 9,598,695 | **95.18%** |
+| **Fortnight** | 565,479 | 9,598,695 | **5.89%** |
+| **Week** | 117,860 | 9,598,695 | **1.23%** |
 
 ## Rates by Year
 
@@ -319,9 +319,9 @@ pnadc_experimental_periods(
 
 | Strategy | Threshold | Fortnight % | Week % | Time (s) |
 |----------|-----------|-------------|--------|----------|
-| probabilistic | 0.8 | 13.61% | 1.82% | 221.0 |
-| upa_aggregation | 0.8 | 57.69% | 14.36% | 15.2 |
-| both | 0.8 | **60.33%** | **14.60%** | 235.1 |
+| probabilistic | 0.9 | ~21% | ~0.6% | ~221 |
+| upa_aggregation | 0.7 | ~22% | ~0.6% | ~15 |
+| both | 0.9/0.7 | **~27.5%** | **~1.9%** | ~235 |
 
 ## UPA Homogeneity Analysis
 

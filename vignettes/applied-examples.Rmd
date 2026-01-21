@@ -600,7 +600,7 @@ However, finer granularity comes at a cost: **smaller samples**.
 | Granularity | Determination Rate | Typical Obs/Period | Best For |
 |-------------|-------------------|-------------------|----------|
 | Monthly | ~97% | ~65,000 | Most analyses |
-| Fortnightly | ~7% | ~3,000 | Transition timing |
+| Fortnightly | ~6% | ~3,000 | Transition timing |
 | Weekly | ~1.5% | ~500 | Shock detection |
 
 **Why the low rates for fortnights and weeks?** Unlike months, which aggregate constraints across multiple quarterly visits (leveraging the panel design), fortnights and weeks can only use information from within a single quarter. The birthday constraints rarely narrow the interview window to a single 15-day or 7-day period.
@@ -609,16 +609,15 @@ However, finer granularity comes at a cost: **smaller samples**.
 
 The strict determination rates above can be significantly improved using `pnadc_experimental_periods()`. This function applies two strategies:
 
-1. **Probabilistic assignment**: When the interview window spans exactly two consecutive periods and ≥90% of the interval falls in one period, assign to that period.
+1. **Probabilistic assignment** (`confidence_threshold = 0.9`): When the interview window spans exactly two consecutive periods and ≥90% of the interval falls in one period, assign to that period.
 
-2. **UPA aggregation**: When ≥50% of observations within a UPA have the same determined period, extend that assignment to undetermined observations.
+2. **UPA aggregation** (`upa_proportion_threshold = 0.7`): When ≥70% of strictly identified observations within a UPA have the same determined period, extend that assignment to undetermined observations. This leverages the empirical finding of 100% UPA homogeneity.
 
 With both strategies (`strategy = "both"`):
-
 | Granularity | Strict Rate | Experimental Rate | Improvement |
 |-------------|-------------|-------------------|-------------|
-| Fortnight | ~6% | ~28% | ~5× more data |
-| Weekly | ~1.2% | ~2% | ~1.6× more data |
+| Fortnight | ~6% | ~27-28% | ~4-5× more data |
+| Weekly | ~1.5% | ~2% | ~1.3× more data |
 
 The examples below use experimental strategies to maximize sample sizes for sub-monthly analysis.
 
@@ -630,16 +629,17 @@ We examine **labor force participation**, which dropped sharply as workers exite
 
 ```{r covid-fortnight}
 # Apply experimental strategies to boost fortnight determination rate
+# Thresholds: 90% confidence for probabilistic, 70% UPA proportion for aggregation
 crosswalk_exp <- pnadc_experimental_periods(
   crosswalk = crosswalk,
   data = pnadc,
   strategy = "both",  # probabilistic + UPA aggregation
-  confidence_threshold = 0.9,
-  upa_proportion_threshold = 0.5,
+  confidence_threshold = 0.9,       # >=90% of interval in one period
+  upa_proportion_threshold = 0.7,   # >=70% UPA consensus for extension
   include_derived = TRUE
 )
 
-# The experimental crosswalk now has ~28% fortnight determination vs ~6% strict
+# The experimental crosswalk now has ~27-28% fortnight determination vs ~6% strict
 # For fortnightly analysis, we use the experimental crosswalk
 pnadc_fortnight <- merge(pnadc, crosswalk_exp[, .(Ano, Trimestre, UPA, V1008, V1014,
                                                     ref_fortnight_in_quarter, ref_fortnight_yyyyff)],
@@ -692,7 +692,7 @@ ggplot() +
     title = "COVID-19 Labor Force Participation: Monthly vs Fortnightly",
     subtitle = "Fortnightly data (orange) reveals sharper discontinuity at lockdown onset (experimental strategies)",
     x = NULL, y = "Labor Force Participation Rate",
-    caption = "Uses pnadc_experimental_periods() for ~28% fortnight determination vs ~6% strict rate."
+    caption = "Uses pnadc_experimental_periods(strategy='both', confidence=0.9, upa_prop=0.7) for ~27-28% fortnight rate."
   ) +
   theme_minimal(base_size = 11)
 ```
@@ -705,7 +705,7 @@ The fortnightly data shows a sharper discontinuity around March 16---the partici
 
 Carnival is Brazil's largest cultural event, concentrated in specific states (Bahia, Rio de Janeiro, Pernambuco) and occurring during a specific week each year. Do workers reduce their hours during Carnival week?
 
-With strict determination, the ~1.2% weekly rate makes this analysis challenging. However, using `pnadc_experimental_periods()` boosts this to ~2%. We **pool multiple years** (2019, 2022-2025, excluding COVID years) and compare Carnival states to other states. We use **average hours worked** (VD4035) as our indicator, which should show a clear drop during Carnival:
+With strict determination, the ~1.5% weekly rate makes this analysis challenging. However, using `pnadc_experimental_periods()` with the same thresholds boosts this to ~14-15%. We **pool multiple years** (2019, 2022-2025, excluding COVID years) and compare Carnival states to other states. We use **average hours worked** (VD4035) as our indicator, which should show a clear drop during Carnival:
 
 ```{r carnival-weekly}
 # Use experimental strategies for improved weekly determination
@@ -760,7 +760,7 @@ ggplot(weekly_carnival,
     subtitle = "Pooled data from Q1 2019, 2022-2025 (experimental strategies)",
     x = NULL, y = "Average Hours Worked (per week)",
     fill = "Region",
-    caption = "Uses pnadc_experimental_periods() for improved weekly determination. Data pooled across 5 years."
+    caption = "Uses pnadc_experimental_periods(strategy='both', confidence=0.9, upa_prop=0.7) for ~2% weekly rate. Data pooled across 5 years."
   ) +
   theme_minimal(base_size = 11)
 ```
@@ -779,9 +779,9 @@ The comparison shows that workers in Carnival-intensive states (BA/RJ/PE) reduce
 
 **Key takeaways:**
 
-1. **Monthly analysis handles most use cases** with ~95% strict determination rate
-2. **Fortnightly analysis** is more practical with `pnadc_experimental_periods()` (~28% rate vs ~6% strict)
-3. **Weekly analysis** benefits from experimental strategies (~2% vs ~1.2% strict); still requires pooling years for subgroup analysis
+1. **Monthly analysis handles most use cases** with ~97% strict determination rate
+2. **Fortnightly analysis** is practical with `pnadc_experimental_periods()` (~27-28% rate vs ~6% strict)
+3. **Weekly analysis** benefits from experimental strategies (~2% vs ~1.5% strict); pooling years essential for subgroup analysis
 
 ---
 

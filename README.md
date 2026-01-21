@@ -20,9 +20,9 @@ The `PNADCperiods` package identifies reference periods (months, fortnights, wee
 
 - **Nested identification hierarchy**: Weeks require fortnights, fortnights require months (enforced by construction)
 - **~97% monthly determination rate** when using stacked multi-quarter data
-- **~7% strict fortnight rate** (within-quarter constraints only)
+- **~6% strict fortnight rate** (within-quarter constraints only)
 - **~1.5% strict week rate** (within-quarter constraints only)
-- **Experimental strategies** boost fortnight to ~58-60% and week to ~14% via UPA aggregation
+- **Experimental strategies** boost fortnight to ~27-28% and week to ~2% via probabilistic + UPA aggregation
 - **IBGE-based calendar**: All periods use IBGE's official Sunday-Saturday week boundaries
 - **Hierarchical weight calibration** adapted per time granularity
 - **Fast**: Processes ~450,000 rows/sec (~1 minute for 28M rows)
@@ -176,10 +176,10 @@ The `pnadc_experimental_periods()` function provides experimental strategies to 
 
 | Strategy | Fortnight % | Week % | Description |
 |----------|-------------|--------|-------------|
-| Strict only | ~7% | ~1.5% | Baseline (deterministic) |
-| `"probabilistic"` | ~14% | ~2% | Assigns based on date interval midpoint |
-| `"upa_aggregation"` | ~58% | ~14% | Extends via UPA consensus |
-| `"both"` | ~60% | ~15% | Sequential: probabilistic then UPA |
+| Strict only | ~6% | ~1.5% | Baseline (deterministic) |
+| `"probabilistic"` | ~21% | ~0.6% | Assigns based on date interval midpoint |
+| `"upa_aggregation"` | ~22% | ~0.6% | Extends via UPA consensus |
+| `"both"` | ~27-28% | ~2% | Sequential: probabilistic then UPA |
 
 **Key finding**: UPA homogeneity rate = 100% for both fortnights and weeks within quarters.
 
