@@ -136,7 +136,7 @@ experimental output to be used directly for weight calibration.</p></dd>
 of date interval in assigned period; values below threshold are removed)</p></li>
 <li><p><code>ref_fortnight_exp</code>: Experimentally assigned fortnight position in quarter (1-6, or NA)</p></li>
 <li><p><code>ref_fortnight_exp_confidence</code>: Confidence of fortnight assignment (0-1)</p></li>
-<li><p><code>ref_week_exp</code>: Experimentally assigned week position in quarter (1-12, or NA)</p></li>
+<li><p><code>ref_week_exp</code>: Experimentally assigned week position in quarter (1-14, or NA)</p></li>
 <li><p><code>ref_week_exp_confidence</code>: Confidence of week assignment (0-1)</p></li>
 </ul></li>
 <li><p><strong>Derived columns</strong> (when <code>include_derived = TRUE</code>):</p><ul><li><p><code>ref_month_start</code>, <code>ref_month_end</code>, <code>ref_month_in_quarter</code>,
@@ -178,17 +178,7 @@ which period contains most of the date interval</p></li>
 <li><p>Only assign if confidence &gt;= <code>confidence_threshold</code></p></li>
 </ol><p>For months: aggregates at UPA-V1014 level (but within-quarter, unlike strict algorithm)
 For fortnights and weeks: works at household level</p>
-<p><strong>Exception Rules:</strong> The probabilistic strategy now implements the same dynamic
-exception detection as the strict algorithm. When standard IBGE rules
-(<code>min_days = 4</code>) produce impossible results for some UPA-panel groups,
-the exception rule (<code>min_days = 3</code>) is applied to the affected months
-within that quarter. This ensures experimental assignments are consistent
-with strict determinations.</p>
-<p><strong>Technical Stop Handling:</strong> The strategy handles technical stops (Paradas
-Técnicas) following the same rules as the strict algorithm:</p><ul><li><p>Rule 3.1: Quarter boundary stops assign to week 12 (last week of quarter)</p></li>
-<li><p>Rule 3.2: Within-quarter stops use household consensus when available</p></li>
-<li><p>Rule 3.3: Fallback to first valid week after the technical stop</p></li>
-</ul></div>
+</div>
 
 <div class="section">
 <h3 id="upa-aggregation-strategy">UPA Aggregation Strategy<a class="anchor" aria-label="anchor" href="#upa-aggregation-strategy"></a></h3>
@@ -265,8 +255,7 @@ rigorous analysis. Experimental outputs are useful for:</p><ul><li><p>Sensitivit
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use directly with calibration (experimental output is compatible)</span></span></span>
 <span class="r-in"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc_data</span>, <span class="va">crosswalk_exp</span>,</span></span>
-<span class="r-in"><span>                              weight_var <span class="op">=</span> <span class="st">"V1028"</span>, anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span></span>
-<span class="r-in"><span>                              calibration_unit <span class="op">=</span> <span class="st">"month"</span>, calibrate <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                              period <span class="op">=</span> <span class="st">"month"</span>, calibrate <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Or filter to only strict determinations</span></span></span>
 <span class="r-in"><span><span class="va">strict_only</span> <span class="op">&lt;-</span> <span class="va">crosswalk_exp</span><span class="op">[</span><span class="va">probabilistic_assignment</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">|</span> <span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">probabilistic_assignment</span><span class="op">)</span><span class="op">]</span></span></span>

@@ -3,12 +3,14 @@
 pre-computed lookup tables for fast date creation (~20x faster than ISOdate).
 This file includes:
 Fast date creation with lookup tables (make_date)
+ISO 8601 week utilities (Monday-Sunday weeks)
 IBGE reference calendar utilities (Sunday-Saturday weeks)
 
 "><meta property="og:description" content="Internal helper functions for date calculations. Optimized with
 pre-computed lookup tables for fast date creation (~20x faster than ISOdate).
 This file includes:
 Fast date creation with lookup tables (make_date)
+ISO 8601 week utilities (Monday-Sunday weeks)
 IBGE reference calendar utilities (Sunday-Saturday weeks)
 
 "></head><body>
@@ -59,6 +61,7 @@ IBGE reference calendar utilities (Sunday-Saturday weeks)
     <p>Internal helper functions for date calculations. Optimized with
 pre-computed lookup tables for fast date creation (~20x faster than ISOdate).</p>
 <p>This file includes:</p><ul><li><p>Fast date creation with lookup tables (make_date)</p></li>
+<li><p>ISO 8601 week utilities (Monday-Sunday weeks)</p></li>
 <li><p>IBGE reference calendar utilities (Sunday-Saturday weeks)</p></li>
 </ul></div>
 
@@ -70,8 +73,7 @@ pre-computed lookup tables for fast date creation (~20x faster than ISOdate).</p
 <p>The IBGE reference calendar differs from ISO 8601:</p><ul><li><p>Weeks start on Sunday and end on Saturday</p></li>
 <li><p>A week belongs to the IBGE month where its Saturday falls</p></li>
 <li><p>The first valid Saturday must have &gt;= 4 days (or 3 as exception) in the month</p></li>
-<li><p>IBGE months always have exactly 4 reference weeks (28 days)</p></li>
-<li><p>Gaps between IBGE months are "Technical Stops" (Paradas Técnicas), not week 5</p></li>
+<li><p>IBGE months can have 4 or 5 reference weeks</p></li>
 </ul></div>
 
   </main></div>

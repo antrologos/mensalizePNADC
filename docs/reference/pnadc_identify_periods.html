@@ -129,10 +129,8 @@ sub-quarterly time series analysis.</p>
 
 
 <dt id="arg-store-date-bounds">store_date_bounds<a class="anchor" aria-label="anchor" href="#arg-store-date-bounds"></a></dt>
-<dd><p>Logical. If TRUE, stores intermediate date bounds
-as an attribute on the returned crosswalk. This is used by
-<code><a href="pnadc_experimental_periods.html">pnadc_experimental_periods</a></code> to avoid recomputing bounds.
-Default FALSE to minimize memory usage.</p></dd>
+<dd><p>Logical. If TRUE, stores exception flags as attributes
+for optimization when calling <code><a href="pnadc_experimental_periods.html">pnadc_experimental_periods()</a></code>. Default FALSE.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -153,7 +151,7 @@ Default FALSE to minimize memory usage.</p></dd>
 <dd><p>Integer YYYYMM format (e.g., 202301)</p></dd>
 
 <dt>ref_month_weeks</dt>
-<dd><p>Number of IBGE reference weeks in month (always 4)</p></dd>
+<dd><p>Number of IBGE reference weeks in month (4 or 5)</p></dd>
 
 <dt>determined_month</dt>
 <dd><p>Logical: TRUE if month was determined</p></dd>
@@ -170,9 +168,6 @@ Default FALSE to minimize memory usage.</p></dd>
 <dt>ref_fortnight_yyyyff</dt>
 <dd><p>Integer YYYYFF format (1-24 per year)</p></dd>
 
-<dt>ref_fortnight_weeks</dt>
-<dd><p>Number of IBGE weeks in fortnight (always 2)</p></dd>
-
 <dt>determined_fortnight</dt>
 <dd><p>Logical: TRUE if fortnight was determined</p></dd>
 
@@ -183,7 +178,7 @@ Default FALSE to minimize memory usage.</p></dd>
 <dd><p>Saturday of the IBGE reference week</p></dd>
 
 <dt>ref_week_in_quarter</dt>
-<dd><p>Position in quarter (1-12) or NA</p></dd>
+<dd><p>Position in quarter (1-14) or NA</p></dd>
 
 <dt>ref_week_yyyyww</dt>
 <dd><p>Integer IBGE YYYYWW format</p></dd>
@@ -200,9 +195,9 @@ and week) for PNADC survey data based on IBGE's interview timing rules.</p><div 
 <h3 id="temporal-granularity">Temporal Granularity<a class="anchor" aria-label="anchor" href="#temporal-granularity"></a></h3>
 
 
-<p>The crosswalk contains three levels of temporal granularity:</p><ul><li><p><strong>Month</strong>: 3 per quarter (4 weeks each), ~97% determination rate (aggregates across quarters)</p></li>
-<li><p><strong>Fortnight (quinzena)</strong>: 6 per quarter (2 weeks each), ~6-8% determination rate (within-quarter only)</p></li>
-<li><p><strong>Week</strong>: 12 per quarter, ~1.5% determination rate (within-quarter only)</p></li>
+<p>The crosswalk contains three levels of temporal granularity:</p><ul><li><p><strong>Month</strong>: 3 per quarter, ~97% determination rate (aggregates across quarters)</p></li>
+<li><p><strong>Fortnight (quinzena)</strong>: 6 per quarter, ~2-8% determination rate (within-quarter only)</p></li>
+<li><p><strong>Week</strong>: 13-14 per quarter, ~1-2% determination rate (within-quarter only)</p></li>
 </ul></div>
 
 <div class="section">
@@ -216,13 +211,14 @@ relative position across quarterly visits.</p>
 </div>
 
 <div class="section">
-<h3 id="fortnight-definition-ibge-reference-weeks-">Fortnight Definition (IBGE Reference Weeks)<a class="anchor" aria-label="anchor" href="#fortnight-definition-ibge-reference-weeks-"></a></h3>
+<h3 id="fortnight-definition">Fortnight Definition<a class="anchor" aria-label="anchor" href="#fortnight-definition"></a></h3>
 
 
-<p>IBGE fortnights are based on IBGE reference weeks, NOT calendar days:</p><ul><li><p>Fortnight 1 of each month = IBGE weeks 1-2 (14 days)</p></li>
-<li><p>Fortnight 2 of each month = IBGE weeks 3-4 (14 days)</p></li>
-</ul><p>Numbered 1-24 per year (2 per month, 6 per quarter).</p>
-</div>
+<p>Fortnights are numbered 1-24 per year (2 per month):</p><ul><li><p>Fortnight 01: Jan 1-15</p></li>
+<li><p>Fortnight 02: Jan 16-31</p></li>
+<li><p>Fortnight 03: Feb 1-15</p></li>
+<li><p>... and so on</p></li>
+</ul></div>
 
     </div>
     <div class="section level2">
