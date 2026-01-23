@@ -40,7 +40,7 @@ A data.table with the original key columns plus:
 \item \code{ref_month_end}: Reference month end (Saturday of last IBGE reference week)
 \item \code{ref_month_in_quarter}: Position in quarter (1, 2, 3) or NA if indeterminate
 \item \code{ref_month_yyyymm}: Integer YYYYMM format (e.g., 202301)
-\item \code{ref_month_weeks}: Number of IBGE weeks in this month (4 or 5)
+\item \code{ref_month_weeks}: Number of IBGE weeks in this month (always 4)
 }
 }
 \description{
@@ -58,7 +58,7 @@ The algorithm uses:
 }
 \details{
 Determines which month within each quarter corresponds to each survey
-observation based on IBGE's "Parada Tecnica" (technical break) rules.
+observation based on IBGE's "Parada Técnica" (technical break) rules.
 \subsection{Exception Detection}{
 
 This function detects which quarters need relaxed timing rules

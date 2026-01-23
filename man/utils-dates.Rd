@@ -10,7 +10,6 @@ pre-computed lookup tables for fast date creation (~20x faster than ISOdate).
 This file includes:
 \itemize{
 \item Fast date creation with lookup tables (make_date)
-\item ISO 8601 week utilities (Monday-Sunday weeks)
 \item IBGE reference calendar utilities (Sunday-Saturday weeks)
 }
 }
@@ -21,7 +20,8 @@ The IBGE reference calendar differs from ISO 8601:
 \item Weeks start on Sunday and end on Saturday
 \item A week belongs to the IBGE month where its Saturday falls
 \item The first valid Saturday must have >= 4 days (or 3 as exception) in the month
-\item IBGE months can have 4 or 5 reference weeks
+\item IBGE months always have exactly 4 reference weeks (28 days)
+\item Gaps between IBGE months are "Technical Stops" (Paradas Técnicas), not week 5
 }
 }
 

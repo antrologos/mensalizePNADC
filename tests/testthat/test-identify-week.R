@@ -29,10 +29,11 @@ test_that("identify_reference_week returns correct structure", {
   expect_type(result$ref_week_in_quarter, "integer")
   expect_type(result$ref_week_yyyyww, "integer")
 
-  # Check ref_week_in_quarter values are valid (1-14 range for quarters)
+  # Check ref_week_in_quarter values are valid (1-12 range for quarters)
+  # IBGE quarters always have exactly 12 reference weeks (4 weeks × 3 months)
   valid_values <- result$ref_week_in_quarter[!is.na(result$ref_week_in_quarter)]
   if (length(valid_values) > 0) {
-    expect_true(all(valid_values >= 1 & valid_values <= 14))
+    expect_true(all(valid_values >= 1 & valid_values <= 12))
   }
 
   expect_s3_class(result, "data.table")

@@ -4,7 +4,7 @@
 \alias{pnadc_identify_periods}
 \title{Identify Reference Periods in PNADC Data}
 \usage{
-pnadc_identify_periods(data, verbose = TRUE)
+pnadc_identify_periods(data, verbose = TRUE, store_date_bounds = FALSE)
 }
 \arguments{
 \item{data}{A data.frame or data.table with PNADC microdata. Required columns:
@@ -25,6 +25,11 @@ Optional but recommended:
 }}
 
 \item{verbose}{Logical. If TRUE (default), display progress information.}
+
+\item{store_date_bounds}{Logical. If TRUE, stores intermediate date bounds
+as an attribute on the returned crosswalk. This is used by
+\code{\link{pnadc_experimental_periods}} to avoid recomputing bounds.
+Default FALSE to minimize memory usage.}
 }
 \value{
 A data.table crosswalk with columns:
@@ -34,16 +39,17 @@ A data.table crosswalk with columns:
 \item{ref_month_end}{Saturday of last IBGE reference week of the month}
 \item{ref_month_in_quarter}{Position in quarter (1, 2, 3) or NA}
 \item{ref_month_yyyymm}{Integer YYYYMM format (e.g., 202301)}
-\item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
+\item{ref_month_weeks}{Number of IBGE reference weeks in month (always 4)}
 \item{determined_month}{Logical: TRUE if month was determined}
 \item{ref_fortnight_start}{Sunday of first IBGE week of the fortnight}
 \item{ref_fortnight_end}{Saturday of last IBGE week of the fortnight}
 \item{ref_fortnight_in_quarter}{Position in quarter (1-6) or NA}
 \item{ref_fortnight_yyyyff}{Integer YYYYFF format (1-24 per year)}
+\item{ref_fortnight_weeks}{Number of IBGE weeks in fortnight (always 2)}
 \item{determined_fortnight}{Logical: TRUE if fortnight was determined}
 \item{ref_week_start}{Sunday of the IBGE reference week}
 \item{ref_week_end}{Saturday of the IBGE reference week}
-\item{ref_week_in_quarter}{Position in quarter (1-14) or NA}
+\item{ref_week_in_quarter}{Position in quarter (1-12) or NA}
 \item{ref_week_yyyyww}{Integer IBGE YYYYWW format}
 \item{determined_week}{Logical: TRUE if week was determined}
 }
@@ -82,9 +88,9 @@ and week) for PNADC survey data based on IBGE's interview timing rules.
 
 The crosswalk contains three levels of temporal granularity:
 \itemize{
-\item \strong{Month}: 3 per quarter, ~97\% determination rate (aggregates across quarters)
-\item \strong{Fortnight (quinzena)}: 6 per quarter, ~2-8\% determination rate (within-quarter only)
-\item \strong{Week}: 13-14 per quarter, ~1-2\% determination rate (within-quarter only)
+\item \strong{Month}: 3 per quarter (4 weeks each), ~97\% determination rate (aggregates across quarters)
+\item \strong{Fortnight (quinzena)}: 6 per quarter (2 weeks each), ~6-8\% determination rate (within-quarter only)
+\item \strong{Week}: 12 per quarter, ~1.5\% determination rate (within-quarter only)
 }
 }
 
@@ -96,15 +102,14 @@ rotating panel design where the same UPA-V1014 is interviewed in the same
 relative position across quarterly visits.
 }
 
-\subsection{Fortnight Definition}{
+\subsection{Fortnight Definition (IBGE Reference Weeks)}{
 
-Fortnights are numbered 1-24 per year (2 per month):
+IBGE fortnights are based on IBGE reference weeks, NOT calendar days:
 \itemize{
-\item Fortnight 01: Jan 1-15
-\item Fortnight 02: Jan 16-31
-\item Fortnight 03: Feb 1-15
-\item ... and so on
+\item Fortnight 1 of each month = IBGE weeks 1-2 (14 days)
+\item Fortnight 2 of each month = IBGE weeks 3-4 (14 days)
 }
+Numbered 1-24 per year (2 per month, 6 per quarter).
 }
 }
 \note{

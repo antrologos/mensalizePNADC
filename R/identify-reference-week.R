@@ -48,7 +48,9 @@
 #'   \itemize{
 #'     \item \code{ref_week_start}: Reference week start (Sunday of IBGE week)
 #'     \item \code{ref_week_end}: Reference week end (Saturday of IBGE week)
-#'     \item \code{ref_week_in_quarter}: Position in quarter (1-14) or NA if indeterminate
+#'     \item \code{ref_week_in_quarter}: Position in quarter (1-12, always 4 weeks
+#'       per month × 3 months = 12 weeks per quarter) or NA if indeterminate.
+#'       Technical stops are handled via fallback rules (see Technical Stops section).
 #'     \item \code{ref_week_yyyyww}: Integer YYYYWW format (IBGE-based)
 #'   }
 #'
@@ -69,10 +71,10 @@
 #'
 #' ## Expected Determination Rate
 #'
-#' The weekly determination rate (~1-2%) is much lower than monthly (~97%) because:
+#' The weekly determination rate (~1.5%) is much lower than monthly (~97%) because:
 #' \itemize{
 #'   \item Cannot aggregate across quarters (no consistent week position in panel design)
-#'   \item Finer granularity (13-14 weeks vs 3 months per quarter)
+#'   \item Finer granularity (12 weeks vs 3 months per quarter)
 #'   \item Birthday constraints rarely narrow the interview window to a single 7-day period
 #' }
 #'
@@ -83,6 +85,29 @@
 #'   \item Weeks start on Sunday and end on Saturday
 #'   \item A week belongs to the IBGE month where its Saturday falls
 #'   \item The first valid Saturday must have >= 4 days in the month
+#'   \item Each IBGE month has exactly 4 reference weeks (28 days)
+#'   \item Each IBGE quarter has exactly 12 reference weeks
+#' }
+#'
+#' ## Technical Stops (Paradas Técnicas)
+#'
+#' Technical stops are periods (full weeks from Sunday to Saturday) that fall
+#' between valid IBGE reference weeks. They are NOT part of any IBGE month.
+#' When a person's possible date range falls entirely within a technical stop,
+#' the following rules are applied:
+#'
+#' \itemize{
+#'   \item \strong{Rule 3.1 - Quarter boundary}: If the technical stop is between
+#'     quarters, the interview is assigned to the last valid week of the quarter
+#'     the observation belongs to (week 12), since interviews must belong to
+#'     their source quarter.
+#'   \item \strong{Rule 3.2 - Household consensus}: If the technical stop is within
+#'     a quarter, the algorithm checks if other household members have a valid
+#'     week assignment. If all assigned members agree on a single week, that
+#'     week is used.
+#'   \item \strong{Rule 3.3 - Fallback}: If no household consensus exists, the
+#'     interview is assigned to the first valid week AFTER the technical stop
+#'     (that still belongs to the same quarter).
 #' }
 #'
 #' @examples
@@ -104,11 +129,11 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # Note: Validation is done in pnadc_identify_periods() for fail-fast behavior.
   # When called directly, caller is responsible for valid input.
 
-  # Initialize progress bar (7 steps total)
+  # Initialize progress bar (8 steps total)
   use_external_pb <- !is.null(.pb)
   if (verbose && !use_external_pb) {
     cat("Identifying reference weeks...\n")
-    pb <- txtProgressBar(min = 0, max = 7, style = 3)
+    pb <- txtProgressBar(min = 0, max = 8, style = 3)
   } else if (use_external_pb) {
     pb <- .pb
   }
@@ -181,7 +206,7 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # ============================================================================
 
   # Calculate the last Saturday of the quarter using IBGE month end
-  # (handles 4 or 5 week months correctly)
+  # (IBGE months always have exactly 4 reference weeks)
   dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
 
   # Initialize date bounds using standard Saturday values
@@ -212,7 +237,7 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # STEP 4: Convert date bounds to IBGE weeks
   # ============================================================================
 
-  # Convert to IBGE week position within quarter (1-14 typically)
+  # Convert to IBGE week position within quarter (1-12)
   dt[, `:=`(
     week_min_pos = ibge_week_in_quarter(date_min, Trimestre, Ano, min_days = 4L),
     week_max_pos = ibge_week_in_quarter(date_max, Trimestre, Ano, min_days = 4L)
@@ -279,7 +304,7 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # STEP 6: Dynamic exception detection (fallback to min_days=3 rule)
   # ============================================================================
   #
-  # IBGE's "Parada Tecnica" defines two rules for first valid Saturday:
+  # IBGE's "Parada Técnica" defines two rules for first valid Saturday:
   #   - Standard rule: First Saturday with >= 4 days in the month
   #   - Exception rule: First Saturday with >= 3 days in the month
   #
@@ -327,6 +352,112 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   update_pb(6)
 
   # ============================================================================
+  # STEP 6b: Handle Technical Stops (Paradas Técnicas)
+  # ============================================================================
+  #
+ # Technical stops are periods (full weeks from Sunday to Saturday) that fall
+  # between valid IBGE reference weeks. They occur:
+  #   - Between quarters (most common)
+  #   - Between months within a quarter (less common)
+  #
+  # When a person's possible date range falls entirely within a technical stop,
+  # special handling rules apply:
+  #
+  # Rule 3.1: Quarter boundary technical stop
+  #   - The interview MUST belong to the quarter the observation came from
+  #   - Assign to the last valid week of that quarter (week 12)
+  #
+  # Rule 3.2: Within-quarter technical stop - household resolution
+  #   - Check if other household members have a valid week assignment
+  #   - If all assigned members agree on a week, use that week
+  #
+  # Rule 3.3: Fallback to week after technical stop
+  #   - If no household consensus or no other members assigned,
+  #   - Assign to the first valid week AFTER the technical stop
+  #   - (that still belongs to the same quarter)
+
+  # Identify cases that are still impossible after exception handling
+  # These are potential technical stop cases
+  dt[, in_technical_stop_range := (
+    (hh_week_min > hh_week_max) |
+    is.na(hh_week_min) |
+    is.na(hh_week_max)
+  )]
+
+  # Only proceed if there are any technical stop cases
+  has_tech_stop_cases <- any(dt$in_technical_stop_range, na.rm = TRUE)
+
+  if (has_tech_stop_cases) {
+    # Detect what type of technical stop for each observation
+    # Use the midpoint of date_min and date_max as representative date
+    dt[in_technical_stop_range == TRUE, tech_stop_type := detect_technical_stop_type(
+      date_min + as.integer((date_max - date_min) / 2),
+      Trimestre, Ano, min_days = 4L
+    )]
+
+    # Rule 3.1: Quarter boundary - assign to last week of quarter (week 12)
+    # The interview must belong to the quarter the data comes from
+    dt[in_technical_stop_range == TRUE & tech_stop_type == "quarter_boundary",
+       `:=`(hh_week_min = 12L, hh_week_max = 12L)]
+
+    # Rule 3.2 & 3.3: Within-quarter technical stop
+    # First, do an initial assignment for non-technical-stop cases
+    dt[, ref_week_temp := NA_integer_]
+    dt[hh_week_min == hh_week_max & !is.na(hh_week_min) & hh_week_min >= 1L,
+       ref_week_temp := hh_week_min]
+
+    # Rule 3.2: Try to resolve using household consensus
+    # Get the weeks assigned to other household members
+    dt[, hh_consensus_week := {
+      assigned_weeks <- ref_week_temp[!is.na(ref_week_temp)]
+      if (length(assigned_weeks) > 0 && length(unique(assigned_weeks)) == 1L) {
+        unique(assigned_weeks)
+      } else {
+        NA_integer_
+      }
+    }, by = .(Ano, Trimestre, UPA, V1008)]
+
+    # Apply household consensus for within-quarter technical stops
+    dt[in_technical_stop_range == TRUE &
+       tech_stop_type == "within_quarter" &
+       !is.na(hh_consensus_week),
+       `:=`(hh_week_min = hh_consensus_week, hh_week_max = hh_consensus_week)]
+
+    # Rule 3.3: Fallback to first valid week after technical stop
+    # For cases that couldn't be resolved by household consensus
+    dt[in_technical_stop_range == TRUE &
+       tech_stop_type == "within_quarter" &
+       is.na(hh_consensus_week),
+       `:=`(
+         fallback_week = first_valid_week_after_technical_stop(
+           date_min + as.integer((date_max - date_min) / 2),
+           Trimestre, Ano, min_days = 4L
+         )
+       )]
+
+    # Apply fallback week
+    dt[in_technical_stop_range == TRUE &
+       tech_stop_type == "within_quarter" &
+       is.na(hh_consensus_week) &
+       !is.na(fallback_week),
+       `:=`(hh_week_min = fallback_week, hh_week_max = fallback_week)]
+
+    # Clean up temporary columns
+    cols_to_remove <- intersect(
+      c("tech_stop_type", "ref_week_temp", "hh_consensus_week", "fallback_week"),
+      names(dt)
+    )
+    if (length(cols_to_remove) > 0) {
+      dt[, (cols_to_remove) := NULL]
+    }
+  }
+
+  # Clean up technical stop tracking column
+  dt[, in_technical_stop_range := NULL]
+
+  update_pb(7)
+
+  # ============================================================================
   # STEP 7: Assign reference week
   # ============================================================================
 
@@ -346,6 +477,8 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   dt[, ref_week_yyyyww := NA_integer_]
   dt[!is.na(ref_week_end),
      ref_week_yyyyww := date_to_ibge_yyyyww(ref_week_end)]
+
+  update_pb(8)
 
   # ============================================================================
   # STEP 8: Select output columns and return
@@ -368,12 +501,11 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   key_cols <- intersect(join_key_vars(), names(dt))
   output_cols <- c(key_cols, "ref_week_start", "ref_week_end", "ref_week_in_quarter", "ref_week_yyyyww")
 
-  result <- dt[, ..output_cols]
+  # Return unique rows at the output key level (removes person-level duplicates)
+  result <- unique(dt[, ..output_cols])
 
   # Store determination rate as attribute
   attr(result, "determination_rate") <- mean(!is.na(result$ref_week_in_quarter))
-
-  update_pb(7)
 
   # Close progress bar and show summary (only if we created our own)
   if (verbose && !use_external_pb) {

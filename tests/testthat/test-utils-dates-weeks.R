@@ -46,79 +46,6 @@ test_that("date_to_yyyyww works correctly", {
   expect_equal(date_to_yyyyww(as.Date("2023-01-01")), 202252L)
 })
 
-test_that("iso_week_monday returns correct Monday", {
-  # Monday should return itself
-  expect_equal(iso_week_monday(as.Date("2024-01-08")), as.Date("2024-01-08"))
-
-  # Sunday should return previous Monday
-  expect_equal(iso_week_monday(as.Date("2024-01-14")), as.Date("2024-01-08"))
-
-  # Wednesday should return Monday of same week
-  expect_equal(iso_week_monday(as.Date("2024-01-10")), as.Date("2024-01-08"))
-
-  # Saturday should return Monday of same week
-  expect_equal(iso_week_monday(as.Date("2024-01-13")), as.Date("2024-01-08"))
-
-  # Year boundary: Dec 31, 2024 (Tuesday) - Monday is Dec 30
-  expect_equal(iso_week_monday(as.Date("2024-12-31")), as.Date("2024-12-30"))
-})
-
-test_that("iso_weeks_in_year returns 52 or 53", {
-  # 2020 had 53 weeks (Jan 1 was Wednesday + leap year)
-  expect_equal(iso_weeks_in_year(2020), 53L)
-
-  # 2015 had 53 weeks (Jan 1 was Thursday)
-  expect_equal(iso_weeks_in_year(2015), 53L)
-
-  # 2023 has 52 weeks (Jan 1 was Sunday)
-  expect_equal(iso_weeks_in_year(2023), 52L)
-
-  # 2024 has 52 weeks (Jan 1 was Monday)
-  expect_equal(iso_weeks_in_year(2024), 52L)
-
-  # 2026 will have 53 weeks (Jan 1 is Thursday)
-  expect_equal(iso_weeks_in_year(2026), 53L)
-})
-
-test_that("week_in_quarter calculates position correctly", {
-  # Q1 2024 starts Jan 1 (Monday)
-  # Week 1 of Q1 is Jan 1-7
-  expect_equal(week_in_quarter(as.Date("2024-01-01"), 1, 2024), 1)
-  expect_equal(week_in_quarter(as.Date("2024-01-07"), 1, 2024), 1)
-  expect_equal(week_in_quarter(as.Date("2024-01-08"), 1, 2024), 2)
-  expect_equal(week_in_quarter(as.Date("2024-01-15"), 1, 2024), 3)
-
-  # Last full week of Q1 2024 (March 25-31)
-  expect_equal(week_in_quarter(as.Date("2024-03-25"), 1, 2024), 13)
-
-  # Q2 2024 starts April 1 (Monday)
-  expect_equal(week_in_quarter(as.Date("2024-04-01"), 2, 2024), 1)
-  expect_equal(week_in_quarter(as.Date("2024-04-08"), 2, 2024), 2)
-
-  # Q3 2024 starts July 1 (Monday)
-  expect_equal(week_in_quarter(as.Date("2024-07-01"), 3, 2024), 1)
-
-  # Q4 2024 starts October 1 (Tuesday) - first Monday is Sept 30
-  # So week 1 starts Oct 7 (next Monday after Oct 1)
-  # Actually: Oct 1 is Tuesday, so Monday of that week is Sept 30
-  # Sept 30 < Oct 1 (quarter start), so first Monday is Oct 7
-  expect_equal(week_in_quarter(as.Date("2024-10-07"), 4, 2024), 1)
-})
-
-test_that("yyyyww_to_date converts correctly", {
-  # Week 1 of 2024 starts Monday Jan 1
-  expect_equal(yyyyww_to_date(202401), as.Date("2024-01-01"))
-
-  # Week 2 of 2024 starts Monday Jan 8
-  expect_equal(yyyyww_to_date(202402), as.Date("2024-01-08"))
-
-  # Week 52 of 2023 (which contains Jan 1, 2023) starts Mon Dec 26, 2022
-  expect_equal(yyyyww_to_date(202252), as.Date("2022-12-26"))
-
-  # Week 1 of 2025 starts Monday Dec 30, 2024
-  expect_equal(yyyyww_to_date(202501), as.Date("2024-12-30"))
-})
-
 test_that("vectorized ISO week functions work", {
   dates <- as.Date(c("2024-01-01", "2024-06-15", "2024-12-31"))
 
@@ -130,10 +57,6 @@ test_that("vectorized ISO week functions work", {
 
   # date_to_yyyyww
   expect_equal(date_to_yyyyww(dates), c(202401L, 202424L, 202501L))
-
-  # iso_week_monday
-  expect_equal(iso_week_monday(dates),
-               as.Date(c("2024-01-01", "2024-06-10", "2024-12-30")))
 })
 
 test_that("ISO week functions handle NA values",

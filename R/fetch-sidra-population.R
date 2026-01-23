@@ -5,6 +5,60 @@
 #' @keywords internal
 NULL
 
+# ============================================================================
+# CACHING INFRASTRUCTURE
+# ============================================================================
+
+# Package-level cache environment for SIDRA population data
+# This avoids repeated API calls within a session
+.sidra_cache <- new.env(parent = emptyenv())
+
+#' Clear SIDRA Population Cache
+#'
+#' Clears the cached population data from SIDRA API. Use this if you need
+#' to force a fresh download, for example after IBGE updates their data.
+#'
+#' @return Invisibly returns TRUE if cache was cleared, FALSE if cache was empty.
+#'
+#' @examples
+#' \dontrun{
+#' # Clear cache to force fresh download
+#' clear_sidra_cache()
+#' pop <- fetch_monthly_population()  # Will fetch from API
+#' }
+#'
+#' @export
+clear_sidra_cache <- function() {
+  had_cache <- exists("population_data", envir = .sidra_cache)
+  if (had_cache) {
+    rm("population_data", envir = .sidra_cache)
+    rm("cache_time", envir = .sidra_cache)
+  }
+  invisible(had_cache)
+}
+
+#' Check if SIDRA Cache is Valid
+#'
+#' Internal function to check if cached data exists and is not expired.
+#'
+#' @param max_age_hours Maximum cache age in hours before expiration. Default 24.
+#' @return Logical. TRUE if cache is valid, FALSE if expired or missing.
+#' @keywords internal
+#' @noRd
+.is_cache_valid <- function(max_age_hours = 24) {
+  if (!exists("population_data", envir = .sidra_cache)) {
+    return(FALSE)
+  }
+  if (!exists("cache_time", envir = .sidra_cache)) {
+    return(FALSE)
+  }
+
+  cache_time <- get("cache_time", envir = .sidra_cache)
+  age_hours <- as.numeric(difftime(Sys.time(), cache_time, units = "hours"))
+
+  age_hours < max_age_hours
+}
+
 #' Fetch Monthly Population from SIDRA
 #'
 #' Downloads population estimates from IBGE SIDRA API (table 6022) and
@@ -15,6 +69,10 @@ NULL
 #' @param end_yyyymm Integer. Last month to include (YYYYMM format).
 #'   If NULL, returns all available months.
 #' @param verbose Logical. Print progress messages? Default TRUE.
+#' @param use_cache Logical. If TRUE (default), uses cached data if available
+#'   and not expired. Set to FALSE to force a fresh download from SIDRA API.
+#' @param cache_max_age_hours Numeric. Maximum cache age in hours before
+#'   automatic expiration. Default 24 hours.
 #'
 #' @return A data.table with columns:
 #'   \itemize{
@@ -58,7 +116,30 @@ NULL
 #' @export
 fetch_monthly_population <- function(start_yyyymm = NULL,
                                       end_yyyymm = NULL,
-                                      verbose = TRUE) {
+                                      verbose = TRUE,
+                                      use_cache = TRUE,
+                                      cache_max_age_hours = 24) {
+
+ # OPTIMIZATION: Check cache first to avoid repeated API calls
+ if (use_cache && .is_cache_valid(cache_max_age_hours)) {
+   if (verbose) message("  Using cached population data...")
+   dt <- data.table::copy(get("population_data", envir = .sidra_cache))
+
+   # Filter to requested date range if specified
+   if (!is.null(start_yyyymm)) {
+     dt <- dt[ref_month_yyyymm >= start_yyyymm]
+   }
+   if (!is.null(end_yyyymm)) {
+     dt <- dt[ref_month_yyyymm <= end_yyyymm]
+   }
+
+   if (verbose) {
+     message("  Population data: ",
+             min(dt$ref_month_yyyymm), " to ", max(dt$ref_month_yyyymm),
+             " (", nrow(dt), " months, from cache)")
+   }
+   return(dt)
+ }
 
  # Check for sidrar package
  if (!requireNamespace("sidrar", quietly = TRUE)) {
@@ -135,6 +216,20 @@ fetch_monthly_population <- function(start_yyyymm = NULL,
 
  # Keep only final columns
  dt <- dt[, .(ref_month_yyyymm, m_populacao)]
+
+ # OPTIMIZATION: Store in cache for future calls
+ if (use_cache) {
+   assign("population_data", data.table::copy(dt), envir = .sidra_cache)
+   assign("cache_time", Sys.time(), envir = .sidra_cache)
+ }
+
+ # Apply date filters AFTER caching (cache stores full data)
+ if (!is.null(start_yyyymm)) {
+   dt <- dt[ref_month_yyyymm >= start_yyyymm]
+ }
+ if (!is.null(end_yyyymm)) {
+   dt <- dt[ref_month_yyyymm <= end_yyyymm]
+ }
 
  if (verbose) {
    message("  Population data: ",

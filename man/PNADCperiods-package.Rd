@@ -16,7 +16,7 @@ The package offers three main capabilities:
 \enumerate{
 \item \strong{Reference period identification}: Determines which temporal
 period (month, fortnight, or week) within each quarter each survey
-observation refers to, using IBGE's "Parada Tecnica" rules and
+observation refers to, using IBGE's "Parada Técnica" rules and
 respondent birthdates. The identification is \strong{nested by construction}:
 fortnights require months, and weeks require fortnights.
 \item \strong{Period-specific weight calibration}: Adjusts survey weights
@@ -30,8 +30,8 @@ analysis
 \strong{Determination rates (strict):}
 \itemize{
 \item Monthly: ~97\\% (with stacked multi-quarter data)
-\item Fortnight: ~7-8\\%
-\item Week: ~1-2\\%
+\item Fortnight: ~6-8\\%
+\item Week: ~1.5\\%
 }
 
 \strong{With experimental strategies:}
@@ -60,7 +60,7 @@ PNADC dataset and optionally calibrates weights
 }
 }
 \references{
-IBGE Manual Basico da Entrevista PNADC (methodology on "Parada Tecnica")
+IBGE Manual Básico da Entrevista PNADC (methodology on "Parada Técnica")
 }
 \seealso{
 Useful links:

@@ -17,29 +17,40 @@ required_vars_ref_month <- function() {
   c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2008", "V20081", "V20082", "V2009")
 }
 
-#' Required Variables for Join Keys
+#' Required Variables for Crosswalk Join Keys
 #'
 #' Returns the column names used as join keys in the output crosswalk.
+#' The crosswalk is at household-quarter level (not person level),
+#' so V2003 (person sequence) is NOT included.
 #'
 #' @return Character vector of join key column names
 #' @keywords internal
 #' @noRd
 join_key_vars <- function() {
-  c("Ano", "Trimestre", "UPA", "V1008", "V1014", "V2003")
+  # Note: Crosswalk is at household level (V1008), not person level (V2003)
+  # All persons in a household share the same reference period
+  c("Ano", "Trimestre", "UPA", "V1008", "V1014")
 }
 
 #' Required Variables for Weight Calibration
 #'
-#' Returns the additional column names required for computing monthly weights.
+#' Returns the additional column names required for computing calibrated weights.
+#'
+#' Note: Weight calibration operates at **person level** (not household level)
+#' because calibration cells are based on individual attributes like age (V2009).
+#' Although the crosswalk assigns reference periods at household level (all
+#' household members share the same reference period), each person receives
+#' a potentially different calibrated weight based on their age group.
 #'
 #' @return Character vector of required column names
 #' @keywords internal
 #' @noRd
 required_vars_weights <- function() {
   c(
-    # Survey design
+    # Survey design - V1028 (quarterly) or V1032 (annual) weights
     "V1028", "UF", "posest", "posest_sxi"
     # V2009 (age) is already required for ref_month identification
+    # and is also used to define calibration cells (person-level)
   )
 }
 
@@ -397,8 +408,8 @@ apply_birthday_constraints <- function(dt, date_min_col, date_max_col) {
 
 #' Compute Determination Statistics Efficiently
 #'
-#' OPTIMIZATION: Computes total and determined counts in a single pass
-#' instead of two separate uniqueN operations.
+#' OPTIMIZATION: Uses uniqueN with direct column access instead of
+#' aggregation with get() (which is extremely slow in data.table).
 #'
 #' @param dt A data.table
 #' @param by_cols Grouping columns for counting unique combinations
@@ -407,13 +418,17 @@ apply_birthday_constraints <- function(dt, date_min_col, date_max_col) {
 #' @keywords internal
 #' @noRd
 compute_determination_stats <- function(dt, by_cols, determined_col) {
-  # Single aggregation to get both counts
-  stats <- dt[, .(
-    is_determined = !is.na(get(determined_col)[1L])
-  ), by = by_cols]
+  # Count total unique combinations - use uniqueN for efficiency
+  n_total <- dt[, data.table::uniqueN(.SD), .SDcols = by_cols]
+
+  # Count determined (non-NA) - filter first, then count unique
+  # Access column directly without get() for speed
+  det_values <- dt[[determined_col]]
+  determined_rows <- !is.na(det_values)
+  n_determined <- dt[determined_rows, data.table::uniqueN(.SD), .SDcols = by_cols]
 
   list(
-    n_total = nrow(stats),
-    n_determined = sum(stats$is_determined)
+    n_total = n_total,
+    n_determined = n_determined
   )
 }

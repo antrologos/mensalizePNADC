@@ -9,7 +9,7 @@
 #' \enumerate{
 #'   \item \strong{Reference period identification}: Determines which temporal
 #'     period (month, fortnight, or week) within each quarter each survey
-#'     observation refers to, using IBGE's "Parada Tecnica" rules and
+#'     observation refers to, using IBGE's "Parada Técnica" rules and
 #'     respondent birthdates. The identification is \strong{nested by construction}:
 #'     fortnights require months, and weeks require fortnights.
 #'   \item \strong{Period-specific weight calibration}: Adjusts survey weights
@@ -23,8 +23,8 @@
 #' \strong{Determination rates (strict):}
 #' \itemize{
 #'   \item Monthly: ~97\% (with stacked multi-quarter data)
-#'   \item Fortnight: ~7-8\%
-#'   \item Week: ~1-2\%
+#'   \item Fortnight: ~6-8\%
+#'   \item Week: ~1.5\%
 #' }
 #'
 #' \strong{With experimental strategies:}
@@ -53,7 +53,7 @@
 #' }
 #'
 #' @references
-#' IBGE Manual Basico da Entrevista PNADC (methodology on "Parada Tecnica")
+#' IBGE Manual Básico da Entrevista PNADC (methodology on "Parada Técnica")
 #'
 #' @author Marcos Hecksher \email{mdhecksher@@gmail.com}
 #' @author Rogerio Barbosa \email{rogerio.barbosa@@iesp.uerj.br}
@@ -206,5 +206,28 @@ utils::globalVariables(c(
   "ref_fortnight_weeks",
   "alt_week_min_pos", "alt_week_max_pos",
   "hh_week_min_pos", "hh_week_max_pos",
-  "fortnight_boundary"
+  "fortnight_boundary",
+  # UPA aggregation week nesting validation variables
+  "effective_fortnight_for_week", "week_lower_bound", "week_upper_bound",
+  # Exception detection variables (experimental strategy)
+  "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
+  "alt_date_min", "alt_date_max", "alt_month_min_pos", "alt_month_max_pos",
+  "upa_month_min_final", "upa_month_max_final",
+  "month_min_pos_final", "month_max_pos_final",
+  "midpoint_in_tech_stop", "tech_stop_type_month", "adjusted_midpoint",
+  "month1_min_days", "month2_min_days", "month3_min_days",
+  # Variables from pnadc_identify_periods and identify_reference_week
+  "date_min_sat", "date_max_sat", "alt_date_min_sat", "alt_date_max_sat",
+  "fortnight_min_in_month", "fortnight_max_in_month", "fortnight1_end",
+  "alt_fortnight_min_in_month", "alt_fortnight_max_in_month",
+  "week_month_in_quarter", "week_month_num", "week_fortnight_in_month",
+  "fortnight_first_week_in_month", "fortnight_last_week_in_month",
+  "fortnight_first_week_in_quarter", "fortnight_last_week_in_quarter",
+  "alt_hh_week_min_pos", "alt_hh_week_max_pos",
+  "in_tech_stop_range", "in_technical_stop_range", "tech_stop_type",
+  "ref_week_temp", "hh_consensus_week", "fallback_week",
+  "week_month_in_qtr", "week_in_month", "ibge_month_start_date",
+  "i.trim_exc_m1", "i.trim_exc_m2", "i.trim_exc_m3",
+  # Variables from pnadc_identify_periods week refinement
+  "temp_month_num"
 ))

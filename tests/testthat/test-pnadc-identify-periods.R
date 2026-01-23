@@ -232,14 +232,15 @@ test_that("ref_fortnight_in_quarter values are 1-6 or NA", {
   }
 })
 
-test_that("ref_week_in_quarter values are 1-14 or NA", {
+test_that("ref_week_in_quarter values are 1-12 or NA", {
+  # IBGE quarters always have exactly 12 reference weeks (4 weeks × 3 months)
   test_data <- create_test_pnadc(n_quarters = 2, n_upas = 5)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
 
   non_na <- result$ref_week_in_quarter[!is.na(result$ref_week_in_quarter)]
   if (length(non_na) > 0) {
-    expect_true(all(non_na >= 1L & non_na <= 14L))
+    expect_true(all(non_na >= 1L & non_na <= 12L))
   }
 })
 

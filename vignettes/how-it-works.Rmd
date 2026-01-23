@@ -176,7 +176,6 @@ The crosswalk returned by `pnadc_identify_periods()` contains IBGE calendar-base
 | `identify_reference_month()` | Standalone reference month identification |
 | `identify_reference_fortnight()` | Standalone fortnight (quinzena) identification |
 | `identify_reference_week()` | Standalone week identification |
-| `calibrate_monthly_weights()` | Legacy monthly calibration function |
 | `fetch_monthly_population()` | Fetch population from SIDRA API |
 | `validate_pnadc()` | Input data validation |
 
@@ -1051,7 +1050,7 @@ Need fortnight/week analysis?
 | `ref_month_exp_confidence` | numeric | Confidence score for month assignment (0-1) |
 | `ref_fortnight_exp` | integer | Experimental fortnight assignment (1-6 in quarter) |
 | `ref_fortnight_exp_confidence` | numeric | Confidence score for fortnight assignment (0-1) |
-| `ref_week_exp` | integer | Experimental week assignment (1-14 in quarter) |
+| `ref_week_exp` | integer | Experimental week assignment (1-12 in quarter) |
 | `ref_week_exp_confidence` | numeric | Confidence score for week assignment (0-1) |
 | `probabilistic_assignment` | logical | TRUE if assigned via experimental method (vs strict) |
 

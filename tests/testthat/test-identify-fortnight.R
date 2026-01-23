@@ -130,13 +130,14 @@ test_that("ibge_fortnight_start and ibge_fortnight_end are consistent", {
 })
 
 test_that("ibge_fortnight_weeks returns correct values", {
-  # Fortnight 1 always has 2 weeks
+  # IBGE fortnights ALWAYS have exactly 2 weeks (14 days)
+  # Fortnight 1 = weeks 1-2, Fortnight 2 = weeks 3-4
   expect_equal(PNADCperiods:::ibge_fortnight_weeks(2024L, 1L, 1L, min_days = 4L), 2L)
   expect_equal(PNADCperiods:::ibge_fortnight_weeks(2024L, 6L, 1L, min_days = 4L), 2L)
 
-  # Fortnight 2 has 2 or 3 weeks depending on month
-  weeks_f2 <- PNADCperiods:::ibge_fortnight_weeks(2024L, 1L, 2L, min_days = 4L)
-  expect_true(weeks_f2 %in% c(2L, 3L))
+  # Fortnight 2 also always has exactly 2 weeks
+  expect_equal(PNADCperiods:::ibge_fortnight_weeks(2024L, 1L, 2L, min_days = 4L), 2L)
+  expect_equal(PNADCperiods:::ibge_fortnight_weeks(2024L, 6L, 2L, min_days = 4L), 2L)
 })
 
 # =============================================================================

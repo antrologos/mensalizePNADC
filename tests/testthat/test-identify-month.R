@@ -277,7 +277,9 @@ test_that("ref_month_end is always a Saturday", {
   }
 })
 
-test_that("ref_month_weeks is always 4 or 5", {
+test_that("ref_month_weeks is always exactly 4", {
+  # IBGE months ALWAYS have exactly 4 reference weeks (28 days)
+  # There is no "week 5" - gaps between months are technical stops
   test_data <- data.frame(
     Ano = c(2023, 2023, 2024, 2024),
     Trimestre = c(1, 2, 3, 4),
@@ -293,10 +295,10 @@ test_that("ref_month_weeks is always 4 or 5", {
 
   result <- identify_reference_month(test_data, verbose = FALSE)
 
-  # Check that ref_month_weeks is 4 or 5
+  # Check that ref_month_weeks is always 4
   valid_weeks <- result$ref_month_weeks[!is.na(result$ref_month_weeks)]
   if (length(valid_weeks) > 0) {
-    expect_true(all(valid_weeks %in% c(4L, 5L)))
+    expect_true(all(valid_weeks == 4L))
   }
 })
 

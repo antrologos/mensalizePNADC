@@ -1,7 +1,7 @@
 #' Identify Reference Month in PNADC Data
 #'
 #' Determines which month within each quarter corresponds to each survey
-#' observation based on IBGE's "Parada Tecnica" (technical break) rules.
+#' observation based on IBGE's "Parada Técnica" (technical break) rules.
 #'
 #' @description
 #' PNADC is a quarterly survey, but each interview actually refers to a specific
@@ -45,7 +45,7 @@
 #'     \item \code{ref_month_end}: Reference month end (Saturday of last IBGE reference week)
 #'     \item \code{ref_month_in_quarter}: Position in quarter (1, 2, 3) or NA if indeterminate
 #'     \item \code{ref_month_yyyymm}: Integer YYYYMM format (e.g., 202301)
-#'     \item \code{ref_month_weeks}: Number of IBGE weeks in this month (4 or 5)
+#'     \item \code{ref_month_weeks}: Number of IBGE weeks in this month (always 4)
 #'   }
 #'
 #' @details
@@ -193,7 +193,7 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   # ============================================================================
 
   # Calculate the last Saturday of the quarter using IBGE month end
-  # (handles 4 or 5 week months correctly)
+  # (IBGE months always have exactly 4 reference weeks)
   dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
 
   # Initialize date bounds using standard Saturday values
@@ -440,11 +440,9 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
     ref_month_end = ibge_month_end(Ano, temp_month, min_days = 4L)
   )]
 
-  # Calculate number of IBGE weeks in this month (4 or 5)
+  # IBGE months always have exactly 4 reference weeks
   dt[, ref_month_weeks := NA_integer_]
-  dt[!is.na(ref_month_in_quarter), `:=`(
-    ref_month_weeks = ibge_month_weeks(Ano, temp_month, min_days = 4L)
-  )]
+  dt[!is.na(ref_month_in_quarter), ref_month_weeks := 4L]
 
   # Calculate YYYYMM format
   dt[, ref_month_yyyymm := NA_integer_]
@@ -463,7 +461,8 @@ identify_reference_month <- function(data, verbose = TRUE, .pb = NULL, .pb_offse
   output_cols <- c(key_cols, "ref_month_start", "ref_month_end",
                    "ref_month_in_quarter", "ref_month_yyyymm", "ref_month_weeks")
 
-  result <- dt[, ..output_cols]
+  # Return unique rows at the output key level (removes person-level duplicates)
+  result <- unique(dt[, ..output_cols])
 
   # Store determination rate as attribute
   attr(result, "determination_rate") <- mean(!is.na(result$ref_month_in_quarter))

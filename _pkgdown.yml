@@ -63,11 +63,6 @@ reference:
   - identify_reference_fortnight
   - identify_reference_week
 
-- title: Weight Calibration
-  desc: Functions for weight calibration
-  contents:
-  - calibrate_monthly_weights
-
 - title: Data Fetching
   desc: Functions for fetching external data
   contents:

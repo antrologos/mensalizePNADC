@@ -40,7 +40,7 @@
 #'     \item \code{ref_fortnight_end}: Reference fortnight end (Saturday of last IBGE week)
 #'     \item \code{ref_fortnight_in_quarter}: Position in quarter (1-6) or NA
 #'     \item \code{ref_fortnight_yyyyff}: Integer YYYYFF format (1-24 per year)
-#'     \item \code{ref_fortnight_weeks}: Number of IBGE weeks in this fortnight (2 or 3)
+#'     \item \code{ref_fortnight_weeks}: Number of IBGE weeks in this fortnight (always 2)
 #'   }
 #'
 #' @details
@@ -48,15 +48,15 @@
 #'
 #' IBGE fortnights are based on IBGE reference weeks, NOT calendar days:
 #' \itemize{
-#'   \item Fortnight 1 of a month = IBGE weeks 1-2 of that month
-#'   \item Fortnight 2 of a month = IBGE weeks 3-4 (or 3-5 for 5-week months)
+#'   \item Fortnight 1 of a month = IBGE weeks 1-2 of that month (14 days)
+#'   \item Fortnight 2 of a month = IBGE weeks 3-4 of that month (14 days)
 #' }
 #'
-#' Each quarter has 6 fortnights (2 per month).
+#' Each quarter has 6 fortnights (2 per month). Each fortnight has exactly 2 weeks.
 #'
 #' ## Expected Determination Rate
 #'
-#' Fortnight determination rate is typically low (~2-5%) because:
+#' Fortnight determination rate is typically low (~6-8%) because:
 #' \itemize{
 #'   \item Unlike months, fortnights cannot aggregate across quarters
 #'   \item Birthday constraints typically narrow the date range by only a few weeks
@@ -89,7 +89,7 @@
 #'   rate = mean(!is.na(ref_fortnight_in_quarter))
 #' ), by = .(Ano, Trimestre)]
 #'
-#' # Note: Fortnight determination rate is typically low (~2-5%)
+#' # Note: Fortnight determination rate is typically low (~6-8%)
 #' # because fortnights cannot aggregate across quarters like months can.
 #' }
 #'
@@ -171,7 +171,7 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
   # ============================================================================
 
   # Calculate the last Saturday of the quarter using IBGE month end
-  # (handles 4 or 5 week months correctly)
+  # (IBGE months always have exactly 4 reference weeks)
   dt[, quarter_end := ibge_month_end(Ano, month3, min_days = 4L)]
 
   dt[, `:=`(
@@ -266,7 +266,7 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
   # STEP 6: Dynamic exception detection (fallback to min_days=3 rule)
   # ============================================================================
   #
-  # IBGE's "Parada Tecnica" defines two rules for first valid Saturday:
+  # IBGE's "Parada Técnica" defines two rules for first valid Saturday:
   #   - Standard rule: First Saturday with >= 4 days in the month
   #   - Exception rule: First Saturday with >= 3 days in the month
   #
@@ -347,11 +347,9 @@ identify_reference_fortnight <- function(data, verbose = TRUE, .pb = NULL, .pb_o
     ref_fortnight_end = ibge_fortnight_end(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
   )]
 
-  # Calculate number of weeks in this fortnight (2 or 3)
+  # IBGE fortnights always have exactly 2 weeks
   dt[, ref_fortnight_weeks := NA_integer_]
-  dt[!is.na(ref_fortnight_in_quarter), `:=`(
-    ref_fortnight_weeks = ibge_fortnight_weeks(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
-  )]
+  dt[!is.na(ref_fortnight_in_quarter), ref_fortnight_weeks := 2L]
 
   # Clean up intermediate columns
   temp_cols <- c(

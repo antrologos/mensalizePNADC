@@ -37,7 +37,9 @@ A data.table with the original key columns plus:
 \itemize{
 \item \code{ref_week_start}: Reference week start (Sunday of IBGE week)
 \item \code{ref_week_end}: Reference week end (Saturday of IBGE week)
-\item \code{ref_week_in_quarter}: Position in quarter (1-14) or NA if indeterminate
+\item \code{ref_week_in_quarter}: Position in quarter (1-12, always 4 weeks
+per month × 3 months = 12 weeks per quarter) or NA if indeterminate.
+Technical stops are handled via fallback rules (see Technical Stops section).
 \item \code{ref_week_yyyyww}: Integer YYYYWW format (IBGE-based)
 }
 }
@@ -80,10 +82,10 @@ only, because households are NOT interviewed in the same week across quarterly v
 
 \subsection{Expected Determination Rate}{
 
-The weekly determination rate (~1-2\%) is much lower than monthly (~97\%) because:
+The weekly determination rate (~1.5\%) is much lower than monthly (~97\%) because:
 \itemize{
 \item Cannot aggregate across quarters (no consistent week position in panel design)
-\item Finer granularity (13-14 weeks vs 3 months per quarter)
+\item Finer granularity (12 weeks vs 3 months per quarter)
 \item Birthday constraints rarely narrow the interview window to a single 7-day period
 }
 }
@@ -95,6 +97,30 @@ Weeks follow IBGE reference calendar:
 \item Weeks start on Sunday and end on Saturday
 \item A week belongs to the IBGE month where its Saturday falls
 \item The first valid Saturday must have >= 4 days in the month
+\item Each IBGE month has exactly 4 reference weeks (28 days)
+\item Each IBGE quarter has exactly 12 reference weeks
+}
+}
+
+\subsection{Technical Stops (Paradas Técnicas)}{
+
+Technical stops are periods (full weeks from Sunday to Saturday) that fall
+between valid IBGE reference weeks. They are NOT part of any IBGE month.
+When a person's possible date range falls entirely within a technical stop,
+the following rules are applied:
+
+\itemize{
+\item \strong{Rule 3.1 - Quarter boundary}: If the technical stop is between
+quarters, the interview is assigned to the last valid week of the quarter
+the observation belongs to (week 12), since interviews must belong to
+their source quarter.
+\item \strong{Rule 3.2 - Household consensus}: If the technical stop is within
+a quarter, the algorithm checks if other household members have a valid
+week assignment. If all assigned members agree on a single week, that
+week is used.
+\item \strong{Rule 3.3 - Fallback}: If no household consensus exists, the
+interview is assigned to the first valid week AFTER the technical stop
+(that still belongs to the same quarter).
 }
 }
 }

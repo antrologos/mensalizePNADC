@@ -44,7 +44,11 @@ One of \code{"month"} (default), \code{"fortnight"}, or \code{"week"}.}
 \item{target_totals}{Optional data.table with population targets. If NULL
 (default), fetches monthly population from SIDRA and derives targets for
 fortnight/week. Each time period (month, fortnight, or week) is calibrated
-to the FULL Brazilian population from SIDRA.}
+to the FULL Brazilian population from SIDRA.
+
+If providing custom targets, the population column (\code{m_populacao} for
+months, \code{f_populacao} for fortnights, \code{w_populacao} for weeks)
+must be in \strong{thousands}. The function multiplies by 1000 internally.}
 
 \item{smooth}{Logical. If TRUE (default), smooth calibrated weights to
 remove quarterly artifacts. Smoothing is adapted per time period:
@@ -61,7 +65,7 @@ A data.table with the input data plus:
 \item{ref_month_start, ref_month_end}{IBGE month boundaries (Sunday/Saturday)}
 \item{ref_fortnight_start, ref_fortnight_end}{IBGE fortnight boundaries (Sunday/Saturday)}
 \item{ref_week_start, ref_week_end}{IBGE week boundaries (Sunday/Saturday)}
-\item{ref_month_in_quarter, ref_fortnight_in_quarter, ref_week_in_quarter}{Position within quarter (1-3, 1-6, 1-14)}
+\item{ref_month_in_quarter, ref_fortnight_in_quarter, ref_week_in_quarter}{Position within quarter (1-3, 1-6, 1-12)}
 \item{ref_month_yyyymm, ref_fortnight_yyyyff, ref_week_yyyyww}{Integer period codes}
 \item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
 \item{determined_month, determined_fortnight, determined_week}{Logical determination flags}

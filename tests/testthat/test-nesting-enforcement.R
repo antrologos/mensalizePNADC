@@ -166,9 +166,9 @@ test_that("week value is consistent with fortnight value when both determined", 
 
   if (nrow(both_determined) > 0) {
     # Week should correspond to dates within the fortnight
-    # Fortnight 1 = 1st-15th of month 1, Fortnight 2 = 16th-end of month 1, etc.
+    # Fortnight 1 = weeks 1-2, Fortnight 2 = weeks 3-4 of each month
     # This is a weaker check - just verify week exists for fortnight-determined obs
-    expect_true(all(!is.na(both_determined$ref_week_yyyyww)))
+    expect_true(all(!is.na(both_determined$ref_week_in_quarter)))
   }
 })
 
@@ -372,7 +372,7 @@ test_that("experimental strategies preserve strict determination columns", {
   # Save original strict values
   original_month <- crosswalk$ref_month_in_quarter
   original_fortnight <- crosswalk$ref_fortnight_in_quarter
-  original_week <- crosswalk$ref_week_yyyyww
+  original_week <- crosswalk$ref_week_in_quarter
 
   # Use upa_aggregation strategy which doesn't require original data
   result <- pnadc_experimental_periods(crosswalk, strategy = "upa_aggregation", verbose = FALSE)
@@ -380,7 +380,7 @@ test_that("experimental strategies preserve strict determination columns", {
   # Strict columns should be unchanged
   expect_identical(result$ref_month_in_quarter, original_month)
   expect_identical(result$ref_fortnight_in_quarter, original_fortnight)
-  expect_identical(result$ref_week_yyyyww, original_week)
+  expect_identical(result$ref_week_in_quarter, original_week)
 })
 
 test_that("experimental determination rates follow nesting hierarchy", {
@@ -394,7 +394,7 @@ test_that("experimental determination rates follow nesting hierarchy", {
   # Calculate combined rates
   combined_month_rate <- mean(!is.na(result$ref_month_in_quarter) | !is.na(result$ref_month_exp))
   combined_fortnight_rate <- mean(!is.na(result$ref_fortnight_in_quarter) | !is.na(result$ref_fortnight_exp))
-  combined_week_rate <- mean(!is.na(result$ref_week_yyyyww) | !is.na(result$ref_week_exp))
+  combined_week_rate <- mean(!is.na(result$ref_week_in_quarter) | !is.na(result$ref_week_exp))
 
   expect_true(
     combined_month_rate >= combined_fortnight_rate,

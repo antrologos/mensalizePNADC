@@ -20,7 +20,9 @@ test_that("join_key_vars returns expected columns", {
   expect_true("UPA" %in% vars)
   expect_true("V1008" %in% vars)
   expect_true("V1014" %in% vars)
-  expect_true("V2003" %in% vars)
+  # Note: V2003 (person number) is NOT in join_key_vars because
+  # crosswalk is at household level (V1008), not person level
+  expect_false("V2003" %in% vars)
 })
 
 test_that("required_vars_weights returns expected columns", {

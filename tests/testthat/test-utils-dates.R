@@ -46,13 +46,6 @@ test_that("is_leap_year identifies leap years correctly", {
   expect_false(is_leap_year(1900))
 })
 
-test_that("quarter_months returns correct months", {
-  expect_equal(quarter_months(1), c(1, 2, 3))
-  expect_equal(quarter_months(2), c(4, 5, 6))
-  expect_equal(quarter_months(3), c(7, 8, 9))
-  expect_equal(quarter_months(4), c(10, 11, 12))
-})
-
 test_that("yyyymm creates correct format", {
   expect_equal(yyyymm(2024, 1), 202401L)
   expect_equal(yyyymm(2024, 12), 202412L)
@@ -86,11 +79,3 @@ test_that("first_saturday_on_or_after works correctly", {
   expect_equal(first_saturday_on_or_after(as.Date("2024-01-08")), as.Date("2024-01-13"))
 })
 
-test_that("month_in_quarter returns correct position", {
-  expect_equal(month_in_quarter(as.Date("2024-01-15")), 1)  # Jan = 1st in Q1
-  expect_equal(month_in_quarter(as.Date("2024-02-15")), 2)  # Feb = 2nd in Q1
-  expect_equal(month_in_quarter(as.Date("2024-03-15")), 3)  # Mar = 3rd in Q1
-  expect_equal(month_in_quarter(as.Date("2024-04-15")), 1)  # Apr = 1st in Q2
-  expect_equal(month_in_quarter(as.Date("2024-07-15")), 1)  # Jul = 1st in Q3
-  expect_equal(month_in_quarter(as.Date("2024-12-15")), 3)  # Dec = 3rd in Q4
-})

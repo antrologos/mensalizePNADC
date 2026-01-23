@@ -66,9 +66,18 @@ create_test_pnadc_for_apply <- function(n_quarters = 4, n_upas = 10, persons_per
 }
 
 #' Create a mock crosswalk for testing
-create_mock_crosswalk <- function(n_upas = 10, n_panels = 8) {
+#' @param n_upas Number of UPAs
+#' @param n_panels Number of panel groups (V1014)
+#' @param n_quarters Number of quarters (to match test data)
+#' @param n_households Number of households per UPA (V1008)
+create_mock_crosswalk <- function(n_upas = 10, n_panels = 8, n_quarters = 1, n_households = 2) {
+  # Create crosswalk at household-quarter level (Ano, Trimestre, UPA, V1008, V1014)
+  # This matches the structure expected by pnadc_apply_periods
   dt <- data.table::CJ(
+    Ano = 2023L,
+    Trimestre = 1:n_quarters,
     UPA = 1:n_upas,
+    V1008 = 1:n_households,
     V1014 = 1:n_panels
   )
 
@@ -85,6 +94,7 @@ create_mock_crosswalk <- function(n_upas = 10, n_panels = 8) {
   )]
 
   # Make some undetermined
+  set.seed(123)  # For reproducibility
   undetermined_idx <- sample(1:n, size = ceiling(n * 0.1))
   dt[undetermined_idx, `:=`(
     ref_month_start = as.Date(NA),
@@ -111,11 +121,12 @@ create_mock_crosswalk <- function(n_upas = 10, n_panels = 8) {
   )]
 
   # Week info (low determination rate) - IBGE-based columns
+  # IBGE quarters always have exactly 12 reference weeks (4 weeks × 3 months)
   dt[, `:=`(
-    ref_week_start = as.Date("2022-12-25") + ((.I - 1L) %% 13L) * 7L,  # Sunday
-    ref_week_end = as.Date("2022-12-25") + ((.I - 1L) %% 13L) * 7L + 6L,  # Saturday
-    ref_week_in_quarter = ((.I - 1L) %% 13L) + 1L,
-    ref_week_yyyyww = 202301L + ((.I - 1L) %% 13L),
+    ref_week_start = as.Date("2022-12-25") + ((.I - 1L) %% 12L) * 7L,  # Sunday
+    ref_week_end = as.Date("2022-12-25") + ((.I - 1L) %% 12L) * 7L + 6L,  # Saturday
+    ref_week_in_quarter = ((.I - 1L) %% 12L) + 1L,
+    ref_week_yyyyww = 202301L + ((.I - 1L) %% 12L),
     determined_week = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.6, 0.4))
   )]
   dt[determined_week == FALSE, `:=`(
@@ -419,7 +430,7 @@ test_that("pnadc_apply_periods accepts anchor = 'quarter'", {
 
 test_that("pnadc_apply_periods accepts anchor = 'year'", {
   test_data <- create_test_pnadc_for_apply(n_quarters = 4, n_upas = 5)
-  crosswalk <- create_mock_crosswalk(n_upas = 5)
+  crosswalk <- create_mock_crosswalk(n_upas = 5, n_quarters = 4)
   monthly_totals <- create_monthly_totals(quarters = 1:4)
 
   expect_no_error(

@@ -22,9 +22,10 @@ The `PNADCperiods` package identifies reference periods (months, fortnights, wee
 - **~97% monthly determination rate** when using stacked multi-quarter data
 - **~6% strict fortnight rate** (within-quarter constraints only)
 - **~1.5% strict week rate** (within-quarter constraints only)
-- **Experimental strategies** boost fortnight to ~27-28% and week to ~2% via probabilistic + UPA aggregation
+- **Experimental strategies** boost fortnight to ~27% and week to ~2% via probabilistic + UPA aggregation
 - **IBGE-based calendar**: All periods use IBGE's official Sunday-Saturday week boundaries
-- **Hierarchical weight calibration** adapted per time granularity
+- **Adaptive weight calibration**: Hierarchical raking with period-specific smoothing (4/2/1 cell levels)
+- **SIDRA integration**: Automatic population target fetching from IBGE API
 - **Fast**: Processes ~450,000 rows/sec (~1 minute for 28M rows)
 
 ## Installation
@@ -68,9 +69,6 @@ result[determined_month == TRUE, .(
 |----------|-------------|
 | `pnadc_identify_periods()` | Build crosswalk: identify reference months, fortnights, and weeks (nested) |
 | `pnadc_apply_periods()` | Apply crosswalk to data + hierarchical weight calibration |
-| `identify_reference_month()` | Standalone month identification |
-| `identify_reference_fortnight()` | Standalone fortnight identification |
-| `identify_reference_week()` | Standalone week identification |
 | `pnadc_experimental_periods()` | Experimental probabilistic/UPA aggregation strategies |
 | `combine_period_crosswalks()` | Merge strict and experimental crosswalks |
 | `fetch_monthly_population()` | Fetch population totals from IBGE SIDRA API |
@@ -98,8 +96,8 @@ All periods use IBGE's official calendar where weeks run Sunday-Saturday:
 
 | Period | Definition |
 |--------|------------|
-| **Month** | 4-5 IBGE weeks; first week has >= 4 days in the calendar month |
-| **Fortnight** | First half (days 1-15) or second half (days 16+) of a month |
+| **Month** | 4 IBGE reference weeks (28 days); first week has >= 4 days in the calendar month |
+| **Fortnight** | 2 IBGE weeks; first fortnight = weeks 1-2, second fortnight = weeks 3-4 of each month |
 | **Week** | Sunday-Saturday; belongs to the month where its Saturday falls |
 
 ### Output Columns
@@ -107,12 +105,15 @@ All periods use IBGE's official calendar where weeks run Sunday-Saturday:
 The crosswalk contains IBGE-based period boundaries:
 
 ```r
+# Join keys (for merging with PNADC data)
+Ano, Trimestre, UPA, V1008, V1014
+
 # Month columns
 ref_month_start      # Sunday of first IBGE week of the month
 ref_month_end        # Saturday of last IBGE week of the month
 ref_month_in_quarter # Position in quarter (1, 2, 3)
 ref_month_yyyymm     # Integer YYYYMM format (e.g., 202301)
-ref_month_weeks      # Number of IBGE weeks in month (4 or 5)
+ref_month_weeks      # Number of IBGE weeks in month (always 4)
 determined_month     # TRUE if month was determined
 
 # Fortnight columns
@@ -125,7 +126,7 @@ determined_fortnight      # TRUE if fortnight was determined
 # Week columns
 ref_week_start       # Sunday of the IBGE week
 ref_week_end         # Saturday of the IBGE week
-ref_week_in_quarter  # Position in quarter (1-14)
+ref_week_in_quarter  # Position in quarter (1-12)
 ref_week_yyyyww      # Integer IBGE YYYYWW format
 determined_week      # TRUE if week was determined
 ```
@@ -174,35 +175,37 @@ Use `validate_pnadc()` to check your data before processing.
 
 The `pnadc_experimental_periods()` function provides experimental strategies to boost fortnight and week determination rates:
 
-| Strategy | Fortnight % | Week % | Description |
-|----------|-------------|--------|-------------|
-| Strict only | ~6% | ~1.5% | Baseline (deterministic) |
-| `"probabilistic"` | ~21% | ~0.6% | Assigns based on date interval midpoint |
-| `"upa_aggregation"` | ~22% | ~0.6% | Extends via UPA consensus |
-| `"both"` | ~27-28% | ~2% | Sequential: probabilistic then UPA |
+| Strategy | Description | Nesting |
+|----------|-------------|---------|
+| `"probabilistic"` | Assigns based on date interval midpoint when range spans 2 periods | Respects month→fortnight→week |
+| `"upa_aggregation"` | Extends via UPA/UPA-V1014 consensus when proportion threshold met | Respects month→fortnight→week |
+| `"both"` | Sequential: probabilistic first, then UPA aggregation | Union of both strategies |
 
-**Key finding**: UPA homogeneity rate = 100% for both fortnights and weeks within quarters.
+All strategies enforce proper nesting: experimental fortnights require identified months (strict or experimental), and experimental weeks require identified fortnights.
+
+**Key finding**: UPA homogeneity rate = 100% for fortnights and weeks within quarters.
 
 ```r
 # Build strict crosswalk
 crosswalk <- pnadc_identify_periods(pnadc)
 
-# Apply experimental strategies
+# Apply experimental strategies (output is directly compatible with pnadc_apply_periods)
 crosswalk_exp <- pnadc_experimental_periods(
   crosswalk,
   pnadc,
   strategy = "both",
-  confidence_threshold = 0.9
+  confidence_threshold = 0.9,
+  upa_proportion_threshold = 0.5
 )
 
-# Check results
+# Check results - the output includes a probabilistic_assignment flag
 crosswalk_exp[, .(
-  strict = sum(!is.na(ref_month_in_quarter) & !probabilistic_assignment),
-  experimental = sum(probabilistic_assignment, na.rm = TRUE),
-  total = sum(determined_month)
+  strict_months = sum(determined_month & !probabilistic_assignment, na.rm = TRUE),
+  experimental_months = sum(probabilistic_assignment, na.rm = TRUE),
+  total_fortnights = sum(determined_fortnight)
 )]
 
-# Use directly with calibration
+# Use directly with calibration (experimental output is fully compatible)
 result <- pnadc_apply_periods(pnadc, crosswalk_exp,
                                weight_var = "V1028",
                                anchor = "quarter")

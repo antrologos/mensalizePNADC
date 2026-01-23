@@ -142,8 +142,11 @@
 #' @seealso \code{\link{pnadc_apply_periods}} to apply the crosswalk and
 #'   calibrate weights
 #'
+#' @param store_date_bounds Logical. If TRUE, stores exception flags as attributes
+#'   for optimization when calling \code{pnadc_experimental_periods()}. Default FALSE.
+#'
 #' @export
-pnadc_identify_periods <- function(data, verbose = TRUE) {
+pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FALSE) {
 
   # ============================================================================
   # INPUT VALIDATION
@@ -466,10 +469,25 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
       fortnight_upper = ref_month_in_quarter * 2L               # Second fortnight of month
     )]
 
-    # Calculate actual fortnight positions from date bounds
+    # OPTIMIZATION: Pre-compute IBGE month boundaries for all unique (year, month) combinations
+    # This avoids redundant computation in ibge_fortnight_in_quarter (169,000x reduction)
+    all_dates <- c(
+      dt[!is.na(ref_month_in_quarter), date_min],
+      dt[!is.na(ref_month_in_quarter), date_max],
+      dt[!is.na(ref_month_in_quarter), alt_date_min],
+      dt[!is.na(ref_month_in_quarter), alt_date_max]
+    )
+    all_dates <- all_dates[!is.na(all_dates)]
+    sat_dates <- ibge_week_saturday(all_dates)
+    all_years <- fast_year(sat_dates)
+    all_months <- fast_month(sat_dates)
+    month_boundaries <- precompute_ibge_month_boundaries(all_years, all_months, min_days = 4L)
+    rm(all_dates, sat_dates, all_years, all_months)
+
+    # Calculate actual fortnight positions from date bounds (using optimized function)
     dt[!is.na(ref_month_in_quarter), `:=`(
-      fortnight_min_pos = ibge_fortnight_in_quarter(date_min, Trimestre, Ano, min_days = 4L),
-      fortnight_max_pos = ibge_fortnight_in_quarter(date_max, Trimestre, Ano, min_days = 4L)
+      fortnight_min_pos = ibge_fortnight_in_quarter_fast(date_min, Trimestre, Ano, month_boundaries),
+      fortnight_max_pos = ibge_fortnight_in_quarter_fast(date_max, Trimestre, Ano, month_boundaries)
     )]
 
     # Constrain to the determined month's fortnights
@@ -478,11 +496,14 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
       fortnight_max_pos = pmin(fortnight_max_pos, fortnight_upper, na.rm = TRUE)
     )]
 
-    # Also calculate alternative positions for exception handling
+    # Also calculate alternative positions for exception handling (using optimized function)
     dt[!is.na(ref_month_in_quarter), `:=`(
-      alt_fortnight_min_pos = ibge_fortnight_in_quarter(alt_date_min, Trimestre, Ano, min_days = 4L),
-      alt_fortnight_max_pos = ibge_fortnight_in_quarter(alt_date_max, Trimestre, Ano, min_days = 4L)
+      alt_fortnight_min_pos = ibge_fortnight_in_quarter_fast(alt_date_min, Trimestre, Ano, month_boundaries),
+      alt_fortnight_max_pos = ibge_fortnight_in_quarter_fast(alt_date_max, Trimestre, Ano, month_boundaries)
     )]
+
+    # OPTIMIZATION: Free memory - month_boundaries no longer needed
+    rm(month_boundaries)
 
     dt[!is.na(ref_month_in_quarter), `:=`(
       alt_fortnight_min_pos = pmax(alt_fortnight_min_pos, fortnight_lower, na.rm = TRUE),
@@ -711,6 +732,16 @@ pnadc_identify_periods <- function(data, verbose = TRUE) {
     ref_fortnight_in_quarter = ref_fortnight_in_quarter[1L],
     ref_week_yyyyww = ref_week_yyyyww[1L]
   ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
+
+  # OPTIMIZATION: Store exception flags for pnadc_experimental_periods()
+  if (store_date_bounds) {
+    exc_cols <- c("trim_exc_m1", "trim_exc_m2", "trim_exc_m3")
+    if (all(exc_cols %in% names(dt))) {
+      exception_flags <- unique(dt[, .(Ano, Trimestre, trim_exc_m1, trim_exc_m2, trim_exc_m3)])
+      attr(crosswalk, "exception_flags") <- exception_flags
+      if (verbose) cat("  - Exception flags stored for experimental strategies\n")
+    }
+  }
 
   # OPTIMIZATION: Free memory from working data.table - no longer needed
   rm(dt)
