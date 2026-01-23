@@ -139,6 +139,8 @@ utils::globalVariables(c(
   # Unified calibration variables
   "anchor_year", "target_pop", "i.target_pop",
   "n_cells_anchor", "n_cells_period", "pop_anchor", "pop_period",
+  # Optimized calibration internal variables
+  ".anchor_key", ".is_determined", "i.pop_orig",
   "ref_week_iso_yyyyww", "ref_week_yyyyww",
   # Smoothing variables
   "period_pos", "i.pos", "cell_pop", "pop_smoothed", "pop_lag", "pop_lead",
@@ -201,6 +203,7 @@ utils::globalVariables(c(
   "i.ref_fortnight_exp", "i.ref_fortnight_exp_confidence",
   "i.ref_week_exp", "i.ref_week_exp_confidence",
   # IBGE calendar variables (quarter/month/fortnight/week bounds)
+  "ibge_month_start_int", "ibge_first_sat_day", "i.ibge_month_start_int", "i.ibge_n_weeks",
   "quarter_end", "alt_quarter_end",
   "temp_month", "temp_month_in_q", "temp_fortnight_in_month",
   "ref_fortnight_weeks",
