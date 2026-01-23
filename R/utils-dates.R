@@ -751,6 +751,124 @@ ibge_month_weeks <- function(year, month, min_days = 4L) {
 }
 
 
+#' Detect Type of Technical Stop
+#'
+#' Classifies a technical stop (parada técnica) as either "quarter_boundary"
+#' (the week falls outside the quarter's valid IBGE range) or "within_quarter"
+#' (the week falls in a gap between two IBGE months within the quarter).
+#'
+#' Technical stops are IBGE weeks (Sunday-Saturday) that don't belong to any
+#' IBGE month. They occur:
+#' - At quarter boundaries (before first or after last valid week)
+#' - Between consecutive IBGE months within a quarter (gaps)
+#'
+#' @param representative_date Date vector - a date within the technical stop week
+#' @param quarter Integer vector of quarters (1-4)
+#' @param year Integer vector of years
+#' @param min_days Integer minimum days required for first Saturday (default 4)
+#' @return Character vector: "quarter_boundary" or "within_quarter"
+#' @keywords internal
+#' @noRd
+detect_technical_stop_type <- function(representative_date, quarter, year, min_days = 4L) {
+  # Get Saturday of the week containing the representative date
+  week_saturday <- ibge_week_saturday(representative_date)
+
+  # Get first and third months of the quarter
+  first_month <- quarter_first_month(quarter)
+  third_month <- quarter_month_n(quarter, 3L)
+
+  # Calculate quarter boundaries:
+  # - First valid Saturday = first Saturday of month 1 with >= min_days in the week
+  # - Last valid Saturday = last Saturday of month 3 (4th week)
+  quarter_first_saturday <- make_date(year, first_month, first_valid_saturday(year, first_month, min_days))
+  quarter_last_saturday <- ibge_month_end(year, third_month, min_days)
+
+  # Classify: if Saturday is outside quarter bounds, it's a quarter boundary stop
+  # Otherwise, it's within the quarter (a gap between months)
+  data.table::fifelse(
+    is.na(representative_date),
+    NA_character_,
+    data.table::fifelse(
+      week_saturday < quarter_first_saturday | week_saturday > quarter_last_saturday,
+      "quarter_boundary",
+      "within_quarter"
+    )
+  )
+}
+
+
+#' First Valid IBGE Week After a Technical Stop
+#'
+#' Returns the first valid IBGE week number (1-12 within quarter) after a
+#' within-quarter technical stop. This is used for Rule 3.3 when no household
+#' consensus exists.
+#'
+#' The week numbers within a quarter are:
+#' - Month 1: weeks 1-4
+#' - Month 2: weeks 5-8
+#' - Month 3: weeks 9-12
+#'
+#' Technical stops can occur in gaps between consecutive months:
+#' - Before month 1 starts -> return week 1
+
+#' - Between month 1 and 2 -> return week 5
+#' - Between month 2 and 3 -> return week 9
+#' - After month 3 ends -> return week 12 (fallback)
+#'
+#' @param representative_date Date vector - a date within the technical stop week
+#' @param quarter Integer vector of quarters (1-4)
+#' @param year Integer vector of years
+#' @param min_days Integer minimum days required for first Saturday (default 4)
+#' @return Integer vector: IBGE week number within quarter (1-12)
+#' @keywords internal
+#' @noRd
+first_valid_week_after_technical_stop <- function(representative_date, quarter, year, min_days = 4L) {
+  # Get Saturday of the week containing the representative date
+  week_saturday <- ibge_week_saturday(representative_date)
+
+  # Get all three months of the quarter
+  month1 <- quarter_first_month(quarter)
+  month2 <- quarter_month_n(quarter, 2L)
+  month3 <- quarter_month_n(quarter, 3L)
+
+  # Calculate the start (first Saturday) and end (last Saturday) of each IBGE month
+  month1_start <- make_date(year, month1, first_valid_saturday(year, month1, min_days))
+  month1_end <- ibge_month_end(year, month1, min_days)
+
+  month2_start <- make_date(year, month2, first_valid_saturday(year, month2, min_days))
+  month2_end <- ibge_month_end(year, month2, min_days)
+
+  month3_start <- make_date(year, month3, first_valid_saturday(year, month3, min_days))
+  month3_end <- ibge_month_end(year, month3, min_days)
+
+  # Determine which gap the date falls in:
+  # - Before month 1 -> next valid week is week 1
+  # - After month 1, before month 2 -> next valid week is week 5 (first week of month 2)
+  # - After month 2, before month 3 -> next valid week is week 9 (first week of month 3)
+  # - After month 3 -> fallback to week 12 (last valid week)
+
+  result <- data.table::fifelse(
+    is.na(representative_date),
+    NA_integer_,
+    data.table::fifelse(
+      week_saturday < month1_start,
+      1L,  # Before month 1 -> week 1
+      data.table::fifelse(
+        week_saturday > month1_end & week_saturday < month2_start,
+        5L,  # Gap between month 1 and 2 -> week 5
+        data.table::fifelse(
+          week_saturday > month2_end & week_saturday < month3_start,
+          9L,  # Gap between month 2 and 3 -> week 9
+          12L  # After month 3 or other cases -> week 12 (fallback)
+        )
+      )
+    )
+  )
+
+  result
+}
+
+
 #' IBGE Week Number within a Month
 #'
 #' Returns which IBGE reference week (1-4) a date falls in within its IBGE month.

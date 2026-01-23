@@ -49,7 +49,7 @@ A modified crosswalk with additional columns. When \code{include_derived = TRUE}
 of date interval in assigned period; values below threshold are removed)
 \item \code{ref_fortnight_exp}: Experimentally assigned fortnight position in quarter (1-6, or NA)
 \item \code{ref_fortnight_exp_confidence}: Confidence of fortnight assignment (0-1)
-\item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-12, or NA)
+\item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-14, or NA)
 \item \code{ref_week_exp_confidence}: Confidence of week assignment (0-1)
 }
 \item \strong{Derived columns} (when \code{include_derived = TRUE}):
@@ -110,21 +110,6 @@ which period contains most of the date interval
 
 For months: aggregates at UPA-V1014 level (but within-quarter, unlike strict algorithm)
 For fortnights and weeks: works at household level
-
-\strong{Exception Rules:} The probabilistic strategy now implements the same dynamic
-exception detection as the strict algorithm. When standard IBGE rules
-(\code{min_days = 4}) produce impossible results for some UPA-panel groups,
-the exception rule (\code{min_days = 3}) is applied to the affected months
-within that quarter. This ensures experimental assignments are consistent
-with strict determinations.
-
-\strong{Technical Stop Handling:} The strategy handles technical stops (Paradas
-Técnicas) following the same rules as the strict algorithm:
-\itemize{
-\item Rule 3.1: Quarter boundary stops assign to week 12 (last week of quarter)
-\item Rule 3.2: Within-quarter stops use household consensus when available
-\item Rule 3.3: Fallback to first valid week after the technical stop
-}
 }
 
 \subsection{UPA Aggregation Strategy}{
@@ -198,8 +183,7 @@ crosswalk_exp[, .(
 
 # Use directly with calibration (experimental output is compatible)
 result <- pnadc_apply_periods(pnadc_data, crosswalk_exp,
-                              weight_var = "V1028", anchor = "quarter",
-                              calibration_unit = "month", calibrate = TRUE)
+                              period = "month", calibrate = TRUE)
 
 # Or filter to only strict determinations
 strict_only <- crosswalk_exp[probabilistic_assignment == FALSE | is.na(probabilistic_assignment)]

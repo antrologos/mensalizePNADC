@@ -69,8 +69,7 @@ combined <- combine_period_crosswalks(strict, experimental)
 
 # Use with calibration
 result <- pnadc_apply_periods(pnadc_data, combined,
-                              weight_var = "V1028", anchor = "quarter",
-                              calibration_unit = "month", calibrate = TRUE)
+                              period = "month", calibrate = TRUE)
 }
 
 }
