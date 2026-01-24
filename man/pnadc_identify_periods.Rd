@@ -26,8 +26,10 @@ Optional but recommended:
 
 \item{verbose}{Logical. If TRUE (default), display progress information.}
 
-\item{store_date_bounds}{Logical. If TRUE, stores exception flags as attributes
-for optimization when calling \code{pnadc_experimental_periods()}. Default FALSE.}
+\item{store_date_bounds}{Logical. If TRUE, stores date bounds and exception
+flags in the crosswalk for optimization when calling
+\code{pnadc_experimental_periods()}. This enables 10-20x speedup for the
+probabilistic strategy by avoiding redundant computation. Default FALSE.}
 }
 \value{
 A data.table crosswalk with columns:

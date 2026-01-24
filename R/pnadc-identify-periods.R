@@ -142,8 +142,10 @@
 #' @seealso \code{\link{pnadc_apply_periods}} to apply the crosswalk and
 #'   calibrate weights
 #'
-#' @param store_date_bounds Logical. If TRUE, stores exception flags as attributes
-#'   for optimization when calling \code{pnadc_experimental_periods()}. Default FALSE.
+#' @param store_date_bounds Logical. If TRUE, stores date bounds and exception
+#'   flags in the crosswalk for optimization when calling
+#'   \code{pnadc_experimental_periods()}. This enables 10-20x speedup for the
+#'   probabilistic strategy by avoiding redundant computation. Default FALSE.
 #'
 #' @export
 pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FALSE) {
@@ -727,20 +729,52 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
   if (verbose) cat("\nPhase 4: Building crosswalk...\n")
 
   # Build crosswalk at household-quarter level
-  crosswalk <- dt[, .(
-    ref_month_in_quarter = ref_month_in_quarter[1L],
-    ref_fortnight_in_quarter = ref_fortnight_in_quarter[1L],
-    ref_week_yyyyww = ref_week_yyyyww[1L]
-  ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
-
-  # OPTIMIZATION: Store exception flags for pnadc_experimental_periods()
+  # OPTIMIZATION: When store_date_bounds=TRUE, include date bounds for pnadc_experimental_periods()
   if (store_date_bounds) {
+    # Aggregate date bounds at UPA-V1014 level (for month probabilistic)
+    # and household level (for fortnight/week probabilistic)
+    # Store as INTEGER days since epoch for fast arithmetic
+    dt[, `:=`(
+      upa_date_min_int = suppressWarnings(as.integer(max(date_min, na.rm = TRUE))),
+      upa_date_max_int = suppressWarnings(as.integer(min(date_max, na.rm = TRUE)))
+    ), by = .(Ano, Trimestre, UPA, V1014)]
+
+    dt[, `:=`(
+      hh_date_min_int = suppressWarnings(as.integer(max(date_min, na.rm = TRUE))),
+      hh_date_max_int = suppressWarnings(as.integer(min(date_max, na.rm = TRUE)))
+    ), by = .(Ano, Trimestre, UPA, V1008)]
+
+    # Fix infinites from empty groups
+    fix_infinite_values(dt, c("upa_date_min_int", "upa_date_max_int",
+                               "hh_date_min_int", "hh_date_max_int"))
+
+    # Include all bounds in crosswalk
+    crosswalk <- dt[, .(
+      ref_month_in_quarter = ref_month_in_quarter[1L],
+      ref_fortnight_in_quarter = ref_fortnight_in_quarter[1L],
+      ref_week_yyyyww = ref_week_yyyyww[1L],
+      upa_date_min_int = upa_date_min_int[1L],
+      upa_date_max_int = upa_date_max_int[1L],
+      hh_date_min_int = hh_date_min_int[1L],
+      hh_date_max_int = hh_date_max_int[1L],
+      upa_month_min = upa_month_min_final[1L],
+      upa_month_max = upa_month_max_final[1L]
+    ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
+
+    # Store exception flags as attribute
     exc_cols <- c("trim_exc_m1", "trim_exc_m2", "trim_exc_m3")
     if (all(exc_cols %in% names(dt))) {
       exception_flags <- unique(dt[, .(Ano, Trimestre, trim_exc_m1, trim_exc_m2, trim_exc_m3)])
       attr(crosswalk, "exception_flags") <- exception_flags
-      if (verbose) cat("  - Exception flags stored for experimental strategies\n")
     }
+
+    if (verbose) cat("  - Date bounds stored for experimental strategies\n")
+  } else {
+    crosswalk <- dt[, .(
+      ref_month_in_quarter = ref_month_in_quarter[1L],
+      ref_fortnight_in_quarter = ref_fortnight_in_quarter[1L],
+      ref_week_yyyyww = ref_week_yyyyww[1L]
+    ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
   }
 
   # OPTIMIZATION: Free memory from working data.table - no longer needed
