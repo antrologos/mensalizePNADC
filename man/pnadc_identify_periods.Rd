@@ -12,7 +12,7 @@ pnadc_identify_periods(data, verbose = TRUE, store_date_bounds = FALSE)
 \item \code{Ano}: Survey year
 \item \code{Trimestre}: Quarter (1-4)
 \item \code{UPA}: Primary Sampling Unit
-\item \code{V1008}: Household sequence within UPA
+\item \code{V1008}: Household id/sequence within UPA
 \item \code{V1014}: Panel identifier
 \item \code{V2008}: Birth day (1-31)
 \item \code{V20081}: Birth month (1-12)
@@ -39,7 +39,7 @@ A data.table crosswalk with columns:
 \item{ref_month_end}{Saturday of last IBGE reference week of the month}
 \item{ref_month_in_quarter}{Position in quarter (1, 2, 3) or NA}
 \item{ref_month_yyyymm}{Integer YYYYMM format (e.g., 202301)}
-\item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
+\item{ref_month_weeks}{Number of IBGE reference weeks in month (always 4)}
 \item{determined_month}{Logical: TRUE if month was determined}
 \item{ref_fortnight_start}{Sunday of first IBGE week of the fortnight}
 \item{ref_fortnight_end}{Saturday of last IBGE week of the fortnight}
@@ -48,7 +48,7 @@ A data.table crosswalk with columns:
 \item{determined_fortnight}{Logical: TRUE if fortnight was determined}
 \item{ref_week_start}{Sunday of the IBGE reference week}
 \item{ref_week_end}{Saturday of the IBGE reference week}
-\item{ref_week_in_quarter}{Position in quarter (1-14) or NA}
+\item{ref_week_in_quarter}{Position in quarter (1-12) or NA}
 \item{ref_week_yyyyww}{Integer IBGE YYYYWW format}
 \item{determined_week}{Logical: TRUE if week was determined}
 }
@@ -63,17 +63,17 @@ The algorithm uses a \strong{nested identification approach}:
 \itemize{
 \item \strong{Phase 1}: Identify MONTHS for all observations using:
 \itemize{
-\item IBGE's reference week timing rules (first Saturday with sufficient days)
+\item IBGE's reference week timing rules (first reference week -- ending in a Saturday -- with sufficient days)
 \item Respondent birthdates to constrain possible interview dates
 \item UPA-panel level aggregation across ALL quarters (panel design)
 \item Dynamic exception detection (identifies quarters needing relaxed rules)
 }
-\item \strong{Phase 2}: Identify FORTNIGHTS only for month-determined observations:
+\item \strong{Phase 2}: Identify FORTNIGHTS for month-determined observations:
 \itemize{
 \item Search space constrained to 2 fortnights within determined month
 \item Household-level aggregation within each quarter
 }
-\item \strong{Phase 3}: Identify WEEKS only for fortnight-determined observations:
+\item \strong{Phase 3}: Identify WEEKS for fortnight-determined observations:
 \itemize{
 \item Search space constrained to ~2 weeks within determined fortnight
 \item Household-level aggregation within each quarter
@@ -81,7 +81,7 @@ The algorithm uses a \strong{nested identification approach}:
 }
 }
 \details{
-Builds a universal crosswalk containing reference periods (month, fortnight,
+Builds a crosswalk containing reference periods (month, fortnight,
 and week) for PNADC survey data based on IBGE's interview timing rules.
 \subsection{Temporal Granularity}{
 
@@ -89,7 +89,7 @@ The crosswalk contains three levels of temporal granularity:
 \itemize{
 \item \strong{Month}: 3 per quarter, ~97\% determination rate (aggregates across quarters)
 \item \strong{Fortnight (quinzena)}: 6 per quarter, ~2-8\% determination rate (within-quarter only)
-\item \strong{Week}: 13-14 per quarter, ~1-2\% determination rate (within-quarter only)
+\item \strong{Week}: 12 per quarter, ~1-2\% determination rate (within-quarter only)
 }
 }
 

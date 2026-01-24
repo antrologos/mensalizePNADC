@@ -21,7 +21,7 @@ The IBGE reference calendar differs from ISO 8601:
 \item Weeks start on Sunday and end on Saturday
 \item A week belongs to the IBGE month where its Saturday falls
 \item The first valid Saturday must have >= 4 days (or 3 as exception) in the month
-\item IBGE months can have 4 or 5 reference weeks
+\item IBGE months always have exactly 4 reference weeks
 }
 }
 

@@ -70,7 +70,6 @@ result[determined_month == TRUE, .(
 | `pnadc_identify_periods()` | Build crosswalk: identify reference months, fortnights, and weeks (nested) |
 | `pnadc_apply_periods()` | Apply crosswalk to data + hierarchical weight calibration |
 | `pnadc_experimental_periods()` | Experimental probabilistic/UPA aggregation strategies |
-| `combine_period_crosswalks()` | Merge strict and experimental crosswalks |
 | `fetch_monthly_population()` | Fetch population totals from IBGE SIDRA API |
 | `validate_pnadc()` | Validate input data has required columns |
 

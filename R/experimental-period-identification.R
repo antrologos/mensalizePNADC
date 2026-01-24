@@ -44,7 +44,7 @@
 #'         of date interval in assigned period; values below threshold are removed)
 #'       \item \code{ref_fortnight_exp}: Experimentally assigned fortnight position in quarter (1-6, or NA)
 #'       \item \code{ref_fortnight_exp_confidence}: Confidence of fortnight assignment (0-1)
-#'       \item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-14, or NA)
+#'       \item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-12, or NA)
 #'       \item \code{ref_week_exp_confidence}: Confidence of week assignment (0-1)
 #'     }
 #'     \item \strong{Derived columns} (when \code{include_derived = TRUE}):
@@ -138,7 +138,6 @@
 #' @seealso
 #' \code{\link{pnadc_identify_periods}} to build the crosswalk that this function modifies.
 #' \code{\link{pnadc_apply_periods}} to apply period crosswalk and calibrate weights.
-#' \code{\link{combine_period_crosswalks}} to merge strict and experimental crosswalks.
 #'
 #' @examples
 #' \dontrun{
@@ -416,30 +415,27 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
     # Calculate midpoint (integer arithmetic)
     crosswalk[month_prob_filter, date_midpoint_int := upa_date_min_int + (upa_date_max_int - upa_date_min_int) %/% 2L]
 
-    # Determine month from midpoint
-    crosswalk[month_prob_filter, `:=`(
-      midpoint_sat_month = fast_month(structure(date_midpoint_int + (6L - ((date_midpoint_int + 4L) %% 7L)), class = "Date"))
-    )]
-    crosswalk[month_prob_filter, ref_month_exp := midpoint_sat_month - first_month + 1L]
-    crosswalk[!is.na(ref_month_exp) & ref_month_exp < 1L, ref_month_exp := ref_month_exp + 12L]
-    crosswalk[!is.na(ref_month_exp), ref_month_exp := pmin(pmax(ref_month_exp, 1L), 3L)]
-
-    # Get calendar month boundary for confidence calculation
-    # Join to get the boundary between the two months
+    # Get calendar month boundary for determining which month the midpoint falls into
+    # The boundary is the first day of the SECOND month in the 2-month range
     crosswalk[month_prob_filter, second_month := upa_month_min_pos + 1L]
     crosswalk[month_prob_filter, second_month_num := quarter_month_n(Trimestre, second_month)]
-
-    # Boundary is first day of second month (integer)
     crosswalk[month_prob_filter, boundary_int := as.integer(make_date(Ano, second_month_num, 1L))]
 
-    # Calculate total interval and days in each period
+    # Calculate total interval and days in each of the two valid months
     crosswalk[month_prob_filter, total_days := upa_date_max_int - upa_date_min_int + 1L]
-
-    # Days before boundary
     crosswalk[month_prob_filter, days_before_boundary := pmax(0L, pmin(boundary_int - 1L, upa_date_max_int) - upa_date_min_int + 1L)]
     crosswalk[month_prob_filter, days_after_boundary := total_days - days_before_boundary]
 
-    # Calculate confidence (only where total_days > 0)
+    # PROPER FIX: Assign month based on which of the two CONSTRAINED months
+    # has more days. This ensures the assignment is always one of upa_month_min_pos or
+    # upa_month_max_pos, which are already validated to be within [1,3].
+    crosswalk[month_prob_filter, ref_month_exp := data.table::fifelse(
+      days_before_boundary >= days_after_boundary,
+      upa_month_min_pos,
+      upa_month_max_pos
+    )]
+
+    # Calculate confidence (proportion of days in assigned month)
     crosswalk[month_prob_filter, ref_month_exp_confidence := data.table::fifelse(
       total_days > 0L,
       data.table::fifelse(
@@ -523,25 +519,36 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
       # Calculate midpoint
       crosswalk[fortnight_prob_filter, hh_midpoint_int := hh_date_min_int + (hh_date_max_int - hh_date_min_int) %/% 2L]
 
-      # Determine fortnight from midpoint
-      crosswalk[fortnight_prob_filter, ref_fortnight_exp := ibge_fortnight_in_quarter(
-        structure(hh_midpoint_int, class = "Date"), Trimestre, Ano, min_days = 4L
-      )]
-
-      # Get fortnight boundary for confidence calculation
+      # Get fortnight boundary for determining which fortnight the midpoint falls into
+      # The boundary is the start of the SECOND fortnight in the 2-fortnight range
       crosswalk[fortnight_prob_filter, fortnight_month_num := ((hh_fortnight_min - 1L) %/% 2L) + 1L]
       crosswalk[fortnight_prob_filter, fortnight_boundary_int := as.integer(
         ibge_fortnight_start(Ano, quarter_month_n(Trimestre, fortnight_month_num), 2L, min_days = 4L)
       )]
 
-      # Calculate confidence
+      # Calculate days in each of the two valid fortnights (hh_fortnight_min and hh_fortnight_max)
       crosswalk[fortnight_prob_filter, total_fortnight_days := hh_date_max_int - hh_date_min_int + 1L]
       crosswalk[fortnight_prob_filter, days_in_first_fortnight := pmax(0L,
         pmin(fortnight_boundary_int - 1L, hh_date_max_int) - hh_date_min_int + 1L
       )]
       crosswalk[fortnight_prob_filter, days_in_second_fortnight := total_fortnight_days - days_in_first_fortnight]
 
-      # Calculate confidence (only where total_fortnight_days > 0)
+      # PROPER FIX: Assign fortnight based on which of the two CONSTRAINED fortnights
+      # has more days. This ensures the assignment is always one of hh_fortnight_min or
+      # hh_fortnight_max, which are already validated to be within the month's range.
+      crosswalk[fortnight_prob_filter, ref_fortnight_exp := data.table::fifelse(
+        days_in_first_fortnight >= days_in_second_fortnight,
+        hh_fortnight_min,
+        hh_fortnight_max
+      )]
+
+      # INVARIANT: Validate fortnight assignments are in [1, 6] range
+      # This should never trigger now since we use constrained bounds, but kept as safety net
+      crosswalk[!is.na(ref_fortnight_exp) &
+                  (ref_fortnight_exp < 1L | ref_fortnight_exp > 6L),
+                ref_fortnight_exp := NA_integer_]
+
+      # Calculate confidence (proportion of days in assigned fortnight)
       crosswalk[fortnight_prob_filter, ref_fortnight_exp_confidence := data.table::fifelse(
         total_fortnight_days > 0L,
         data.table::fifelse(
@@ -628,24 +635,35 @@ apply_probabilistic_strategy_nested <- function(crosswalk, data, confidence_thre
       # Calculate midpoint
       crosswalk[week_prob_filter, week_midpoint_int := hh_date_min_int + (hh_date_max_int - hh_date_min_int) %/% 2L]
 
-      # Determine week from midpoint
-      crosswalk[week_prob_filter, ref_week_exp := ibge_week_in_quarter(
-        structure(week_midpoint_int, class = "Date"), Trimestre, Ano, min_days = 4L
-      )]
-
-      # Get week boundary for confidence
+      # Get week boundary for determining which week the midpoint falls into
+      # The boundary is the start of the SECOND week in the 2-week range
       crosswalk[week_prob_filter, week_boundary_int := as.integer(
         ibge_week_dates_from_position(Ano, Trimestre, hh_week_max_pos, min_days = 4L)$start
       )]
 
-      # Calculate confidence
+      # Calculate days in each of the two valid weeks (hh_week_min_pos and hh_week_max_pos)
       crosswalk[week_prob_filter, total_week_days := hh_date_max_int - hh_date_min_int + 1L]
       crosswalk[week_prob_filter, days_in_first_week := pmax(0L,
         pmin(week_boundary_int - 1L, hh_date_max_int) - hh_date_min_int + 1L
       )]
       crosswalk[week_prob_filter, days_in_second_week := total_week_days - days_in_first_week]
 
-      # Calculate confidence (only where total_week_days > 0)
+      # PROPER FIX: Assign week based on which of the two CONSTRAINED weeks
+      # has more days. This ensures the assignment is always one of hh_week_min_pos or
+      # hh_week_max_pos, which are already validated to be within the fortnight's range.
+      crosswalk[week_prob_filter, ref_week_exp := data.table::fifelse(
+        days_in_first_week >= days_in_second_week,
+        hh_week_min_pos,
+        hh_week_max_pos
+      )]
+
+      # INVARIANT: Validate week assignments are in [1, 12] range
+      # This should never trigger now since we use constrained bounds, but kept as safety net
+      crosswalk[!is.na(ref_week_exp) &
+                  (ref_week_exp < 1L | ref_week_exp > 12L),
+                ref_week_exp := NA_integer_]
+
+      # Calculate confidence (proportion of days in assigned week)
       crosswalk[week_prob_filter, ref_week_exp_confidence := data.table::fifelse(
         total_week_days > 0L,
         data.table::fifelse(
@@ -913,11 +931,13 @@ apply_upa_aggregation_strategy_nested <- function(crosswalk, threshold, verbose)
     )]
 
     # Join consensus_fortnight and validate it's within the month's fortnight bounds
+    # INVARIANT: Also validate consensus_fortnight is in [1, 6] range
     crosswalk[upa_fortnight_qualify, on = .(Ano, Trimestre, UPA), `:=`(
       ref_fortnight_exp = fifelse(
         is.na(ref_fortnight_in_quarter) & month_identified &
           i.consensus_fortnight >= fortnight_lower &
-          i.consensus_fortnight <= fortnight_upper,
+          i.consensus_fortnight <= fortnight_upper &
+          i.consensus_fortnight >= 1L & i.consensus_fortnight <= 6L,
         i.consensus_fortnight,
         ref_fortnight_exp
       ),
@@ -972,14 +992,17 @@ apply_upa_aggregation_strategy_nested <- function(crosswalk, threshold, verbose)
     # algorithm's nesting enforcement for the source consensus values.
     crosswalk[, fortnight_identified := !is.na(ref_fortnight_in_quarter) | !is.na(ref_fortnight_exp)]
 
+    # INVARIANT: Validate consensus_week is in [1, 12] range
     crosswalk[upa_week_qualify, on = .(Ano, Trimestre, UPA), `:=`(
       ref_week_exp = fifelse(
-        is.na(ref_week_in_quarter) & fortnight_identified,
+        is.na(ref_week_in_quarter) & fortnight_identified &
+          i.consensus_week >= 1L & i.consensus_week <= 12L,
         i.consensus_week,
         ref_week_exp
       ),
       ref_week_exp_confidence = fifelse(
-        is.na(ref_week_in_quarter) & fortnight_identified,
+        is.na(ref_week_in_quarter) & fortnight_identified &
+          i.consensus_week >= 1L & i.consensus_week <= 12L,
         1.0,
         ref_week_exp_confidence
       )
@@ -1103,6 +1126,10 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
   # MONTH: Combine strict + experimental
   # -------------------------------------------------------------------------
 
+  # INVARIANT: Validate ref_month_exp is in [1, 3] range before using
+  crosswalk[!is.na(ref_month_exp) & (ref_month_exp < 1L | ref_month_exp > 3L),
+            ref_month_exp := NA_integer_]
+
   # If experimental assigned but strict not, mark as probabilistic
   crosswalk[is.na(ref_month_in_quarter) & !is.na(ref_month_exp),
             probabilistic_assignment := TRUE]
@@ -1134,6 +1161,10 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
   # -------------------------------------------------------------------------
   # FORTNIGHT: Combine strict + experimental
   # -------------------------------------------------------------------------
+
+  # INVARIANT: Validate ref_fortnight_exp is in [1, 6] range before using
+  crosswalk[!is.na(ref_fortnight_exp) & (ref_fortnight_exp < 1L | ref_fortnight_exp > 6L),
+            ref_fortnight_exp := NA_integer_]
 
   # If experimental assigned but strict not, mark as probabilistic
   crosswalk[is.na(ref_fortnight_in_quarter) & !is.na(ref_fortnight_exp),
@@ -1170,6 +1201,10 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
   # WEEK: Combine strict + experimental
   # -------------------------------------------------------------------------
 
+  # INVARIANT: Validate ref_week_exp is in [1, 12] range before using
+  crosswalk[!is.na(ref_week_exp) & (ref_week_exp < 1L | ref_week_exp > 12L),
+            ref_week_exp := NA_integer_]
+
   # If experimental assigned but strict not, mark as probabilistic
   crosswalk[is.na(ref_week_in_quarter) & !is.na(ref_week_exp),
             probabilistic_assignment := TRUE]
@@ -1179,7 +1214,7 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
             ref_week_in_quarter := ref_week_exp]
 
   # For weeks, we need to derive IBGE week boundaries from the week position
-  # The experimental ref_week_exp is a position in quarter (1-14)
+  # The experimental ref_week_exp is a position in quarter (1-12)
   crosswalk[!is.na(ref_week_in_quarter) & is.na(ref_week_start), `:=`(
     ref_week_start = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$start,
     ref_week_end = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$end
@@ -1192,6 +1227,11 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
 
   # Update determined_week flag
   crosswalk[, determined_week := !is.na(ref_week_in_quarter)]
+
+  # -------------------------------------------------------------------------
+  # FINAL VALIDATION: Ensure all IBGE period invariants hold
+  # -------------------------------------------------------------------------
+  validate_period_invariants(crosswalk, strict = TRUE, context = "experimental_derived_columns")
 
   # -------------------------------------------------------------------------
   # Summary
@@ -1216,248 +1256,6 @@ apply_combined_strategy_nested <- function(crosswalk, data, confidence_threshold
 
 # NOTE: The week_in_quarter_to_yyyyww function has been replaced by IBGE-based functions
 # in utils-dates.R. Use ibge_week_dates_from_position() and date_to_ibge_yyyyww() instead.
-
-# =============================================================================
-# COMBINE CROSSWALKS FUNCTION
-# =============================================================================
-
-#' Combine Strict and Experimental Period Crosswalks
-#'
-#' Merges a strict crosswalk from \code{pnadc_identify_periods()} with an
-#' experimental crosswalk from \code{pnadc_experimental_periods()}, filling
-#' in undetermined periods from the strict crosswalk with experimental
-#' assignments.
-#'
-#' @param strict_crosswalk data.table from \code{pnadc_identify_periods()}
-#' @param experimental_crosswalk data.table from \code{pnadc_experimental_periods()}
-#'   with \code{include_derived = FALSE} (experimental columns only)
-#' @param priority Character. Which source takes priority when both have assignments.
-#'   Default "strict" means strict determinations are never overwritten.
-#'   Use "experimental" to prefer experimental assignments (rarely needed).
-#' @param verbose Logical. If TRUE, print summary of combined assignments.
-#'
-#' @return A combined crosswalk data.table with:
-#'   \itemize{
-#'     \item All columns from strict crosswalk
-#'     \item Experimental columns (ref_month_exp, etc.)
-#'     \item \code{probabilistic_assignment}: TRUE for rows where experimental
-#'       assignment was used to fill a gap
-#'   }
-#'   The combined crosswalk is ready for use with \code{pnadc_apply_periods()}.
-#'
-#' @details
-#' This function is useful when you want to:
-#' \itemize{
-#'   \item Keep strict and experimental crosswalks separate
-#'   \item Apply different confidence thresholds to experimental assignments
-#'   \item Audit which assignments came from which source
-#' }
-#'
-#' If you just want experimental assignments integrated automatically, use
-#' \code{pnadc_experimental_periods()} with \code{include_derived = TRUE}.
-#'
-#' @examples
-#' \dontrun{
-#' # Build strict crosswalk
-#' strict <- pnadc_identify_periods(pnadc_data)
-#'
-#' # Build experimental crosswalk (without derived columns)
-#' experimental <- pnadc_experimental_periods(
-#'   strict,
-#'   pnadc_data,
-#'   strategy = "probabilistic",
-#'   confidence_threshold = 0.95,
-#'   include_derived = FALSE
-#' )
-#'
-#' # Combine them
-#' combined <- combine_period_crosswalks(strict, experimental)
-#'
-#' # Use with calibration
-#' result <- pnadc_apply_periods(pnadc_data, combined,
-#'                               period = "month", calibrate = TRUE)
-#' }
-#'
-#' @seealso \code{\link{pnadc_identify_periods}}, \code{\link{pnadc_experimental_periods}}
-#'
-#' @export
-combine_period_crosswalks <- function(
-    strict_crosswalk,
-    experimental_crosswalk,
-    priority = c("strict", "experimental"),
-    verbose = TRUE
-) {
-
-  priority <- match.arg(priority)
-
-  # Validate inputs
-  checkmate::assert_data_table(strict_crosswalk)
-  checkmate::assert_data_table(experimental_crosswalk)
-
-  # Required join keys
-  join_keys <- c("Ano", "Trimestre", "UPA", "V1008", "V1014")
-
-  missing_strict <- setdiff(join_keys, names(strict_crosswalk))
-  if (length(missing_strict) > 0) {
-    stop("strict_crosswalk missing required columns: ", paste(missing_strict, collapse = ", "))
-  }
-
-  missing_exp <- setdiff(join_keys, names(experimental_crosswalk))
-  if (length(missing_exp) > 0) {
-    stop("experimental_crosswalk missing required columns: ", paste(missing_exp, collapse = ", "))
-  }
-
-  # Copy strict crosswalk as base
-  result <- data.table::copy(strict_crosswalk)
-
-  # Ensure join key types match
-  for (key in join_keys) {
-    if (!is.integer(result[[key]])) {
-      data.table::set(result, j = key, value = as.integer(result[[key]]))
-    }
-    if (!is.integer(experimental_crosswalk[[key]])) {
-      data.table::set(experimental_crosswalk, j = key, value = as.integer(experimental_crosswalk[[key]]))
-    }
-  }
-
-  # Extract experimental columns to merge
-  exp_cols <- c("ref_month_exp", "ref_month_exp_confidence",
-                "ref_fortnight_exp", "ref_fortnight_exp_confidence",
-                "ref_week_exp", "ref_week_exp_confidence")
-
-  exp_cols_present <- intersect(exp_cols, names(experimental_crosswalk))
-  if (length(exp_cols_present) == 0) {
-    warning("No experimental columns found in experimental_crosswalk. ",
-            "Returning strict crosswalk unchanged.")
-    result[, probabilistic_assignment := FALSE]
-    return(result)
-  }
-
-  # Subset experimental crosswalk to join keys + experimental columns
-  exp_subset <- experimental_crosswalk[, c(join_keys, exp_cols_present), with = FALSE]
-
-  # Merge experimental columns
-  result[exp_subset, on = join_keys, `:=`(
-    ref_month_exp = i.ref_month_exp,
-    ref_month_exp_confidence = i.ref_month_exp_confidence,
-    ref_fortnight_exp = i.ref_fortnight_exp,
-    ref_fortnight_exp_confidence = i.ref_fortnight_exp_confidence,
-    ref_week_exp = i.ref_week_exp,
-    ref_week_exp_confidence = i.ref_week_exp_confidence
-  )]
-
-  # Initialize probabilistic_assignment flag
-  result[, probabilistic_assignment := FALSE]
-
-  # Fill gaps based on priority
-  if (priority == "strict") {
-    # Only fill where strict is NA
-    # Month
-    result[is.na(ref_month_in_quarter) & !is.na(ref_month_exp), `:=`(
-      ref_month_in_quarter = ref_month_exp,
-      probabilistic_assignment = TRUE
-    )]
-    # Fortnight
-    result[is.na(ref_fortnight_in_quarter) & !is.na(ref_fortnight_exp), `:=`(
-      ref_fortnight_in_quarter = ref_fortnight_exp,
-      probabilistic_assignment = TRUE
-    )]
-    # Week
-    result[is.na(ref_week_in_quarter) & !is.na(ref_week_exp), `:=`(
-      ref_week_in_quarter = ref_week_exp,
-      probabilistic_assignment = TRUE
-    )]
-  } else {
-    # Experimental takes priority (overwrite strict)
-    result[!is.na(ref_month_exp), `:=`(
-      ref_month_in_quarter = ref_month_exp,
-      probabilistic_assignment = TRUE
-    )]
-    result[!is.na(ref_fortnight_exp), `:=`(
-      ref_fortnight_in_quarter = ref_fortnight_exp,
-      probabilistic_assignment = TRUE
-    )]
-    result[!is.na(ref_week_exp), `:=`(
-      ref_week_in_quarter = ref_week_exp,
-      probabilistic_assignment = TRUE
-    )]
-  }
-
-  # Derive YYYYMM/YYYYFF/YYYYWW and IBGE boundary columns for newly assigned periods
-
-  # Month - derive IBGE boundaries
-  result[probabilistic_assignment == TRUE & !is.na(ref_month_in_quarter), `:=`(
-    temp_month = quarter_month_n(Trimestre, ref_month_in_quarter)
-  )]
-  result[probabilistic_assignment == TRUE & !is.na(temp_month), `:=`(
-    ref_month_yyyymm = yyyymm(Ano, temp_month),
-    ref_month_start = ibge_month_start(Ano, temp_month, min_days = 4L),
-    ref_month_end = ibge_month_end(Ano, temp_month, min_days = 4L),
-    ref_month_weeks = ibge_month_weeks(Ano, temp_month, min_days = 4L)
-  )]
-  result[, temp_month := NULL]
-
-  # Fortnight - derive IBGE boundaries
-  result[probabilistic_assignment == TRUE & !is.na(ref_fortnight_in_quarter), `:=`(
-    temp_month_in_q = ((ref_fortnight_in_quarter - 1L) %/% 2L) + 1L,
-    temp_fortnight_in_month = ((ref_fortnight_in_quarter - 1L) %% 2L) + 1L
-  )]
-  result[probabilistic_assignment == TRUE & !is.na(temp_month_in_q), `:=`(
-    temp_month = quarter_month_n(Trimestre, temp_month_in_q)
-  )]
-  result[probabilistic_assignment == TRUE & !is.na(temp_month), `:=`(
-    ref_fortnight_yyyyff = ibge_fortnight_in_quarter_to_yyyyff(Ano, Trimestre, ref_fortnight_in_quarter),
-    ref_fortnight_start = ibge_fortnight_start(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
-    ref_fortnight_end = ibge_fortnight_end(Ano, temp_month, temp_fortnight_in_month, min_days = 4L),
-    ref_fortnight_weeks = ibge_fortnight_weeks(Ano, temp_month, temp_fortnight_in_month, min_days = 4L)
-  )]
-  result[, c("temp_month_in_q", "temp_fortnight_in_month", "temp_month") := NULL]
-
-  # Week - derive IBGE boundaries
-  result[probabilistic_assignment == TRUE & !is.na(ref_week_in_quarter), `:=`(
-    ref_week_start = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$start,
-    ref_week_end = ibge_week_dates_from_position(Ano, Trimestre, ref_week_in_quarter, min_days = 4L)$end
-  )]
-  result[probabilistic_assignment == TRUE & !is.na(ref_week_end), `:=`(
-    ref_week_yyyyww = date_to_ibge_yyyyww(ref_week_end)
-  )]
-
-  # Update determination flags
-  result[, `:=`(
-    determined_month = !is.na(ref_month_in_quarter),
-    determined_fortnight = !is.na(ref_fortnight_in_quarter),
-    determined_week = !is.na(ref_week_in_quarter)
-  )]
-
-  # Summary
-  if (verbose) {
-    n_strict_month <- sum(result$determined_month & !result$probabilistic_assignment, na.rm = TRUE)
-    n_exp_month <- sum(result$determined_month & result$probabilistic_assignment, na.rm = TRUE)
-    n_strict_fortnight <- sum(result$determined_fortnight & !result$probabilistic_assignment, na.rm = TRUE)
-    n_exp_fortnight <- sum(result$determined_fortnight & result$probabilistic_assignment, na.rm = TRUE)
-    n_strict_week <- sum(result$determined_week & !result$probabilistic_assignment, na.rm = TRUE)
-    n_exp_week <- sum(result$determined_week & result$probabilistic_assignment, na.rm = TRUE)
-
-    cat("Combined crosswalk summary:\n")
-    cat(sprintf("  Months: %s strict + %s experimental = %s total (%.1f%% rate)\n",
-                format(n_strict_month, big.mark = ","),
-                format(n_exp_month, big.mark = ","),
-                format(n_strict_month + n_exp_month, big.mark = ","),
-                100 * (n_strict_month + n_exp_month) / nrow(result)))
-    cat(sprintf("  Fortnights: %s strict + %s experimental = %s total (%.1f%% rate)\n",
-                format(n_strict_fortnight, big.mark = ","),
-                format(n_exp_fortnight, big.mark = ","),
-                format(n_strict_fortnight + n_exp_fortnight, big.mark = ","),
-                100 * (n_strict_fortnight + n_exp_fortnight) / nrow(result)))
-    cat(sprintf("  Weeks: %s strict + %s experimental = %s total (%.1f%% rate)\n",
-                format(n_strict_week, big.mark = ","),
-                format(n_exp_week, big.mark = ","),
-                format(n_strict_week + n_exp_week, big.mark = ","),
-                100 * (n_strict_week + n_exp_week) / nrow(result)))
-  }
-
-  result
-}
 
 
 #' Calculate IBGE Month Position from Date

@@ -15,7 +15,7 @@
 #'   \item Weeks start on Sunday and end on Saturday
 #'   \item A week belongs to the IBGE month where its Saturday falls
 #'   \item The first valid Saturday must have >= 4 days (or 3 as exception) in the month
-#'   \item IBGE months can have 4 or 5 reference weeks
+#'   \item IBGE months always have exactly 4 reference weeks
 #' }
 #'
 #' @name utils-dates
@@ -635,7 +635,7 @@ days_in_month <- function(year, month) {
 # - Weeks start on SUNDAY and end on SATURDAY (not Monday-Sunday)
 # - A week belongs to the IBGE month where its SATURDAY falls
 # - The first valid Saturday must have >= 4 days in the month
-# - IBGE months can have 4 or 5 reference weeks
+# - IBGE months always have exactly 4 reference weeks
 #
 # The IBGE calendar forms a partition: every day belongs to exactly one
 # IBGE week, and every week belongs to exactly one IBGE month.
@@ -925,14 +925,14 @@ ibge_fortnight_of_month <- function(date, year, month, min_days = 4L) {
 
 #' IBGE Week Number within a Quarter
 #'
-#' Returns which IBGE reference week (1-14 typically) a date falls in within
+#' Returns which IBGE reference week (1-12) a date falls in within
 #' its quarter, using IBGE week boundaries (Sunday-Saturday).
 #'
 #' @param date Date vector
 #' @param quarter Integer quarter vector (1-4)
 #' @param year Integer year vector
 #' @param min_days Integer minimum days required (default 4)
-#' @return Integer vector (1-14 typically, or NA if out of range)
+#' @return Integer vector (1-12, or NA if out of range)
 #' @keywords internal
 #' @noRd
 ibge_week_in_quarter <- function(date, quarter, year, min_days = 4L) {
@@ -1003,7 +1003,7 @@ ibge_fortnight_in_quarter <- function(date, quarter, year, min_days = 4L) {
 #'
 #' @param year Integer year
 #' @param quarter Integer quarter (1-4)
-#' @param week_in_quarter Integer week position (1-14 typically)
+#' @param week_in_quarter Integer week position (1-12)
 #' @param min_days Integer minimum days required (default 4)
 #' @return List with start (Sunday) and end (Saturday) Date vectors
 #' @keywords internal

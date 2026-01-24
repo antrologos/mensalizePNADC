@@ -172,7 +172,6 @@ The crosswalk returned by `pnadc_identify_periods()` contains IBGE calendar-base
 | `pnadc_identify_periods()` | Main function: build crosswalk with months/fortnights/weeks |
 | `pnadc_apply_periods()` | Apply crosswalk + calibrate weights (quarterly or annual) |
 | `pnadc_experimental_periods()` | Experimental strategies for improved fortnight/week determination |
-| `combine_period_crosswalks()` | Merge strict and experimental crosswalks |
 | `identify_reference_month()` | Standalone reference month identification |
 | `identify_reference_fortnight()` | Standalone fortnight (quinzena) identification |
 | `identify_reference_week()` | Standalone week identification |

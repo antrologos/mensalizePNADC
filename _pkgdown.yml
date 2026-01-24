@@ -78,7 +78,6 @@ reference:
   desc: Experimental strategies for improved period identification
   contents:
   - pnadc_experimental_periods
-  - combine_period_crosswalks
 
 home:
   links:

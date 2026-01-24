@@ -21,7 +21,6 @@ This document describes the implemented architecture of the PNADCperiods package
 | Function | Purpose |
 |----------|---------|
 | `pnadc_experimental_periods()` | Probabilistic + UPA aggregation strategies for higher determination rates |
-| `combine_period_crosswalks()` | Merge strict and experimental crosswalks |
 
 ### Supporting Functions
 
@@ -94,7 +93,7 @@ The crosswalk is a `data.table` at household-quarter level:
 R/
 ├── pnadc-identify-periods.R         # pnadc_identify_periods() - nested 4-phase algorithm
 ├── pnadc-apply-periods.R            # pnadc_apply_periods() - adaptive calibration + smoothing
-├── experimental-period-identification.R  # pnadc_experimental_periods() + combine_period_crosswalks()
+├── experimental-period-identification.R  # pnadc_experimental_periods()
 ├── identify-reference-month.R       # Core month algorithm with dynamic exceptions (internal)
 ├── identify-reference-fortnight.R   # Core fortnight algorithm (internal)
 ├── identify-reference-week.R        # Core week algorithm + technical stop handling (internal)

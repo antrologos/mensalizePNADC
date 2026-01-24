@@ -4,6 +4,232 @@
 #' @keywords internal
 NULL
 
+# ============================================================================
+# IBGE PERIOD INVARIANT VALIDATION
+# ============================================================================
+
+#' Validate IBGE Period Crosswalk Invariants
+#'
+#' Ensures that period identification functions never produce invalid IBGE
+#' calendar values. This function checks all invariants that must hold for
+#' valid period assignments.
+#'
+#' @param crosswalk A data.table crosswalk with period columns
+#' @param strict Logical. If TRUE (default), stops with an error on violations.
+#'   If FALSE, issues warnings and returns a validation report.
+#' @param context Character string describing where validation is being called
+#'   from (for error messages). Default is "crosswalk".
+#'
+#' @return If \code{strict = TRUE}, returns invisibly if valid or stops with error.
+#'   If \code{strict = FALSE}, returns a list with:
+#'   \itemize{
+#'     \item \code{valid}: Logical indicating if all invariants passed
+#'     \item \code{violations}: Named list of violations found (empty if none)
+#'   }
+#'
+#' @details
+#' The following IBGE calendar invariants are checked:
+#' \itemize{
+#'   \item \strong{Valid ranges}: ref_week_in_quarter in [1,12] or NA,
+#'     ref_fortnight_in_quarter in [1,6] or NA, ref_month_in_quarter in [1,3] or NA
+#'   \item \strong{Nesting}: week requires fortnight, fortnight requires month
+#'   \item \strong{Fortnight-month consistency}: fortnights 1-2 belong to month 1,
+#'     3-4 to month 2, 5-6 to month 3
+#'   \item \strong{Week-fortnight consistency}: weeks 1-2 belong to fortnight 1,
+#'     3-4 to fortnight 2, etc.
+#' }
+#'
+#' @keywords internal
+#' @noRd
+validate_period_invariants <- function(crosswalk, strict = TRUE, context = "crosswalk") {
+
+  violations <- list()
+
+  # -------------------------------------------------------------------------
+  # INVARIANT 1: Valid ranges
+  # -------------------------------------------------------------------------
+
+  # Check ref_month_in_quarter in [1,3] or NA
+  if ("ref_month_in_quarter" %in% names(crosswalk)) {
+    invalid_months <- crosswalk[!is.na(ref_month_in_quarter) &
+                                  (ref_month_in_quarter < 1L | ref_month_in_quarter > 3L)]
+    if (nrow(invalid_months) > 0) {
+      violations$invalid_month_values <- list(
+        count = nrow(invalid_months),
+        values = unique(invalid_months$ref_month_in_quarter),
+        message = sprintf(
+          "ref_month_in_quarter must be 1-3 or NA. Found %d rows with invalid values: %s",
+          nrow(invalid_months),
+          paste(unique(invalid_months$ref_month_in_quarter), collapse = ", ")
+        )
+      )
+    }
+  }
+
+  # Check ref_fortnight_in_quarter in [1,6] or NA
+  if ("ref_fortnight_in_quarter" %in% names(crosswalk)) {
+    invalid_fortnights <- crosswalk[!is.na(ref_fortnight_in_quarter) &
+                                      (ref_fortnight_in_quarter < 1L | ref_fortnight_in_quarter > 6L)]
+    if (nrow(invalid_fortnights) > 0) {
+      violations$invalid_fortnight_values <- list(
+        count = nrow(invalid_fortnights),
+        values = unique(invalid_fortnights$ref_fortnight_in_quarter),
+        message = sprintf(
+          "ref_fortnight_in_quarter must be 1-6 or NA. Found %d rows with invalid values: %s",
+          nrow(invalid_fortnights),
+          paste(unique(invalid_fortnights$ref_fortnight_in_quarter), collapse = ", ")
+        )
+      )
+    }
+  }
+
+  # Check ref_week_in_quarter in [1,12] or NA
+  if ("ref_week_in_quarter" %in% names(crosswalk)) {
+    invalid_weeks <- crosswalk[!is.na(ref_week_in_quarter) &
+                                 (ref_week_in_quarter < 1L | ref_week_in_quarter > 12L)]
+    if (nrow(invalid_weeks) > 0) {
+      violations$invalid_week_values <- list(
+        count = nrow(invalid_weeks),
+        values = unique(invalid_weeks$ref_week_in_quarter),
+        message = sprintf(
+          "ref_week_in_quarter must be 1-12 or NA. Found %d rows with invalid values: %s",
+          nrow(invalid_weeks),
+          paste(unique(invalid_weeks$ref_week_in_quarter), collapse = ", ")
+        )
+      )
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # INVARIANT 2: Nesting - week requires fortnight, fortnight requires month
+  # -------------------------------------------------------------------------
+
+  # Check: if week is determined, fortnight must be determined
+  if (all(c("ref_week_in_quarter", "ref_fortnight_in_quarter") %in% names(crosswalk))) {
+    week_without_fortnight <- crosswalk[!is.na(ref_week_in_quarter) &
+                                          is.na(ref_fortnight_in_quarter)]
+    if (nrow(week_without_fortnight) > 0) {
+      violations$week_without_fortnight <- list(
+        count = nrow(week_without_fortnight),
+        message = sprintf(
+          "Nesting violation: %d rows have week determined but fortnight is NA",
+          nrow(week_without_fortnight)
+        )
+      )
+    }
+  }
+
+  # Check: if fortnight is determined, month must be determined
+  if (all(c("ref_fortnight_in_quarter", "ref_month_in_quarter") %in% names(crosswalk))) {
+    fortnight_without_month <- crosswalk[!is.na(ref_fortnight_in_quarter) &
+                                           is.na(ref_month_in_quarter)]
+    if (nrow(fortnight_without_month) > 0) {
+      violations$fortnight_without_month <- list(
+        count = nrow(fortnight_without_month),
+        message = sprintf(
+          "Nesting violation: %d rows have fortnight determined but month is NA",
+          nrow(fortnight_without_month)
+        )
+      )
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # INVARIANT 3: Fortnight-month consistency
+  # Fortnights 1-2 belong to month 1, 3-4 to month 2, 5-6 to month 3
+  # -------------------------------------------------------------------------
+
+  if (all(c("ref_fortnight_in_quarter", "ref_month_in_quarter") %in% names(crosswalk))) {
+    # Calculate expected month from fortnight: ((fortnight - 1) %/% 2) + 1
+    fortnight_month_inconsistent <- crosswalk[
+      !is.na(ref_fortnight_in_quarter) & !is.na(ref_month_in_quarter) &
+        (((ref_fortnight_in_quarter - 1L) %/% 2L) + 1L) != ref_month_in_quarter
+    ]
+    if (nrow(fortnight_month_inconsistent) > 0) {
+      violations$fortnight_month_mismatch <- list(
+        count = nrow(fortnight_month_inconsistent),
+        message = sprintf(
+          "Fortnight-month inconsistency: %d rows have fortnight that doesn't match month",
+          nrow(fortnight_month_inconsistent)
+        )
+      )
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # INVARIANT 4: Week-fortnight consistency
+  # Weeks 1-2 belong to fortnight 1, 3-4 to fortnight 2, etc.
+  # Formula: expected_fortnight = ((week - 1) %/% 2) + 1
+  # -------------------------------------------------------------------------
+
+  if (all(c("ref_week_in_quarter", "ref_fortnight_in_quarter") %in% names(crosswalk))) {
+    # Calculate expected fortnight from week
+    week_fortnight_inconsistent <- crosswalk[
+      !is.na(ref_week_in_quarter) & !is.na(ref_fortnight_in_quarter) &
+        (((ref_week_in_quarter - 1L) %/% 2L) + 1L) != ref_fortnight_in_quarter
+    ]
+    if (nrow(week_fortnight_inconsistent) > 0) {
+      violations$week_fortnight_mismatch <- list(
+        count = nrow(week_fortnight_inconsistent),
+        message = sprintf(
+          "Week-fortnight inconsistency: %d rows have week that doesn't match fortnight",
+          nrow(week_fortnight_inconsistent)
+        )
+      )
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # INVARIANT 5: Week-month consistency (derived from above, but direct check)
+  # Weeks 1-4 belong to month 1, 5-8 to month 2, 9-12 to month 3
+  # -------------------------------------------------------------------------
+
+  if (all(c("ref_week_in_quarter", "ref_month_in_quarter") %in% names(crosswalk))) {
+    # Calculate expected month from week: ((week - 1) %/% 4) + 1
+    week_month_inconsistent <- crosswalk[
+      !is.na(ref_week_in_quarter) & !is.na(ref_month_in_quarter) &
+        (((ref_week_in_quarter - 1L) %/% 4L) + 1L) != ref_month_in_quarter
+    ]
+    if (nrow(week_month_inconsistent) > 0) {
+      violations$week_month_mismatch <- list(
+        count = nrow(week_month_inconsistent),
+        message = sprintf(
+          "Week-month inconsistency: %d rows have week that doesn't match month",
+          nrow(week_month_inconsistent)
+        )
+      )
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # RETURN RESULT
+  # -------------------------------------------------------------------------
+
+  result <- list(
+    valid = length(violations) == 0,
+    violations = violations
+  )
+
+  if (strict && !result$valid) {
+    # Build error message
+    error_msgs <- vapply(violations, function(v) v$message, character(1))
+    msg <- paste0(
+      "IBGE period invariant violations in ", context, ":\n",
+      paste("  - ", error_msgs, collapse = "\n")
+    )
+    stop(msg, call. = FALSE)
+  }
+
+  if (!strict && !result$valid) {
+    # Issue warnings
+    for (violation in violations) {
+      warning(paste0(context, ": ", violation$message), call. = FALSE)
+    }
+  }
+
+  invisible(result)
+}
+
 #' Required Variables for Reference Period Identification
 #'
 #' Returns the minimum required column names for identifying reference periods

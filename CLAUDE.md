@@ -27,7 +27,6 @@ result <- pnadc_apply_periods(pnadc_2023, crosswalk, weight_var = "V1028", ancho
 | `fetch_monthly_population()` | Fetch population from SIDRA API |
 | `validate_pnadc()` | Input validation |
 | `pnadc_experimental_periods()` | Experimental probabilistic period assignment |
-| `combine_period_crosswalks()` | Merge strict and experimental crosswalks |
 
 ### Required Variables
 

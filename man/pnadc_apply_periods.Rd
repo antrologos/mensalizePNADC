@@ -67,7 +67,7 @@ A data.table with the input data plus:
 \item{ref_week_start, ref_week_end}{IBGE week boundaries (Sunday/Saturday)}
 \item{ref_month_in_quarter, ref_fortnight_in_quarter, ref_week_in_quarter}{Position within quarter (1-3, 1-6, 1-12)}
 \item{ref_month_yyyymm, ref_fortnight_yyyyff, ref_week_yyyyww}{Integer period codes}
-\item{ref_month_weeks}{Number of IBGE reference weeks in month (4 or 5)}
+\item{ref_month_weeks}{Number of IBGE reference weeks in month (always 4)}
 \item{determined_month, determined_fortnight, determined_week}{Logical determination flags}
 \item{weight_monthly, weight_fortnight, or weight_weekly}{Calibrated weights (if calibrate=TRUE)}
 }

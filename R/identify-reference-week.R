@@ -462,8 +462,10 @@ identify_reference_week <- function(data, verbose = TRUE, .pb = NULL, .pb_offset
   # ============================================================================
 
   # Assign reference week: if min == max, that's the week; otherwise indeterminate
+  # INVARIANT: ref_week_in_quarter must be in [1, 12] (4 weeks per month × 3 months)
   dt[, ref_week_in_quarter := NA_integer_]
-  dt[hh_week_min == hh_week_max & !is.na(hh_week_min) & hh_week_min >= 1L,
+  dt[hh_week_min == hh_week_max & !is.na(hh_week_min) &
+       hh_week_min >= 1L & hh_week_min <= 12L,
      ref_week_in_quarter := hh_week_min]
 
   # Calculate IBGE week dates from position (Sunday start, Saturday end)

@@ -49,7 +49,7 @@ A modified crosswalk with additional columns. When \code{include_derived = TRUE}
 of date interval in assigned period; values below threshold are removed)
 \item \code{ref_fortnight_exp}: Experimentally assigned fortnight position in quarter (1-6, or NA)
 \item \code{ref_fortnight_exp_confidence}: Confidence of fortnight assignment (0-1)
-\item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-14, or NA)
+\item \code{ref_week_exp}: Experimentally assigned week position in quarter (1-12, or NA)
 \item \code{ref_week_exp_confidence}: Confidence of week assignment (0-1)
 }
 \item \strong{Derived columns} (when \code{include_derived = TRUE}):
@@ -193,5 +193,4 @@ strict_only <- crosswalk_exp[probabilistic_assignment == FALSE | is.na(probabili
 \seealso{
 \code{\link{pnadc_identify_periods}} to build the crosswalk that this function modifies.
 \code{\link{pnadc_apply_periods}} to apply period crosswalk and calibrate weights.
-\code{\link{combine_period_crosswalks}} to merge strict and experimental crosswalks.
 }

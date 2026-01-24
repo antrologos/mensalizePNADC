@@ -76,18 +76,7 @@ create_realistic_pnadc <- function(n_quarters = 4,
     V2008 = as.integer(birth_days)
   )]
 
-  # Cross with quarters to get full panel
-  dt <- data.table::CJ(
-    person_id = seq_len(n_persons),
-    quarter_id = quarters$q
-  )
-  dt <- merge(dt, persons, by.x = "person_id", by.y = ".I", all.x = TRUE)
-
-  # Re-merge to get person data correctly
-  dt[, person_id := NULL]
-  dt[, quarter_id := NULL]
-
-  # Properly create the cross-product
+  # Properly create the cross-product of persons and quarters
   dt <- data.table::rbindlist(lapply(seq_len(nrow(quarters)), function(q) {
     qdata <- quarters[q]
     persons_copy <- data.table::copy(persons)
