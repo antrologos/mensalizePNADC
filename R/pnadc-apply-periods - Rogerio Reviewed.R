@@ -15,12 +15,12 @@
 #' @param weight_var Character. Name of the survey weight column. Must be specified:
 #'   \itemize{
 #'     \item \code{"V1028"} for quarterly PNADC data
-#'     \item \code{"V1032"} for annual PNADC data (visit-specific)
+#'     \item \code{"V1032"} for annual PNADC data (visit-specific or annual releases organized by quarters)
 #'   }
 #' @param anchor Character. How to anchor the weight redistribution. Must be specified:
 #'   \itemize{
-#'     \item \code{"quarter"} for quarterly data (preserves quarterly totals)
-#'     \item \code{"year"} for annual data (preserves yearly totals)
+#'     \item \code{"quarter"} for quarterly data or annual releases organized by quarters (preserves quarterly totals)
+#'     \item \code{"year"} for annual visit-specific data (preserves yearly totals)
 #'   }
 #' @param calibrate Logical. If TRUE (default), calibrate weights to external
 #'   population totals. If FALSE, only merge the crosswalk without calibration.
@@ -138,6 +138,18 @@
 #' @seealso \code{\link{pnadc_identify_periods}} to build the crosswalk
 #'
 #' @export
+
+#data = pnadc[Ano %in% c(2019, 2020)]
+#crosswalk = teste[Ano %in% c(2019, 2020)]
+#weight_var = "V1028"
+#anchor     = "quarter"
+#calibrate = TRUE
+#calibration_unit = "month"
+#target_totals = NULL
+#smooth = TRUE
+#keep_all = TRUE
+#verbose = TRUE
+
 pnadc_apply_periods <- function(data,
                                 crosswalk,
                                 weight_var,
@@ -151,7 +163,6 @@ pnadc_apply_periods <- function(data,
 
   # ============================================================================
   # INPUT VALIDATION
-  # OPTIMIZATION: Replace checkmate with lightweight base R checks (Phase 3)
   # ============================================================================
 
   # Validate required arguments (no defaults)
@@ -161,8 +172,6 @@ pnadc_apply_periods <- function(data,
   if (missing(anchor)) {
     stop("'anchor' must be specified: \"quarter\" for quarterly data, \"year\" for annual data")
   }
-
-  # Lightweight validation (Phase 3: replaces checkmate)
   if (!is.character(weight_var) || length(weight_var) != 1L) {
     stop("'weight_var' must be a single character string")
   }
@@ -184,26 +193,26 @@ pnadc_apply_periods <- function(data,
   }
 
   # Convert to data.table
-  # OPTIMIZATION: Copy data (needed for modification), but don't copy crosswalk (Phase 2)
-  dt <- ensure_data_table(data, copy = TRUE)
-  xw <- ensure_data_table(crosswalk, copy = FALSE)  # No copy needed - only read
+  dt <- PNADCperiods:::ensure_data_table(data, copy = TRUE)
+  xw <- PNADCperiods:::ensure_data_table(crosswalk, copy = FALSE)  # No copy needed - only read
 
-  # Cache column names for repeated checks (Phase 3)
+  # Cache column names for repeated checks
   dt_names <- names(dt)
   xw_names <- names(xw)
 
   # Ensure consistent types for join keys
   # PNADC data may have character or integer columns depending on source
-  # OPTIMIZATION: Use data.table::set() for more efficient by-reference updates
   join_keys <- c("Ano", "Trimestre", "UPA", "V1008", "V1014")
 
   for (col in join_keys) {
     if (col %in% dt_names && col %in% xw_names) {
+
       # Coerce both to integer for consistent joins
       if (!is.integer(dt[[col]])) {
         data.table::set(dt, j = col, value = as.integer(dt[[col]]))
       }
-      # OPTIMIZATION: Only coerce crosswalk if needed (copy it first to avoid modifying original)
+
+      # Only coerce crosswalk if needed (copy it first to avoid modifying original)
       if (!is.integer(xw[[col]])) {
         xw <- data.table::copy(xw)  # Copy only if we need to modify
         xw_names <- names(xw)  # Update cache
@@ -236,28 +245,40 @@ pnadc_apply_periods <- function(data,
 
   # ============================================================================
   # STEP 1: Merge crosswalk with data
-  # OPTIMIZATION: Use keyed merge (Phase 3)
   # ============================================================================
 
   if (verbose) cat("Applying reference period crosswalk...\n")
 
   # Select crosswalk columns to merge
   xw_cols <- intersect(
-    c("Ano", "Trimestre", "UPA", "V1008", "V1014",
-      "ref_month_start", "ref_month_end", "ref_month_in_quarter", "ref_month_yyyymm", "ref_month_weeks", "determined_month",
-      "ref_fortnight_start", "ref_fortnight_end", "ref_fortnight_in_quarter", "ref_fortnight_yyyyff", "ref_fortnight_weeks", "determined_fortnight",
-      "ref_week_start", "ref_week_end", "ref_week_in_quarter", "ref_week_yyyyww", "determined_week"),
+    c("Ano",
+      "Trimestre",
+      "UPA",
+      "V1008",
+      "V1014",
+      "ref_month_in_quarter",
+      "ref_month_in_year",
+      "ref_fortnight_in_month",
+      "ref_fortnight_in_quarter",
+      "ref_week_in_month",
+      "ref_week_in_quarter",
+      "ref_month_yyyymm",
+      "ref_fortnight_yyyyff",
+      "ref_week_yyyyww",
+      "determined_month",
+      "determined_fortnight",
+      "determined_week"),
     xw_names
   )
 
-  # OPTIMIZATION: Set keys before merge (Phase 3)
+  # Set keys before merge
   data.table::setkeyv(dt, join_keys)
   data.table::setkeyv(xw, join_keys)
 
   # Merge (keyed merge is faster)
-  dt <- merge(dt, xw[, ..xw_cols], all.x = TRUE)
+  dt <- merge(dt, xw[, ..xw_cols], by = join_keys, all.x = TRUE)
 
-  n_matched <- sum(!is.na(dt$ref_month_yyyymm))
+  n_matched <- sum(dt$determined_month == T)
   if (verbose) {
     cat(sprintf("  Matched %s of %s observations (%.1f%%)\n",
                 format(n_matched, big.mark = ","),
@@ -286,9 +307,9 @@ pnadc_apply_periods <- function(data,
 
     # Determine ref_var based on calibration_unit
     ref_var <- switch(calibration_unit,
-                      month = "ref_month_yyyymm",
+                      month     = "ref_month_yyyymm",
                       fortnight = "ref_fortnight_yyyyff",
-                      week = "ref_week_yyyyww")
+                      week      = "ref_week_yyyyww")
 
     determined_var <- switch(calibration_unit,
                              month = "determined_month",
@@ -312,7 +333,7 @@ pnadc_apply_periods <- function(data,
     }
 
     # Run unified calibration
-    dt <- calibrate_weights_internal(
+    dt <- PNADCperiods:::calibrate_weights_internal(
       dt,
       weight_var = weight_var,
       ref_var = ref_var,
@@ -345,11 +366,14 @@ pnadc_apply_periods <- function(data,
                              fortnight = "determined_fortnight",
                              week = "determined_week")
     if (determined_var %in% names(dt)) {
-      # OPTIMIZATION: Direct column access instead of get()
+
       keep_rows <- dt[[determined_var]] == TRUE
       dt <- dt[keep_rows]
     }
   }
+
+  # Freeing memory
+  gc()
 
   if (verbose) cat("Done.\n")
 
@@ -362,12 +386,6 @@ pnadc_apply_periods <- function(data,
 #' Performs hierarchical rake weighting for any anchor/unit combination.
 #' The number of hierarchical cell levels is automatically adjusted based on
 #' the time period granularity to avoid sparse cell issues.
-#'
-#' OPTIMIZATION: This function has been heavily optimized:
-#' - Replaced get() with direct column access
-#' - Replaced uniqueN(do.call(paste,...)) with integer anchor key
-#' - Eliminated split/rbindlist pattern with in-place flag
-#' - Pre-extracted column vectors for reweighting loop
 #'
 #' @param dt data.table with PNADC data and reference period columns
 #' @param weight_var Name of input weight column
@@ -387,6 +405,18 @@ pnadc_apply_periods <- function(data,
 #' @return data.table with weight_calibrated column
 #' @keywords internal
 #' @noRd
+
+#dt
+#weight_var = weight_var
+#ref_var = ref_var
+#anchor = anchor
+#target_totals = target_totals
+#n_cells = NULL
+#min_cell_size = 10L
+#smooth = smooth
+#keep_all = keep_all
+#verbose = verbose
+
 calibrate_weights_internal <- function(dt,
                                        weight_var,
                                        ref_var,
@@ -398,21 +428,21 @@ calibrate_weights_internal <- function(dt,
                                        keep_all = TRUE,
                                        verbose = FALSE) {
 
-  # OPTIMIZATION: Pre-extract ref column for direct access (Phase 1)
+  # Pre-extract ref column for direct access
   ref_col <- dt[[ref_var]]
 
   # Determine anchor grouping variable
   anchor_vars <- if (anchor == "quarter") {
     c("Ano", "Trimestre")
   } else {
-    # For annual anchor, extract year using integer arithmetic (Phase 1)
-    # OPTIMIZATION: ref_var is YYYYMM/YYYYFF/YYYYWW format, so %/% 100 gives YYYY
+    # For annual anchor, extract year using integer arithmetic
+    # ref_var is YYYYMM/YYYYFF/YYYYWW format, so %/% 100 gives YYYY
     data.table::set(dt, j = "anchor_year", value = ref_col %/% 100L)
     "anchor_year"
   }
 
-  # OPTIMIZATION: Create integer anchor key for efficient uniqueN (Phase 1)
-  # This replaces the expensive uniqueN(do.call(paste, ...)) pattern
+  # Create integer anchor key for efficient uniqueN
+
   if (length(anchor_vars) == 2L) {
     # Quarterly: create composite key from Ano and Trimestre
     data.table::set(dt, j = ".anchor_key", value = dt[["Ano"]] * 10L + dt[["Trimestre"]])
@@ -421,7 +451,6 @@ calibrate_weights_internal <- function(dt,
     data.table::set(dt, j = ".anchor_key", value = dt[["anchor_year"]])
   }
 
-  # OPTIMIZATION: Use in-place flag instead of split/rbindlist (Phase 2)
   # Mark determined observations
   is_determined <- !is.na(ref_col)
   data.table::set(dt, j = ".is_determined", value = is_determined)
@@ -459,13 +488,13 @@ calibrate_weights_internal <- function(dt,
     }
   }
 
-  # Initialize working weight using direct column copy (Phase 1)
+  # Initialize working weight using direct column copy
   data.table::set(dt, j = "weight_current", value = dt[[weight_var]])
 
-  # Step 1: Create calibration cells (OPTIMIZATION: only create needed levels)
-  dt <- create_calibration_cells_unified(dt, n_cells = n_cells)
+  # Step 1: Create calibration cells (only create needed levels)
+  dt <- PNADCperiods:::create_calibration_cells_unified(dt, n_cells = n_cells)
 
-  # OPTIMIZATION: Pre-extract weight column for reweighting loop (Phase 1)
+  # Pre-extract weight column for reweighting loop
   weight_vec <- dt[[weight_var]]
 
   # Step 2: Iterative hierarchical reweighting with cell size checking
@@ -486,8 +515,12 @@ calibrate_weights_internal <- function(dt,
       break
     }
 
-    # OPTIMIZATION: Inline reweighting with pre-extracted columns (Phase 1)
-    dt <- reweight_at_cell_level_optimized(dt, cell_var, anchor_vars, ref_var, weight_vec)
+    # Inline reweighting with pre-extracted columns
+    dt <- PNADCperiods:::reweight_at_cell_level(dt          = dt,
+                                                          cell_var    = cell_var,
+                                                          anchor_vars = anchor_vars,
+                                                          ref_var     = ref_var,
+                                                          weight_vec  = weight_vec)
     levels_applied <- levels_applied + 1L
   }
 
@@ -496,17 +529,17 @@ calibrate_weights_internal <- function(dt,
   }
 
   # Step 3: Final calibration to external totals (only for determined obs)
-  dt <- calibrate_to_external_totals_optimized(dt, target_totals, ref_var)
+  dt <- PNADCperiods:::calibrate_to_external_totals(dt, target_totals, ref_var)
 
   # Step 4: Smooth weights (if requested and appropriate for the time period)
   if (smooth) {
-    dt <- smooth_calibrated_weights_optimized(dt, ref_var)
+    dt <- PNADCperiods:::smooth_calibrated_weights(dt, ref_var)
   }
 
   # Rename final weight
   data.table::setnames(dt, "weight_current", "weight_calibrated")
 
-  # Set NA for undetermined observations (Phase 2)
+  # Set NA for undetermined observations
   dt[.is_determined == FALSE, weight_calibrated := NA_real_]
 
   # Clean up temporary columns
@@ -519,21 +552,11 @@ calibrate_weights_internal <- function(dt,
     dt[, (existing_temp) := NULL]
   }
 
-  # OPTIMIZATION: No rbindlist needed - all rows are already in dt (Phase 2)
-  # Filter out undetermined if keep_all = FALSE (handled in caller)
-
   dt
 }
 
 
-#' Create Calibration Cells (Unified)
-#'
-#' OPTIMIZATION: Now accepts n_cells parameter to only create needed columns.
-#' For weekly calibration (n_cells=1), only celula1 is created.
-#' For fortnight calibration (n_cells=2), only celula1-2 are created.
-#' This reduces memory allocation for finer time periods.
-#'
-#' Phase 1 optimization: Pre-extract age column, simplified type checking.
+#' Create Calibration Cells
 #'
 #' @param dt data.table with PNADC data
 #' @param n_cells Integer (1-4). Number of cell levels to create. Default 4.
@@ -541,10 +564,9 @@ calibrate_weights_internal <- function(dt,
 #' @noRd
 create_calibration_cells_unified <- function(dt, n_cells = 4L) {
 
-  # Cache column names (Phase 3)
+  # Cache column names
   dt_names <- names(dt)
 
-  # OPTIMIZATION: Simplified type checking (Phase 1)
   # Convert age column to integer if needed
   age_col <- if ("V2009" %in% dt_names) "V2009" else if ("v2009" %in% dt_names) "v2009" else NULL
 
@@ -575,11 +597,10 @@ create_calibration_cells_unified <- function(dt, n_cells = 4L) {
     return(dt)
   }
 
-  # OPTIMIZATION: Pre-extract age vector for fcase (Phase 1)
+  # Pre-extract age vector for fcase
   age_vec <- dt[[age_col]]
 
   # Celula 1: Age groups (always needed)
-  # OPTIMIZATION: Use pre-extracted vector instead of get() (Phase 1)
   data.table::set(dt, j = "celula1", value = data.table::fcase(
     age_vec <= 13L, 0L,
     age_vec <= 29L, 1L,
@@ -587,7 +608,7 @@ create_calibration_cells_unified <- function(dt, n_cells = 4L) {
     default = 3L
   ))
 
-  # OPTIMIZATION: Only create higher-level cells if needed
+  # Only create higher-level cells if needed
   if (n_cells >= 2L) {
     # Celula 2: Post-stratum group + age
     if ("posest_sxi" %in% dt_names) {
@@ -627,20 +648,17 @@ create_calibration_cells_unified <- function(dt, n_cells = 4L) {
 }
 
 
-#' Reweight at Cell Level (Optimized)
-#'
-#' OPTIMIZATION: Replaced get() with direct column access,
-#' replaced uniqueN(do.call(paste,...)) with pre-computed anchor key.
+#' Reweight at Cell Level
 #'
 #' @keywords internal
 #' @noRd
-reweight_at_cell_level_optimized <- function(dt, cell_var, anchor_vars, ref_var, weight_vec) {
+reweight_at_cell_level <- function(dt, cell_var, anchor_vars, ref_var, weight_vec) {
 
   # Only process determined observations
-  # OPTIMIZATION: Use direct column access throughout (Phase 1)
+  # Use direct column access throughout
 
   # Anchor-level aggregations: sum of original weights per cell-anchor
-  # OPTIMIZATION: Use pre-extracted weight_vec instead of get(weight_var)
+  # Use pre-extracted weight_vec instead of get(weight_var)
   dt[.is_determined == TRUE, pop_anchor := sum(weight_vec[.I], na.rm = TRUE),
      by = c(cell_var, anchor_vars)]
 
@@ -652,7 +670,7 @@ reweight_at_cell_level_optimized <- function(dt, cell_var, anchor_vars, ref_var,
   dt[.is_determined == TRUE, pop_period := sum(weight_current, na.rm = TRUE),
      by = c(cell_var, ref_var)]
 
-  # OPTIMIZATION: Count unique anchors using pre-computed .anchor_key (Phase 1)
+  # Count unique anchors using pre-computed .anchor_key
   # This replaces uniqueN(do.call(paste, ...)) which was extremely slow
   dt[.is_determined == TRUE, n_cells_period := data.table::uniqueN(.anchor_key),
      by = c(cell_var, ref_var)]
@@ -668,15 +686,13 @@ reweight_at_cell_level_optimized <- function(dt, cell_var, anchor_vars, ref_var,
 }
 
 
-#' Calibrate to External Population Totals (Optimized)
-#'
-#' OPTIMIZATION: Reduced copies, uses direct column access.
+#' Calibrate to External Population Totals
 #'
 #' @keywords internal
 #' @noRd
-calibrate_to_external_totals_optimized <- function(dt, target_totals, ref_var) {
+calibrate_to_external_totals <- function(dt, target_totals, ref_var) {
 
-  # OPTIMIZATION: Don't copy target_totals, work with it directly (Phase 2)
+  # Don't copy target_totals, work with it directly
   tt <- ensure_data_table(target_totals, copy = FALSE)
   tt_names <- names(tt)
 
@@ -689,9 +705,9 @@ calibrate_to_external_totals_optimized <- function(dt, target_totals, ref_var) {
 
   # Find the ref column in targets
   ref_col_map <- list(
-    "ref_month_yyyymm" = c("ref_month_yyyymm", "anomesexato", "yyyymm"),
+    "ref_month_yyyymm"     = c("ref_month_yyyymm", "anomesexato", "yyyymm"),
     "ref_fortnight_yyyyff" = c("ref_fortnight_yyyyff", "yyyyff"),
-    "ref_week_yyyyww" = c("ref_week_yyyyww", "ref_week_iso_yyyyww", "yyyyww")
+    "ref_week_yyyyww"      = c("ref_week_yyyyww", "ref_week_iso_yyyyww", "yyyyww")
   )
 
   if (!ref_var %in% names(ref_col_map)) {
@@ -740,17 +756,14 @@ calibrate_to_external_totals_optimized <- function(dt, target_totals, ref_var) {
 }
 
 
-#' Smooth Calibrated Weights (Optimized)
-#'
-#' OPTIMIZATION: Reduced aggregation passes, uses match() directly,
-#' works primarily on smaller aggregated table.
+#' Smooth Calibrated Weights
 #'
 #' @param dt data.table with calibrated weights
 #' @param ref_var Name of reference period variable (e.g., "ref_month_yyyymm")
 #' @return data.table with smoothed weights in weight_current column
 #' @keywords internal
 #' @noRd
-smooth_calibrated_weights_optimized <- function(dt, ref_var) {
+smooth_calibrated_weights <- function(dt, ref_var) {
 
   # Skip smoothing for weekly data
   if (grepl("week", ref_var, ignore.case = TRUE)) {
@@ -786,7 +799,7 @@ smooth_calibrated_weights_optimized <- function(dt, ref_var) {
     return(dt)
   }
 
-  # OPTIMIZATION: Single aggregation pass on determined data only (Phase 3)
+  # Single aggregation pass on determined data only
   # Aggregate by cell and ref_var to get cell-period populations
   cell_period_agg <- dt[.is_determined == TRUE,
                         .(cell_pop = sum(weight_current, na.rm = TRUE)),
@@ -795,8 +808,7 @@ smooth_calibrated_weights_optimized <- function(dt, ref_var) {
   # Derive original period totals from the smaller aggregated table
   original_pop <- cell_period_agg[, .(pop_orig = sum(cell_pop)), keyby = ref_var]
 
-  # OPTIMIZATION: Add period_pos using match() directly (Phase 3)
-  # Avoid creating lookup table and joining to large dt
+  # Add period_pos using match()
   cell_period_agg[, period_pos := match(cell_period_agg[[ref_var]], periods)]
 
   # Rekey for frollmean
@@ -820,7 +832,7 @@ smooth_calibrated_weights_optimized <- function(dt, ref_var) {
     1.0
   )]
 
-  # OPTIMIZATION: Join smooth_factor using (cell_var, ref_var) instead of period_pos (Phase 3)
+  # Join smooth_factor using (cell_var, ref_var)
   # Create minimal join table
   smooth_join <- cell_period_agg[, c(cell_var, ref_var, "smooth_factor"), with = FALSE]
   data.table::setkeyv(smooth_join, c(cell_var, ref_var))
@@ -861,7 +873,7 @@ smooth_calibrated_weights_optimized <- function(dt, ref_var) {
 #' @noRd
 derive_fortnight_population <- function(monthly_pop) {
 
-  # OPTIMIZATION: Don't copy if not needed (Phase 2)
+  # Don't copy if not needed
   mt <- ensure_data_table(monthly_pop, copy = FALSE)
 
   # Standardize column name
@@ -898,7 +910,7 @@ derive_fortnight_population <- function(monthly_pop) {
 #' @noRd
 derive_weekly_population <- function(monthly_pop) {
 
-  # OPTIMIZATION: Don't copy if not needed (Phase 2)
+  # Don't copy if not needed
   mt <- ensure_data_table(monthly_pop, copy = FALSE)
 
   # Standardize column name
@@ -907,7 +919,7 @@ derive_weekly_population <- function(monthly_pop) {
     mt[, ref_month_yyyymm := anomesexato]
   }
 
-  # OPTIMIZATION: Vectorized approach instead of lapply + rbindlist (Phase 3)
+  # Vectorized approach instead of lapply + rbindlist
   # Each IBGE month has exactly 4 reference weeks
   n_months <- nrow(mt)
 

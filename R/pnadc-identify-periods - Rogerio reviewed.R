@@ -46,7 +46,10 @@
 #'   \itemize{
 #'     \item \code{V2003}: Person sequence within household
 #'   }
+#'
 #' @param verbose Logical. If TRUE (default), display progress information.
+#'
+#' @param store_date_bounds  Logical. If TRUE, store the date bounds of the 4 reference weeks of each month as columns. Default to FALSE.
 #'
 #' @return A data.table crosswalk with columns:
 #'   \describe{
@@ -67,6 +70,9 @@
 #'     \item{week_3_end}{Date. Saturday of the IBGE third reference week of the month. Only returned if store_date_bounds = TRUE}
 #'     \item{week_4_start}{Date. Sunday of the IBGE forth reference week of the month. Only returned if store_date_bounds = TRUE}
 #'     \item{week_4_end}{Date. Saturday of the IBGE forth reference week of the month. Only returned if store_date_bounds = TRUE}
+#'     \item{ref_month_yyyymm}{Integer. Identified reference month in the format YYYYMM, where MM follows the IBGE calendar. 1 <= MM  <= 12}
+#'     \item{ref_fortnight_yyyyff}{Integer. Identified reference fortnight in the format YYYYFF, where FF follows the IBGE calendar. 1 <= FF  <= 24}
+#'     \item{ref_week_yyyyww}{Integer. Identified reference Week in the format YYYYWW, where WW follows the IBGE calendar. 1 <= WW  <= 48}
 #'     \item{determined_month}{Logical. Flags if the month was determined.}
 #'     \item{determined_fortnight}{Logical. Flags if the fortnight was determined.}
 #'     \item{determined_week}{Logical. Flags if the week was determined.}
@@ -151,7 +157,7 @@
 #'   probabilistic strategy by avoiding redundant computation. Default FALSE.
 #'
 #' @export
-pnadc_identify_periods2 <- function(data, verbose = TRUE, store_date_bounds = FALSE) {
+pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FALSE) {
 
   # ============================================================================
   # INPUT VALIDATION
@@ -167,7 +173,7 @@ pnadc_identify_periods2 <- function(data, verbose = TRUE, store_date_bounds = FA
   # Validate required columns
   validate_pnadc(data, check_weights = FALSE)
 
-  # OPTIMIZATION: Subset to required columns BEFORE copying (80-90% memory reduction)
+  # Subset to required columns BEFORE copying (80-90% memory reduction)
   # Instead of copying all 50+ columns, only copy the ~9 columns we actually need
   required_cols <- PNADCperiods:::required_vars_ref_month()
   dt            <- PNADCperiods:::subset_and_copy(data, required_cols)
@@ -779,8 +785,8 @@ pnadc_identify_periods2 <- function(data, verbose = TRUE, store_date_bounds = FA
               ref_week_in_month,
               ref_week_in_quarter,
 
-              date_max,
-              date_min,
+              #date_max,
+              #date_min,
 
               week_1_start,
               week_1_end,
@@ -796,11 +802,19 @@ pnadc_identify_periods2 <- function(data, verbose = TRUE, store_date_bounds = FA
     ]
   }
 
+  dt = unique(dt)
+
   dt[, `:=`(
+
+    ref_month_yyyymm     = Ano * 100 + ref_month_in_year,
+    ref_fortnight_yyyyff = Ano * 100 + (ref_fortnight_in_quarter + (Trimestre - 1)*6),
+    ref_week_yyyyww      = Ano * 100 + (ref_week_in_month + (ref_month_in_year - 1)*4),
+
     determined_month     = !is.na(ref_month_in_quarter),
     determined_fortnight = !is.na(ref_fortnight_in_quarter),
     determined_week      = !is.na(ref_week_in_quarter)
     )]
+
 
   gc()
 
