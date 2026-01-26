@@ -31,7 +31,8 @@ Depends:
 Imports:
     data.table (>= 1.14.0),
     checkmate (>= 2.0.0),
-    sidrar (>= 0.2.9)
+    sidrar (>= 0.2.9),
+    lubridate (>= 1.9.4)
 Suggests:
     dplyr,
     haven,

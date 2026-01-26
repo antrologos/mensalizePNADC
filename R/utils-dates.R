@@ -66,103 +66,10 @@ dow <- function(date) {
   (as.integer(date) + 4L) %% 7L
 }
 
-#' Create Date from Year, Month, Day (Optimized)
-#'
-#' Creates Date objects using pre-computed lookup tables for speed.
-#' This is ~20x faster than ISOdate for large vectors.
-#'
-#' Note: For invalid dates (e.g., Feb 29 in non-leap years), this returns
-#' an incorrect date rather than NA. This is acceptable because the
-#' mensalization algorithm only creates valid dates by construction.
-#'
-#' @param year Integer vector of years (must be in range 2000-2050)
-#' @param month Integer vector of months (1-12)
-#' @param day Integer vector of days (1-31)
-#' @return Date vector
-#' @keywords internal
-#' @noRd
-make_date <- function(year, month, day) {
-  # OPTIMIZATION: Check types only if not already integer
-  if (!is.integer(year)) year <- as.integer(year)
-  if (!is.integer(month)) month <- as.integer(month)
-  if (!is.integer(day)) day <- as.integer(day)
-
-  # OPTIMIZATION: Fast path for equal-length inputs (most common case)
-  n_year <- length(year)
-  n_month <- length(month)
-  n_day <- length(day)
-
-  if (n_year == n_month && n_month == n_day) {
-    n <- n_year
-  } else {
-    # Recycling needed (rare case)
-    n <- max(n_year, n_month, n_day)
-    year <- rep_len(year, n)
-    month <- rep_len(month, n)
-    day <- rep_len(day, n)
-  }
-
-  # Handle NAs
-  valid <- !is.na(year) & !is.na(month) & !is.na(day)
-
-  # Initialize result with NAs
-  result <- rep(NA_integer_, n)
-
-  if (any(valid)) {
-    y <- year[valid]
-    m <- month[valid]
-    d <- day[valid]
-
-    # Check for years outside lookup table range (2000-2050)
-    # Mark out-of-range years as invalid
-    in_range <- y >= 2000L & y <= 2050L
-    if (!all(in_range)) {
-      # Warn once about out-of-range years
-      n_out <- sum(!in_range)
-      warning(sprintf(
-        "make_date(): %d year(s) outside supported range (2000-2050). These will return NA.",
-        n_out
-      ), call. = FALSE)
-
-      # Update valid mask to exclude out-of-range years
-      valid_idx <- which(valid)
-      valid[valid_idx[!in_range]] <- FALSE
-
-      # Subset to only in-range values
-      y <- y[in_range]
-      m <- m[in_range]
-      d <- d[in_range]
-    }
-
-    if (length(y) > 0) {
-      # OPTIMIZATION: Use integer offset indexing instead of character lookup
-      year_base <- .YEAR_BASE[y - .YEAR_BASE_START + 1L]
-
-      # Leap year check (vectorized)
-      is_leap <- (y %% 4L == 0L & y %% 100L != 0L) | (y %% 400L == 0L)
-
-      # Month offset using data.table::fifelse for speed
-      month_offset <- data.table::fifelse(
-        is_leap,
-        .MONTH_OFFSET_LEAP[m],
-        .MONTH_OFFSET_REGULAR[m]
-      )
-
-      # Total days since epoch
-      result[valid] <- year_base + month_offset + d - 1L
-    }
-  }
-
-  structure(result, class = "Date")
-}
 
 #' Handle February 29 Birthdays
 #'
 #' For leap year birthdays (Feb 29), returns March 1 in non-leap years.
-#'
-#' Note: With the optimized make_date(), Feb 29 on non-leap years
-#' automatically becomes March 1 via the lookup math, so this function
-#' is now just a direct wrapper around make_date().
 #'
 #' @param birth_month Integer vector of birth months
 #' @param birth_day Integer vector of birth days
@@ -170,12 +77,26 @@ make_date <- function(year, month, day) {
 #' @return Date vector of birthdays in the given year
 #' @keywords internal
 #' @noRd
-make_birthday <- function(birth_month, birth_day, year) {
-  # The optimized make_date() automatically handles Feb 29 on non-leap years
+#'
+
+birth_day   = 29
+birth_month = 2
+year        = 2019
+
+make_birthday <- function(birth_day, birth_month, year) {
+
+  is_leap <- PNADCperiods:::is_leap_year(year)
+
+  # automatically handles Feb 29 on non-leap years
+  must_change = (!is_leap) & birth_day == 29 & birth_month == 2
+
+  birth_day[must_change]   = 1
+  birth_month[must_change] = 3
 
   # by returning March 1 (via the lookup arithmetic), which is the desired behavior
-  make_date(year, birth_month, birth_day)
+  lubridate::ymd(paste(year, birth_month, birth_day, sep = "-"))
 }
+
 
 #' Is Leap Year
 #'
@@ -240,39 +161,6 @@ yyyymm <- function(year, month) {
   as.integer(year * 100L + month)
 }
 
-#' Fast Year Extraction
-#'
-#' Extract year from Date using data.table's optimized function.
-#' OPTIMIZATION: Direct alias to avoid function call overhead.
-#'
-#' @param date Date vector
-#' @return Integer vector of years
-#' @keywords internal
-#' @noRd
-fast_year <- data.table::year
-
-#' Fast Month Extraction
-#'
-#' Extract month from Date using data.table's optimized function.
-#' OPTIMIZATION: Direct alias to avoid function call overhead.
-#'
-#' @param date Date vector
-#' @return Integer vector of months
-#' @keywords internal
-#' @noRd
-fast_month <- data.table::month
-
-#' Fast Day Extraction
-#'
-#' Extract day of month from Date using data.table's optimized function.
-#' OPTIMIZATION: Direct alias to avoid function call overhead.
-#'
-#' @param date Date vector
-#' @return Integer vector of days
-#' @keywords internal
-#' @noRd
-fast_mday <- data.table::mday
-
 #' First Saturday of Month (with minimum days constraint)
 #'
 #' Calculates the day of the month for the first Saturday that has at least
@@ -290,18 +178,19 @@ fast_mday <- data.table::mday
 #' @keywords internal
 #' @noRd
 first_valid_saturday <- function(year, month, min_days = 4L) {
+
   # Get first day of the month
-  first_day <- make_date(year, month, 1L)
+  first_day <- lubridate:::ymd(paste(year = year, month = month, day = 1L, sep = "-"))
 
   # Day of week for first of month (0=Sun, 6=Sat)
-  first_dow <- dow(first_day)
+  first_dow <- PNADCperiods:::dow(first_day)
 
   # Calculate first Saturday
   # If first_dow = 0 (Sunday), first Saturday is day 7
   # If first_dow = 1 (Monday), first Saturday is day 6
   # ...
   # If first_dow = 6 (Saturday), first Saturday is day 1
-  days_to_saturday <- (6L - first_dow) %% 7L
+  days_to_saturday   <- (6L - first_dow) %% 7L
   first_saturday_day <- 1L + days_to_saturday
 
   # How many days of the reference week (ending on Saturday) are in this month?
@@ -333,7 +222,7 @@ first_valid_saturday <- function(year, month, min_days = 4L) {
 #' @keywords internal
 #' @noRd
 first_saturday_on_or_after <- function(date) {
-  dow_date <- dow(date)
+  dow_date    <- dow(date)
   days_to_add <- (6L - dow_date) %% 7L
   date + days_to_add
 }
@@ -347,7 +236,7 @@ first_saturday_on_or_after <- function(date) {
 #' @keywords internal
 #' @noRd
 month_in_quarter <- function(date) {
-  month <- fast_month(date)
+  month <- data.table:::month(date)
   ((month - 1L) %% 3L) + 1L
 }
 
@@ -427,7 +316,7 @@ iso_week_year <- function(date) {
 #' @keywords internal
 #' @noRd
 iso_week <- function(date) {
-  iso_week_year(date)$week
+  PNADCperiods:::iso_week_year(date)$week
 }
 
 #' ISO Week-Year (Optimized)
@@ -444,7 +333,7 @@ iso_week <- function(date) {
 #' @keywords internal
 #' @noRd
 iso_year <- function(date) {
-  iso_week_year(date)$year
+  PNADCperiods:::iso_week_year(date)$year
 }
 
 #' Create ISO Week Integer (YYYYWW format)
@@ -469,8 +358,8 @@ yyyyww <- function(iso_yr, iso_wk) {
 #' @keywords internal
 #' @noRd
 date_to_yyyyww <- function(date) {
-  iwy <- iso_week_year(date)
-  yyyyww(iwy$year, iwy$week)
+  iwy <- PNADCperiods:::iso_week_year(date)
+  PNADCperiods:::yyyyww(iwy$year, iwy$week)
 }
 
 #' Convert YYYYWW to Sequential Value
@@ -537,13 +426,13 @@ iso_week_monday <- function(date) {
 #' @keywords internal
 #' @noRd
 iso_weeks_in_year <- function(year) {
-  jan1 <- make_date(year, 1L, 1L)
-  jan1_dow <- dow(jan1)  # 0=Sun, 1=Mon, ..., 6=Sat
+  jan1     <- lubridate::ymd(paste(year, 1L, 1L, sep = "-"))
+  jan1_dow <- PNADCperiods:::dow(jan1)  # 0=Sun, 1=Mon, ..., 6=Sat
 
   # Thursday = dow 4, Wednesday = dow 3
-  is_thursday <- (jan1_dow == 4L)
+  is_thursday  <- (jan1_dow == 4L)
   is_wednesday <- (jan1_dow == 3L)
-  is_leap <- is_leap_year(year)
+  is_leap      <- PNADCperiods:::is_leap_year(year)
 
   data.table::fifelse(is_thursday | (is_wednesday & is_leap), 53L, 52L)
 }
@@ -972,8 +861,8 @@ ibge_fortnight_in_quarter <- function(date, quarter, year, min_days = 4L) {
   # Determine which month of the quarter this date's IBGE week belongs to
   # by finding which month's Saturday boundary contains the date's Saturday
   sat_date <- ibge_week_saturday(date)
-  sat_month <- fast_month(sat_date)
-  sat_year <- fast_year(sat_date)
+  sat_month <- data.table:::month(sat_date)
+  sat_year <- data.table::year(sat_date)
 
   # Calculate month position in quarter (1, 2, or 3)
   month_in_quarter <- sat_month - first_month + 1L
@@ -1052,8 +941,8 @@ date_to_ibge_yyyyww <- function(date) {
   sat_date <- ibge_week_saturday(date)
 
   # Year and month of Saturday
-  sat_year <- fast_year(sat_date)
-  sat_month <- fast_month(sat_date)
+  sat_year <- data.table::year(sat_date)
+  sat_month <- data.table:::month(sat_date)
 
   # Get the IBGE week number within that year
   # For simplicity, calculate from the start of the year
@@ -1346,3 +1235,146 @@ ibge_fortnight_in_quarter_fast <- function(date, quarter, year, month_boundaries
   result
 }
 
+
+
+
+#' Calculate Month Position in Quarter (for date_min)
+#'
+#' Converts a date_min to its month position within the quarter (1, 2, or 3).
+#' For date_min: if day <= threshold and not in first month of quarter, subtract 1.
+#'
+#' @param date Date vector
+#' @param year Integer year vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param day_threshold Integer threshold for adjustment (3 for standard, 2 for exception)
+#' @return Integer vector (1, 2, or 3)
+#' @keywords internal
+#' @noRd
+calculate_month_position_min <- function(date, year, quarter, day_threshold = 3L) {
+  first_month <- PNADCperiods:::quarter_first_month(quarter)
+  date_month  <- data.table:::month(date)
+  date_day    <- data.table:::mday(date)
+
+  pos <- date_month - first_month + 1L
+
+  # Adjust if day <= threshold and not in first month of quarter
+  adjust <- (date_day <= day_threshold & date_month > first_month)
+  pos <- pos - as.integer(adjust)
+
+  pmin(pmax(pos, 1L), 3L)
+}
+
+
+#' Calculate Month Position in Quarter (for date_max)
+#'
+#' Converts a date_max to its month position within the quarter (1, 2, or 3).
+#' For date_max: if day <= threshold, use the month of (date - 3 days) instead.
+#'
+#' @param date Date vector
+#' @param year Integer year vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param day_threshold Integer threshold for adjustment (3 for standard, 2 for exception)
+#' @return Integer vector (1, 2, or 3)
+#' @keywords internal
+#' @noRd
+calculate_month_position_max <- function(date, year, quarter, day_threshold = 3L) {
+  first_month <- PNADCperiods:::quarter_first_month(quarter)
+  date_day    <- data.table:::mday(date)
+
+  # When day <= threshold, use the month of (date - 3 days)
+  needs_adjust   <- date_day <= day_threshold
+  adjusted_date  <- date - needs_adjust * 3L
+  adjusted_month <- data.table:::month(adjusted_date)
+
+  pos <- adjusted_month - first_month + 1L
+
+  pmin(pmax(pos, 1L), 3L)
+}
+
+
+#' Calculate Month Position (date_min) with Dynamic Per-Month Thresholds
+#'
+#' Applies different thresholds based on which month the date falls in and
+#' whether that month has exception rules enabled.
+#'
+#' @param date Date vector
+#' @param year Integer year vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param exc_m1 Integer: exception flag for month 1 of quarter (0 or 1)
+#' @param exc_m2 Integer: exception flag for month 2 of quarter (0 or 1)
+#' @param exc_m3 Integer: exception flag for month 3 of quarter (0 or 1)
+#' @return Integer vector (1, 2, or 3)
+#' @keywords internal
+#' @noRd
+calculate_month_position_min_dynamic <- function(date, year, quarter, exc_m1, exc_m2, exc_m3) {
+  first_month <- quarter_first_month(quarter)
+  date_month <- data.table:::month(date)
+  date_day <- data.table:::mday(date)
+
+  pos <- date_month - first_month + 1L
+
+  # Determine threshold based on which month the date falls in
+  # Month 1 of quarter: months 1, 4, 7, 10
+  # Month 2 of quarter: months 2, 5, 8, 11
+  # Month 3 of quarter: months 3, 6, 9, 12
+  # Use modular arithmetic to identify position in quarter
+  month_in_quarter <- ((date_month - 1L) %% 3L) + 1L  # 1, 2, or 3
+
+  # Threshold is 2 if exception applies for this month, 3 otherwise
+  # OPTIMIZATION: Use fifelse instead of rep() + subsetting
+  threshold <- fifelse(
+    (month_in_quarter == 1L & exc_m1 == 1L) |
+      (month_in_quarter == 2L & exc_m2 == 1L) |
+      (month_in_quarter == 3L & exc_m3 == 1L),
+    2L, 3L
+  )
+
+  # Adjust if day <= threshold and not in first month of quarter
+  adjust <- (date_day <= threshold & date_month > first_month)
+  pos <- pos - as.integer(adjust)
+
+  pmin(pmax(pos, 1L), 3L)
+}
+
+
+#' Calculate Month Position (date_max) with Dynamic Per-Month Thresholds
+#'
+#' Applies different thresholds based on which month the date falls in and
+#' whether that month has exception rules enabled.
+#'
+#' @param date Date vector
+#' @param year Integer year vector
+#' @param quarter Integer quarter vector (1-4)
+#' @param exc_m1 Integer: exception flag for month 1 of quarter (0 or 1)
+#' @param exc_m2 Integer: exception flag for month 2 of quarter (0 or 1)
+#' @param exc_m3 Integer: exception flag for month 3 of quarter (0 or 1)
+#' @return Integer vector (1, 2, or 3)
+#' @keywords internal
+#' @noRd
+calculate_month_position_max_dynamic <- function(date, year, quarter, exc_m1, exc_m2, exc_m3) {
+  first_month <- quarter_first_month(quarter)
+  date_month  <- data.table:::month(date)
+  date_day    <- data.table:::mday(date)
+
+  # Determine threshold based on which month the date falls in
+  # Use modular arithmetic to identify position in quarter
+  month_in_quarter <- ((date_month - 1L) %% 3L) + 1L  # 1, 2, or 3
+
+  # Threshold is 2 if exception applies for this month, 3 otherwise
+  # OPTIMIZATION: Use fifelse instead of rep() + subsetting
+  threshold <- fifelse(
+    (month_in_quarter == 1L & exc_m1 == 1L) |
+      (month_in_quarter == 2L & exc_m2 == 1L) |
+      (month_in_quarter == 3L & exc_m3 == 1L),
+    2L, 3L
+  )
+
+  # When day <= threshold, use the month of (date - 3 days)
+  needs_adjust <- date_day <= threshold
+  adjusted_date <- date - needs_adjust * 3L
+  adjusted_month <- data.table:::month(adjusted_date)
+
+  pos <- adjusted_month - first_month + 1L
+
+  pmin(pmax(pos, 1L), 3L)
+}

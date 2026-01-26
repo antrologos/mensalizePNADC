@@ -330,23 +330,23 @@ validate_pnadc <- function(data, check_weights = FALSE, stop_on_error = TRUE) {
   issues <- list()
 
   # Check required columns for reference month
-  required <- required_vars_ref_month()
-  missing <- setdiff(required, names(data))
+  required <- PNADCperiods:::required_vars_ref_month()
+  missing  <- setdiff(required, names(data))
   if (length(missing) > 0) {
     issues$missing_ref_month <- missing
   }
 
   # Check weight-related columns if requested
   if (check_weights) {
-    required_wt <- required_vars_weights()
-    missing_wt <- setdiff(required_wt, names(data))
+    required_wt <- PNADCperiods:::required_vars_weights()
+    missing_wt  <- setdiff(required_wt, names(data))
     if (length(missing_wt) > 0) {
       issues$missing_weights <- missing_wt
     }
   }
 
   # Check join key columns (V1008, V2003 may be optional in some cases)
-  join_keys <- join_key_vars()
+  join_keys      <- PNADCperiods:::join_key_vars()
   join_available <- intersect(join_keys, names(data))
 
   # Validate data types and ranges
@@ -545,7 +545,7 @@ subset_and_copy <- function(data, required_cols, optional_cols = NULL) {
 
 #' Convert PNADC Columns to Appropriate Types
 #'
-#' OPTIMIZATION: Consolidates repeated type conversion code from multiple functions.
+#' Consolidates repeated type conversion code from multiple functions.
 #' Uses data.table::set() for in-place modification without copy overhead.
 #'
 #' @param dt A data.table (modified in place)
@@ -556,30 +556,17 @@ subset_and_copy <- function(data, required_cols, optional_cols = NULL) {
 #' @keywords internal
 #' @noRd
 convert_pnadc_columns <- function(dt,
-                                   int_cols = c("Ano", "Trimestre", "V2008", "V20081", "V20082"),
-                                   num_cols = "V2009",
-                                   na_codes = list(V2008 = 99L, V20081 = 99L, V20082 = 9999L)) {
-  # Convert integer columns
-  for (col in int_cols) {
-    if (col %in% names(dt) && !is.integer(dt[[col]])) {
-      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
-    }
-  }
+                                  num_cols = c("Ano", "Trimestre", "V2008", "V20081", "V20082", "V2009"),
+                                  na_codes = list(V2008 = 99L, V20081 = 99L, V20082 = 9999L)) {
 
-  # Convert numeric columns to INTEGER (OPTIMIZATION: 4 bytes vs 8 bytes for double)
-  # Age (V2009) is always a whole number, so integer is sufficient
-  for (col in num_cols) {
-    if (col %in% names(dt) && !is.integer(dt[[col]])) {
-      data.table::set(dt, j = col, value = as.integer(dt[[col]]))
-    }
-  }
+
+  # Convert to numeric - Multiple columns in place
+  dt[ , names(.SD) := lapply(.SD, as.numeric), .SDcols = num_cols]
 
   # Replace NA codes with actual NA
   for (col in names(na_codes)) {
-    if (col %in% names(dt)) {
       na_val <- na_codes[[col]]
       dt[get(col) == na_val, (col) := NA_integer_]
-    }
   }
 
   invisible(dt)
@@ -597,11 +584,12 @@ convert_pnadc_columns <- function(dt,
 #' @keywords internal
 #' @noRd
 fix_infinite_values <- function(dt, cols, replacement = NA_integer_) {
-  for (col in cols) {
-    if (col %in% names(dt)) {
-      dt[is.infinite(get(col)), (col) := replacement]
-    }
-  }
+
+  dt[, (cols) := lapply(.SD, function(x) {
+      x[is.infinite(x)] <- replacement
+      x
+    }), .SDcols = cols]
+
   invisible(dt)
 }
 
