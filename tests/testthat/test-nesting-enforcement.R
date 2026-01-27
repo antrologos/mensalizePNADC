@@ -181,19 +181,24 @@ test_that("determination rates follow nesting hierarchy", {
   test_data <- create_test_pnadc_for_nesting(n_quarters = 4, n_upas = 10)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
-  rates <- attr(result, "determination_rates")
+
+  # Compute determination rates from result
+  n_total <- nrow(result)
+  month_rate <- sum(result$determined_month) / n_total
+  fortnight_rate <- sum(result$determined_fortnight) / n_total
+  week_rate <- sum(result$determined_week) / n_total
 
   expect_true(
-    rates$month >= rates$fortnight,
+    month_rate >= fortnight_rate,
     info = paste(
-      "Month rate", round(rates$month, 4), "should be >= fortnight rate", round(rates$fortnight, 4)
+      "Month rate", round(month_rate, 4), "should be >= fortnight rate", round(fortnight_rate, 4)
     )
   )
 
   expect_true(
-    rates$fortnight >= rates$week,
+    fortnight_rate >= week_rate,
     info = paste(
-      "Fortnight rate", round(rates$fortnight, 4), "should be >= week rate", round(rates$week, 4)
+      "Fortnight rate", round(fortnight_rate, 4), "should be >= week rate", round(week_rate, 4)
     )
   )
 })
@@ -209,7 +214,7 @@ test_that("all determined fortnights have valid month reference", {
   if (nrow(fortnight_det) > 0) {
     # All should have valid month values
     expect_true(all(!is.na(fortnight_det$ref_month_in_quarter)))
-    expect_true(all(!is.na(fortnight_det$ref_month)))
+    expect_true(all(!is.na(fortnight_det$ref_month_in_year)))
     expect_true(all(!is.na(fortnight_det$ref_month_yyyymm)))
   }
 })
@@ -225,7 +230,7 @@ test_that("all determined weeks have valid fortnight reference", {
   if (nrow(week_det) > 0) {
     # All should have valid fortnight values
     expect_true(all(!is.na(week_det$ref_fortnight_in_quarter)))
-    expect_true(all(!is.na(week_det$ref_fortnight)))
+    expect_true(all(!is.na(week_det$ref_fortnight_in_month)))
     expect_true(all(!is.na(week_det$ref_fortnight_yyyyff)))
   }
 })

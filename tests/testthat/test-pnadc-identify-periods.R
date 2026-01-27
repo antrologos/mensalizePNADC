@@ -129,56 +129,57 @@ test_that("pnadc_identify_periods returns correct crosswalk structure", {
   expect_false("V2003" %in% names(result))
 
   # Should have month columns (IBGE-based)
-  expect_true("ref_month_start" %in% names(result))
-  expect_true("ref_month_end" %in% names(result))
   expect_true("ref_month_in_quarter" %in% names(result))
+  expect_true("ref_month_in_year" %in% names(result))
   expect_true("ref_month_yyyymm" %in% names(result))
-  expect_true("ref_month_weeks" %in% names(result))
   expect_true("determined_month" %in% names(result))
 
   # Should have fortnight columns (IBGE-based)
-  expect_true("ref_fortnight_start" %in% names(result))
-  expect_true("ref_fortnight_end" %in% names(result))
+  expect_true("ref_fortnight_in_month" %in% names(result))
   expect_true("ref_fortnight_in_quarter" %in% names(result))
   expect_true("ref_fortnight_yyyyff" %in% names(result))
   expect_true("determined_fortnight" %in% names(result))
 
   # Should have week columns (IBGE-based)
-  expect_true("ref_week_start" %in% names(result))
-  expect_true("ref_week_end" %in% names(result))
+  expect_true("ref_week_in_month" %in% names(result))
   expect_true("ref_week_in_quarter" %in% names(result))
   expect_true("ref_week_yyyyww" %in% names(result))
   expect_true("determined_week" %in% names(result))
 })
 
-test_that("pnadc_identify_periods returns one row per household-quarter-panel", {
+test_that("pnadc_identify_periods returns same number of rows as input", {
   test_data <- create_test_pnadc(n_quarters = 2, n_upas = 5)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
 
-  # Count unique household-quarter-panel combinations in input
-  # V1014 is included because it's a key for the month identification
-  n_expected <- nrow(unique(test_data[, .(Ano, Trimestre, UPA, V1008, V1014)]))
+  # Result should have same number of rows as input
+  # (crosswalk preserves person-level rows for joining)
+  expect_equal(nrow(result), nrow(test_data))
 
-  # Result should have same number of observations
-  expect_equal(nrow(result), n_expected)
+  # Each household-quarter-panel combination should have consistent reference values
+  # (all persons in same household should have same determined period)
+  dt_check <- result[, .(
+    n_unique_month = data.table::uniqueN(ref_month_in_quarter)
+  ), by = .(Ano, Trimestre, UPA, V1008, V1014)]
+  expect_true(all(dt_check$n_unique_month == 1))
 })
 
-test_that("pnadc_identify_periods has determination_rates attribute", {
+test_that("pnadc_identify_periods has determination flags that allow computing rates", {
   test_data <- create_test_pnadc(n_quarters = 2, n_upas = 5)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
 
-  rates <- attr(result, "determination_rates")
-  expect_type(rates, "list")
-  expect_true("month" %in% names(rates))
-  expect_true("fortnight" %in% names(rates))
-  expect_true("week" %in% names(rates))
+  # Compute determination rates from the result
+  n_total <- nrow(result)
+  month_rate <- sum(result$determined_month) / n_total
+  fortnight_rate <- sum(result$determined_fortnight) / n_total
+  week_rate <- sum(result$determined_week) / n_total
 
   # Rates should be between 0 and 1
-  expect_true(rates$month >= 0 && rates$month <= 1)
-  expect_true(rates$fortnight >= 0 && rates$fortnight <= 1)
-  expect_true(rates$week >= 0 && rates$week <= 1)
+
+  expect_true(month_rate >= 0 && month_rate <= 1)
+  expect_true(fortnight_rate >= 0 && fortnight_rate <= 1)
+  expect_true(week_rate >= 0 && week_rate <= 1)
 })
 
 # =============================================================================
@@ -244,16 +245,15 @@ test_that("ref_week_in_quarter values are 1-12 or NA", {
   }
 })
 
-test_that("ref_month_yyyymm is consistent with ref_month Date", {
+test_that("ref_month_yyyymm is consistent with ref_month_in_year", {
   test_data <- create_test_pnadc(n_quarters = 2, n_upas = 5)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
 
   determined <- result[determined_month == TRUE]
   if (nrow(determined) > 0) {
-    # Extract year and month from ref_month Date
-    expected_yyyymm <- data.table::year(determined$ref_month) * 100L +
-                       data.table::month(determined$ref_month)
+    # ref_month_yyyymm should be Ano * 100 + ref_month_in_year
+    expected_yyyymm <- determined$Ano * 100L + determined$ref_month_in_year
     expect_equal(determined$ref_month_yyyymm, expected_yyyymm)
   }
 })
@@ -280,15 +280,15 @@ test_that("ref_fortnight_yyyyff follows YYYY01-YYYY24 format", {
   }
 })
 
-test_that("ref_fortnight Date is 1st or 16th of month", {
+test_that("ref_fortnight_in_month is 1 or 2", {
   test_data <- create_test_pnadc(n_quarters = 4, n_upas = 5)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
 
   determined <- result[determined_fortnight == TRUE]
   if (nrow(determined) > 0) {
-    days <- data.table::mday(determined$ref_fortnight)
-    expect_true(all(days %in% c(1L, 16L)))
+    # ref_fortnight_in_month should be 1 (first fortnight) or 2 (second fortnight)
+    expect_true(all(determined$ref_fortnight_in_month %in% c(1L, 2L)))
   }
 })
 
@@ -318,14 +318,18 @@ test_that("month determination rate >= fortnight rate >= week rate", {
   test_data <- create_test_pnadc(n_quarters = 4, n_upas = 10)
 
   result <- pnadc_identify_periods(test_data, verbose = FALSE)
-  rates <- attr(result, "determination_rates")
+
+  # Compute determination rates from the result
+  n_total <- nrow(result)
+  month_rate <- sum(result$determined_month) / n_total
+  fortnight_rate <- sum(result$determined_fortnight) / n_total
+  week_rate <- sum(result$determined_week) / n_total
 
   # Month should have highest (or equal) rate
-
-  expect_true(rates$month >= rates$fortnight ||
-              abs(rates$month - rates$fortnight) < 0.01)  # Allow small tolerance
+  expect_true(month_rate >= fortnight_rate ||
+              abs(month_rate - fortnight_rate) < 0.01)  # Allow small tolerance
 
   # Fortnight should have higher (or equal) rate than week
-  expect_true(rates$fortnight >= rates$week ||
-              abs(rates$fortnight - rates$week) < 0.01)
+  expect_true(fortnight_rate >= week_rate ||
+              abs(fortnight_rate - week_rate) < 0.01)
 })
