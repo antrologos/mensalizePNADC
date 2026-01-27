@@ -49,7 +49,10 @@
 #'
 #' @param verbose Logical. If TRUE (default), display progress information.
 #'
-#' @param store_date_bounds  Logical. If TRUE, store the date bounds of the 4 reference weeks of each month as columns. Default to FALSE.
+#' @param store_date_bounds Logical. If TRUE, stores date bounds and exception
+#'   flags in the crosswalk for optimization when calling
+#'   \code{pnadc_experimental_periods()}. This enables 10-20x speedup for the
+#'   probabilistic strategy by avoiding redundant computation. Default FALSE.
 #'
 #' @return A data.table crosswalk with columns:
 #'   \describe{
@@ -68,8 +71,14 @@
 #'     \item{week_2_end}{Date. Saturday of the IBGE second reference week of the month. Only returned if store_date_bounds = TRUE}
 #'     \item{week_3_start}{Date. Sunday of the IBGE third reference week of the month. Only returned if store_date_bounds = TRUE}
 #'     \item{week_3_end}{Date. Saturday of the IBGE third reference week of the month. Only returned if store_date_bounds = TRUE}
-#'     \item{week_4_start}{Date. Sunday of the IBGE forth reference week of the month. Only returned if store_date_bounds = TRUE}
-#'     \item{week_4_end}{Date. Saturday of the IBGE forth reference week of the month. Only returned if store_date_bounds = TRUE}
+#'     \item{week_4_start}{Date. Sunday of the IBGE fourth reference week of the month. Only returned if store_date_bounds = TRUE}
+#'     \item{week_4_end}{Date. Saturday of the IBGE fourth reference week of the month. Only returned if store_date_bounds = TRUE}
+#'     \item{month_max_upa}{Integer. Maximum month position across UPA-V1014 group (for debugging). Only returned if store_date_bounds = TRUE}
+#'     \item{month_min_upa}{Integer. Minimum month position across UPA-V1014 group (for debugging). Only returned if store_date_bounds = TRUE}
+#'     \item{fortnight_max_hh}{Integer. Maximum fortnight position within household (for debugging). Only returned if store_date_bounds = TRUE}
+#'     \item{fortnight_min_hh}{Integer. Minimum fortnight position within household (for debugging). Only returned if store_date_bounds = TRUE}
+#'     \item{week_min_hh}{Integer. Minimum week position within household (for debugging). Only returned if store_date_bounds = TRUE}
+#'     \item{week_max_hh}{Integer. Maximum week position within household (for debugging). Only returned if store_date_bounds = TRUE}
 #'     \item{ref_month_yyyymm}{Integer. Identified reference month in the format YYYYMM, where MM follows the IBGE calendar. 1 <= MM  <= 12}
 #'     \item{ref_fortnight_yyyyff}{Integer. Identified reference fortnight in the format YYYYFF, where FF follows the IBGE calendar. 1 <= FF  <= 24}
 #'     \item{ref_week_yyyyww}{Integer. Identified reference Week in the format YYYYWW, where WW follows the IBGE calendar. 1 <= WW  <= 48}
@@ -151,17 +160,16 @@
 #' @seealso \code{\link{pnadc_apply_periods}} to apply the crosswalk and
 #'   calibrate weights
 #'
-#' @param store_date_bounds Logical. If TRUE, stores date bounds and exception
-#'   flags in the crosswalk for optimization when calling
-#'   \code{pnadc_experimental_periods()}. This enables 10-20x speedup for the
-#'   probabilistic strategy by avoiding redundant computation. Default FALSE.
-#'
 #' @export
 pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FALSE) {
 
   # ============================================================================
   # INPUT VALIDATION
   # ============================================================================
+
+  # Validate parameters
+  checkmate::assert_flag(verbose)
+  checkmate::assert_flag(store_date_bounds)
 
   # Freeing memory before starting...
   gc()
@@ -209,6 +217,15 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
   dt[V20081 == 99,  V20081 := NA]
   dt[V20082 == 9999,V20082 := NA]
 
+  # Initialize output columns to ensure they exist even if phases are skipped
+  dt[, `:=`(
+    ref_month_in_quarter     = NA_integer_,
+    ref_month_in_year        = NA_integer_,
+    ref_fortnight_in_month   = NA_integer_,
+    ref_fortnight_in_quarter = NA_integer_,
+    ref_week_in_month        = NA_integer_,
+    ref_week_in_quarter      = NA_integer_
+  )]
 
   # --------------------------------------------------------------------------
   # STEP 1.2: Pre-compute first valid Saturdays for each unique (year, quarter)
@@ -239,6 +256,8 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
   )][, `:=`(
 
     # Date bounds (for regular first reference weeks, with 4 or more days in the IBGE reference month)
+    # date_min: Sunday of first reference week (first_sat - 6 days, but we use Saturday here)
+    # date_max: End of 4th week of month 3 (first_sat + 21 days = 3 more weeks after Saturday)
     date_min = lubridate::ymd(paste(Ano, month1, first_sat_m1, sep = "-")),
     date_max = lubridate::ymd(paste(Ano, month3, first_sat_m3, sep = "-")) + 21L,
 
@@ -282,11 +301,21 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
 
   if (verbose) cat("  Step 1.3: Calculating birthdays and adjusting for leap years...\n")
 
-  dt[!is.na(V2008), birthday := lubridate::ymd(paste(Ano, V20081, V2008, sep = "-"), quiet = T)]
+  dt[!is.na(V2008), birthday := lubridate::ymd(paste(Ano, V20081, V2008, sep = "-"), quiet = TRUE)]
 
   # Handling 29th February birthdays on non-leap years
   dt[(!is_leap) & V2008 == 29 & V20081 == 2, birthday := lubridate::ymd(paste(Ano, 3, 1, sep = "-"))]
 
+  # Diagnostic: Warn if many birthdays failed to parse
+  n_failed_birthday <- dt[!is.na(V2008) & is.na(birthday), .N]
+  n_valid_birthday_input <- dt[!is.na(V2008), .N]
+  if (n_failed_birthday > 0 && n_valid_birthday_input > 0) {
+    pct_failed <- 100 * n_failed_birthday / n_valid_birthday_input
+    if (pct_failed > 5 && verbose) {
+      warning(sprintf("%.1f%% of birthdays failed to parse (%d of %d). Check V2008/V20081 data quality.",
+                      pct_failed, n_failed_birthday, n_valid_birthday_input), call. = FALSE)
+    }
+  }
 
   dt[, first_sat_after_birthday := PNADCperiods:::first_saturday_on_or_after(birthday)]
 
@@ -359,6 +388,12 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
     alt_upa_month_min = max(alt_month_min_pos, na.rm = TRUE),
     alt_upa_month_max = min(alt_month_max_pos, na.rm = TRUE)
   ), by = .(UPA, V1014)]
+
+  # Handle all-NA groups (max returns -Inf, min returns Inf)
+  dt[is.infinite(upa_month_min),     upa_month_min     := NA_integer_]
+  dt[is.infinite(upa_month_max),     upa_month_max     := NA_integer_]
+  dt[is.infinite(alt_upa_month_min), alt_upa_month_min := NA_integer_]
+  dt[is.infinite(alt_upa_month_max), alt_upa_month_max := NA_integer_]
 
   # --------------------------------------------------------------------------
   # STEP 1.7: Dynamic exception detection for MONTHS
@@ -445,12 +480,31 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
       upa_month_min_final = max(month_min_pos, na.rm = TRUE),
       upa_month_max_final = min(month_max_pos, na.rm = TRUE)
     ), by = .(UPA, V1014)]
+
+    # Handle all-NA groups (max returns -Inf, min returns Inf)
+    dt[is.infinite(upa_month_min_final), upa_month_min_final := NA_integer_]
+    dt[is.infinite(upa_month_max_final), upa_month_max_final := NA_integer_]
   } else {
     # No exceptions - reuse aggregation
     dt[, `:=`(
       upa_month_min_final = upa_month_min,
       upa_month_max_final = upa_month_max
     )]
+  }
+
+  # Clean up intermediate columns no longer needed
+  cols_to_remove <- c("is_leap", "alt_sat_m1", "alt_sat_m2", "alt_sat_m3",
+                      "alt_date_min", "alt_date_max",
+                      "first_sat_after_birthday", "visit_before_birthday",
+                      "month_min_pos", "month_max_pos",
+                      "alt_month_min_pos", "alt_month_max_pos",
+                      "upa_month_min", "upa_month_max",
+                      "alt_upa_month_min", "alt_upa_month_max",
+                      "requires_exception", "requires_exc_m1", "requires_exc_m2", "requires_exc_m3",
+                      "trim_exc_m1", "trim_exc_m2", "trim_exc_m3")
+  cols_present <- intersect(cols_to_remove, names(dt))
+  if (length(cols_present) > 0) {
+    dt[, (cols_present) := NULL]
   }
 
   # --------------------------------------------------------------------------
@@ -501,6 +555,24 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
   # Initialize fortnight columns
   dt[, ref_fortnight_in_quarter := NA_integer_]
 
+  # Initialize counter (may be updated in else branch)
+  n_fortnight_determined <- 0L
+
+  # Pre-compute IBGE month boundaries for all unique (Ano, Trimestre, ref_month_in_quarter) combinations
+  # Created here (outside conditional) so it's available for both Phase 2 and Phase 3
+  month_boundaries <- unique(dt[!is.na(ref_month_in_quarter),
+            .(Ano,
+              Trimestre,
+              ref_month_in_quarter,
+              month = ref_month_in_quarter + (Trimestre - 1)*3,
+              ibge_first_sat_day  = fcase(ref_month_in_quarter == 1, first_sat_m1,
+                                          ref_month_in_quarter == 2, first_sat_m2,
+                                          ref_month_in_quarter == 3, first_sat_m3))])
+  if (nrow(month_boundaries) > 0) {
+    month_boundaries[, ibge_month_start := lubridate::ymd(paste(Ano, month, ibge_first_sat_day, sep = "-")) - 6L]
+    data.table::setkey(month_boundaries, Ano, Trimestre, ref_month_in_quarter)
+  }
+
   if (n_month_determined == 0) {
     if (verbose) cat("  -> No months determined - skipping fortnight identification\n")
   } else {
@@ -513,30 +585,16 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
 
     if (verbose) cat("  Step 2.1: Calculate fortnight bounds WITHIN the determined month...\n")
 
-    # The fortnight position is determined by:
-    # 1. Which month (ref_month_in_quarter: 1, 2, or 3)
-    # 2. Whether the date falls in the 1st half (days 1-15) or 2nd half (days 16+)
-
-    # Pre-compute IBGE month boundaries for all unique (Ano, Trimestre, , ref_month_in_quarter) combinations
-    month_boundaries = unique(dt[!is.na(ref_month_in_quarter) ,
-              .(Ano,
-                Trimestre,
-                ref_month_in_quarter,
-                month = ref_month_in_quarter + (Trimestre - 1)*3,
-                ibge_first_sat_day  = fcase(ref_month_in_quarter == 1, first_sat_m1,
-                                            ref_month_in_quarter == 2, first_sat_m2,
-                                            ref_month_in_quarter == 3, first_sat_m3))])[,
-                                   ibge_month_start := lubridate::ymd(paste(Ano, month, ibge_first_sat_day, sep = "-")) - 6L]
-    data.table::setkey(month_boundaries, Ano, Trimestre, ref_month_in_quarter)
-
     # Pre-compute IBGE fortnight boundaries
+    # IBGE reference months are 28-day periods starting on Sunday of the first reference week
+    # Fortnight 1: Days 0-13 (weeks 1-2), Fortnight 2: Days 14-27 (weeks 3-4)
     fortnight_boundaries = copy(month_boundaries)
 
     fortnight_boundaries[ , `:=`(
-      fortnight_1_start = ibge_month_start,
-      fortnight_1_end   = ibge_month_start + 13,
-      fortnight_2_start = ibge_month_start + 14,
-      fortnight_2_end   = ibge_month_start + 27
+      fortnight_1_start = ibge_month_start,           # Day 0 of IBGE month
+      fortnight_1_end   = ibge_month_start + 13L,     # Day 13 (14 days: weeks 1-2)
+      fortnight_2_start = ibge_month_start + 14L,     # Day 14 (start of weeks 3-4)
+      fortnight_2_end   = ibge_month_start + 27L      # Day 27 (28 days total)
       )][,
          `:=`(
            month = NULL,
@@ -590,12 +648,15 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
       hh_fortnight_min     = min(fortnight_pos,     na.rm = TRUE)
     ), by = .(Ano, Trimestre, UPA, V1008)]
 
+    # Handle all-NA groups (max returns -Inf, min returns Inf)
+    dt[is.infinite(hh_fortnight_max), hh_fortnight_max := NA_integer_]
+    dt[is.infinite(hh_fortnight_min), hh_fortnight_min := NA_integer_]
 
     # --------------------------------------------------------------------------
     # STEP 2.3: FORTNIGHT DETERMINATION
     # --------------------------------------------------------------------------
 
-    if (verbose) cat("  Step 2.2: Determining reference fortnights...\n")
+    if (verbose) cat("  Step 2.3: Determining reference fortnights...\n")
 
     dt[!is.na(ref_month_in_quarter) &
          hh_fortnight_min == hh_fortnight_max,
@@ -613,6 +674,15 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
                   fortnight_rate * 100,
                   format(n_fortnight_determined, big.mark = ","),
                   format(n_total, big.mark = ",")))
+    }
+
+    # Clean up intermediate fortnight columns no longer needed
+    # (hh_fortnight_max/min are kept for store_date_bounds option)
+    cols_to_remove <- c("fortnight_pos", "fortnight_1_start", "fortnight_1_end",
+                        "fortnight_2_start", "fortnight_2_end")
+    cols_present <- intersect(cols_to_remove, names(dt))
+    if (length(cols_present) > 0) {
+      dt[, (cols_present) := NULL]
     }
   }
 
@@ -639,21 +709,23 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
     # STEP 3.1: Calculate week bounds WITHIN the determined fortnight
     # --------------------------------------------------------------------------
 
-    # Pre-compute IBGE fortnight boundaries
+    # Pre-compute IBGE week boundaries
+    # IBGE reference months are 28-day periods (4 weeks x 7 days), starting Sunday
+    # Each week runs Sunday (day N) to Saturday (day N+6)
     weeks_boundaries = copy(month_boundaries)
 
     weeks_boundaries[ , `:=`(
-      week_1_start = ibge_month_start,
-      week_1_end   = ibge_month_start + 6,
+      week_1_start = ibge_month_start,          # Day 0: Week 1 Sunday
+      week_1_end   = ibge_month_start + 6L,     # Day 6: Week 1 Saturday
 
-      week_2_start = ibge_month_start + 7,
-      week_2_end   = ibge_month_start + 13,
+      week_2_start = ibge_month_start + 7L,     # Day 7: Week 2 Sunday
+      week_2_end   = ibge_month_start + 13L,    # Day 13: Week 2 Saturday
 
-      week_3_start = ibge_month_start + 14,
-      week_3_end   = ibge_month_start + 20,
+      week_3_start = ibge_month_start + 14L,    # Day 14: Week 3 Sunday
+      week_3_end   = ibge_month_start + 20L,    # Day 20: Week 3 Saturday
 
-      week_4_start  = ibge_month_start + 21,
-      week_4_end    = ibge_month_start + 27
+      week_4_start = ibge_month_start + 21L,    # Day 21: Week 4 Sunday
+      week_4_end   = ibge_month_start + 27L     # Day 27: Week 4 Saturday
     )][,
        `:=`(
          month = NULL,
@@ -678,32 +750,32 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
     # Adjust date_min and date_max for those with determined months
     dt[!is.na(ref_fortnight_in_month),
        `:=`(
-         date_min  = fifelse(ref_fortnight_in_month %in% 1 & is.na(date_min), week_1_start, date_min),
-         date_max  = fifelse(ref_fortnight_in_month %in% 1 & is.na(date_max), week_2_end,   date_max))][,
+         date_min  = fifelse(ref_fortnight_in_month == 1L & is.na(date_min), week_1_start, date_min),
+         date_max  = fifelse(ref_fortnight_in_month == 1L & is.na(date_max), week_2_end,   date_max))][,
        `:=`(
-         date_min  = fifelse(ref_fortnight_in_month %in% 2 & is.na(date_min), week_3_start, date_min),
-         date_max  = fifelse(ref_fortnight_in_month %in% 2 & is.na(date_max), week_4_end,   date_max)
+         date_min  = fifelse(ref_fortnight_in_month == 2L & is.na(date_min), week_3_start, date_min),
+         date_max  = fifelse(ref_fortnight_in_month == 2L & is.na(date_max), week_4_end,   date_max)
          )]
 
 
     dt[!is.na(ref_fortnight_in_month),
        `:=`(
-         date_min  = fifelse(ref_fortnight_in_month %in% 1 & date_min < week_1_start, week_1_start, date_min),
-         date_max  = fifelse(ref_fortnight_in_month %in% 1 & date_max > week_2_end,   week_2_end,   date_max)
+         date_min  = fifelse(ref_fortnight_in_month == 1L & date_min < week_1_start, week_1_start, date_min),
+         date_max  = fifelse(ref_fortnight_in_month == 1L & date_max > week_2_end,   week_2_end,   date_max)
        )][,
        `:=`(
-         date_min  = fifelse(ref_fortnight_in_month %in% 2 & date_min < week_3_start, week_3_start, date_min),
-         date_max  = fifelse(ref_fortnight_in_month %in% 2 & date_max > week_4_end,   week_4_end,   date_max)
+         date_min  = fifelse(ref_fortnight_in_month == 2L & date_min < week_3_start, week_3_start, date_min),
+         date_max  = fifelse(ref_fortnight_in_month == 2L & date_max > week_4_end,   week_4_end,   date_max)
          )]
 
     # Identifying the weeks for individuals
     dt[!is.na(ref_fortnight_in_quarter),
        `:=`(
          week_pos = fcase(
-           (ref_fortnight_in_month %in% 1) &  (date_min >= week_1_start) & (date_max <= week_1_end), 1,
-           (ref_fortnight_in_month %in% 1) &  (date_min >= week_2_start) & (date_max <= week_2_end), 2,
-           (ref_fortnight_in_month %in% 2) &  (date_min >= week_3_start) & (date_max <= week_3_end), 3,
-           (ref_fortnight_in_month %in% 2) &  (date_min >= week_4_start) & (date_max <= week_4_end), 4,
+           (ref_fortnight_in_month == 1L) &  (date_min >= week_1_start) & (date_max <= week_1_end), 1,
+           (ref_fortnight_in_month == 1L) &  (date_min >= week_2_start) & (date_max <= week_2_end), 2,
+           (ref_fortnight_in_month == 2L) &  (date_min >= week_3_start) & (date_max <= week_3_end), 3,
+           (ref_fortnight_in_month == 2L) &  (date_min >= week_4_start) & (date_max <= week_4_end), 4,
            default = NA_real_)
        )]
 
@@ -721,6 +793,9 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
       hh_week_min = min(week_pos, na.rm = TRUE)
     ), by = .(Ano, Trimestre, UPA, V1008)]
 
+    # Handle all-NA groups (max returns -Inf, min returns Inf)
+    dt[is.infinite(hh_week_max), hh_week_max := NA_integer_]
+    dt[is.infinite(hh_week_min), hh_week_min := NA_integer_]
 
     # --------------------------------------------------------------------------
     # STEP 3.4: WEEK DETERMINATION (using sequential values for comparison)
@@ -745,6 +820,12 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
                   week_rate * 100,
                   format(n_week_determined, big.mark = ","),
                   format(n_total, big.mark = ",")))
+    }
+
+    # Clean up intermediate week column no longer needed
+    # (hh_week_max/min and week_*_start/end are kept for store_date_bounds option)
+    if ("week_pos" %in% names(dt)) {
+      dt[, week_pos := NULL]
     }
   }
 
@@ -771,47 +852,47 @@ pnadc_identify_periods <- function(data, verbose = TRUE, store_date_bounds = FAL
        ref_week_in_quarter)
      ]
 
-  }else{
+  } else {
+    # Build column list dynamically to handle cases where phases were skipped
+    # Base columns that always exist
+    cols_to_keep <- c("Ano", "Trimestre", "UPA", "V1008", "V1014",
+                      "ref_month_in_quarter", "ref_month_in_year",
+                      "ref_fortnight_in_month", "ref_fortnight_in_quarter",
+                      "ref_week_in_month", "ref_week_in_quarter",
+                      "date_max", "date_min",
+                      "upa_month_max_final", "upa_month_min_final")
 
-    dt = dt[,
-            .(Ano, Trimestre, UPA, V1008, V1014,
+    # Conditionally add fortnight bounds if they exist
+    if ("hh_fortnight_max" %in% names(dt)) {
+      cols_to_keep <- c(cols_to_keep, "hh_fortnight_max", "hh_fortnight_min")
+    }
 
-              ref_month_in_quarter,
-              ref_month_in_year,
+    # Conditionally add week bounds if they exist
+    if ("hh_week_max" %in% names(dt)) {
+      cols_to_keep <- c(cols_to_keep, "hh_week_max", "hh_week_min",
+                        "week_1_start", "week_1_end",
+                        "week_2_start", "week_2_end",
+                        "week_3_start", "week_3_end",
+                        "week_4_start", "week_4_end")
+    }
 
-              ref_fortnight_in_month,
-              ref_fortnight_in_quarter,
+    dt <- dt[, ..cols_to_keep]
 
-              ref_week_in_month,
-              ref_week_in_quarter,
-
-              date_max,
-              date_min,
-
-              month_max_upa = upa_month_max_final,
-              month_min_upa = upa_month_min_final,
-
-              fortnight_max_hh = hh_fortnight_max,
-              fortnight_min_hh = hh_fortnight_min,
-
-              week_min_hh = hh_week_min,
-              week_max_hh = hh_week_max,
-
-              week_1_start,
-              week_1_end,
-
-              week_2_start,
-              week_2_end,
-
-              week_3_start,
-              week_3_end,
-
-              week_4_start,
-              week_4_end)
-    ]
+    # Rename columns for output
+    data.table::setnames(dt,
+                         old = c("upa_month_max_final", "upa_month_min_final"),
+                         new = c("month_max_upa", "month_min_upa"))
+    if ("hh_fortnight_max" %in% names(dt)) {
+      data.table::setnames(dt,
+                           old = c("hh_fortnight_max", "hh_fortnight_min"),
+                           new = c("fortnight_max_hh", "fortnight_min_hh"))
+    }
+    if ("hh_week_max" %in% names(dt)) {
+      data.table::setnames(dt,
+                           old = c("hh_week_max", "hh_week_min"),
+                           new = c("week_max_hh", "week_min_hh"))
+    }
   }
-
-  #dt = unique(dt)
 
   dt[, `:=`(
 

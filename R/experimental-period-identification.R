@@ -18,8 +18,6 @@
 #' }
 #'
 #' @param crosswalk A crosswalk data.table from \code{pnadc_identify_periods()}
-#' @param data The original PNADC data.table used to build the crosswalk
-#'   (required for probabilistic strategy to access date bounds)
 #' @param strategy Character specifying which strategy to apply.
 #'   Options: "none", "probabilistic", "upa_aggregation", "both"
 #' @param confidence_threshold Numeric (0-1). Minimum confidence required to
@@ -142,7 +140,6 @@
 #' # Apply experimental strategies
 #' crosswalk_exp <- pnadc_experimental_periods(
 #'   crosswalk,
-#'   pnadc_data,
 #'   strategy = "probabilistic",
 #'   confidence_threshold = 0.9
 #' )
@@ -202,7 +199,7 @@ pnadc_experimental_periods <- function(
     result <- PNADCperiods:::.apply_combined_strategy(
       crosswalk = result,
       confidence_threshold = confidence_threshold,
-      upa_threshold        = upa_threshold,
+      upa_threshold        = upa_proportion_threshold,
       verbose              = verbose)
   }
 

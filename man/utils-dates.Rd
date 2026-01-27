@@ -4,25 +4,14 @@
 \alias{utils-dates}
 \title{Date Utility Functions}
 \description{
-Internal helper functions for date calculations. Optimized with
-pre-computed lookup tables for fast date creation (~20x faster than ISOdate).
+Internal helper functions for date calculations.
 
 This file includes:
 \itemize{
-\item Fast date creation with lookup tables (make_date)
+\item Day of week calculation (dow)
 \item ISO 8601 week utilities (Monday-Sunday weeks)
-\item IBGE reference calendar utilities (Sunday-Saturday weeks)
+\item IBGE first Saturday calculation for reference weeks
+\item Month position calculation for quarter mapping
 }
 }
-\section{IBGE Reference Calendar}{
-
-The IBGE reference calendar differs from ISO 8601:
-\itemize{
-\item Weeks start on Sunday and end on Saturday
-\item A week belongs to the IBGE month where its Saturday falls
-\item The first valid Saturday must have >= 4 days (or 3 as exception) in the month
-\item IBGE months always have exactly 4 reference weeks
-}
-}
-
 \keyword{internal}

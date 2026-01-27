@@ -1,6 +1,5 @@
 #' @title Date Utility Functions
-#' @description Internal helper functions for date calculations. Optimized with
-#'   pre-computed lookup tables for fast ISO week calculation.
+#' @description Internal helper functions for date calculations.
 #'
 #'   This file includes:
 #'   \itemize{
@@ -20,11 +19,12 @@ NULL
 # ============================================================================
 
 # Days since 1970-01-01 for January 1st of each year (2000-2050)
-# OPTIMIZATION: Use plain integer vector with offset indexing instead of named lookup
+# Use plain integer vector with offset indexing instead of named lookup
 .YEAR_BASE_START <- 2000L
 .YEAR_BASE <- local({
   years <- 2000:2050
-  # OPTIMIZATION: Vectorized approach instead of sapply
+
+  # Vectorized approach instead of sapply
   as.integer(as.Date(paste0(years, "-01-01")))
 })
 
@@ -32,7 +32,8 @@ NULL
 # Used for fast ISO week calculation (Jan 4 is always in ISO week 1)
 .JAN4_BASE <- local({
   years <- 2000:2050
-  # OPTIMIZATION: Vectorized approach instead of sapply
+
+  # Vectorized approach instead of sapply
   as.integer(as.Date(paste0(years, "-01-04")))
 })
 
@@ -125,7 +126,7 @@ yyyymm <- function(year, month) {
 first_valid_saturday <- function(year, month, min_days = 4L) {
 
   # Get first day of the month
-  first_day <- lubridate:::ymd(paste(year = year, month = month, day = 1L, sep = "-"))
+  first_day <- lubridate::ymd(paste(year = year, month = month, day = 1L, sep = "-"))
 
   # Day of week for first of month (0=Sun, 6=Sat)
   first_dow <- PNADCperiods:::dow(first_day)
@@ -153,7 +154,6 @@ first_valid_saturday <- function(year, month, min_days = 4L) {
   #   If Saturday is day 2: 2 < 3, skip to next week (day 9)
 
   # If first Saturday has enough days, use it; otherwise use second Saturday
-  # OPTIMIZATION: Use fifelse instead of ifelse for 5-10x speedup
 
   data.table::fifelse(first_saturday_day >= min_days, first_saturday_day, first_saturday_day + 7L)
 }
@@ -174,20 +174,17 @@ first_saturday_on_or_after <- function(date) {
 
 
 # ============================================================================
-# ISO 8601 Week Utilities (Optimized with integer arithmetic)
+# ISO 8601 Week Utilities
 # ISO week 1 is the week containing January 4th (equivalently, the first week
 # with at least 4 days in the new year). Weeks start on Monday.
-#
-# OPTIMIZATION: data.table::isoweek() is extremely slow (~50s for 4M dates).
-# We use pure integer arithmetic with lookup tables for 300x speedup.
 # ============================================================================
 
-#' ISO Week and Year Combined (Optimized)
+#' ISO Week and Year Combined
 #'
 #' Returns both ISO 8601 week number and week-year for a date in a single pass.
 #' This avoids redundant computation when both values are needed.
 #'
-#' OPTIMIZATION: Computes Thursday of the week only once, then derives both
+#' Computes Thursday of the week only once, then derives both
 #' week number and year. This is 2x faster than calling iso_week() and iso_year()
 #' separately when both values are needed.
 #'
@@ -233,12 +230,12 @@ iso_week_year <- function(date) {
   list(year = iso_yr, week = iso_wk)
 }
 
-#' ISO Week Number (Optimized)
+#' ISO Week Number
 #'
 #' Returns the ISO 8601 week number for a date. Week 1 is the week containing
 #' January 4th (equivalently, the first week with at least 4 days in January).
 #'
-#' OPTIMIZATION: Uses pure integer arithmetic with pre-computed lookup tables.
+#' Uses pure integer arithmetic with pre-computed lookup tables.
 #' This is ~300x faster than data.table::isoweek() for large vectors.
 #'
 #' Note: If you need both week and year, use \code{iso_week_year()} instead
@@ -252,7 +249,7 @@ iso_week <- function(date) {
   PNADCperiods:::iso_week_year(date)$week
 }
 
-#' ISO Week-Year (Optimized)
+#' ISO Week-Year
 #'
 #' Returns the ISO 8601 week-year for a date. This may differ from the calendar
 #' year for dates near year boundaries (e.g., Dec 31 may be in week 1 of the
@@ -288,8 +285,8 @@ iso_year <- function(date) {
 #' @noRd
 calculate_month_position_min <- function(date, year, quarter, day_threshold = 3L) {
   first_month <- PNADCperiods:::quarter_first_month(quarter)
-  date_month  <- data.table:::month(date)
-  date_day    <- data.table:::mday(date)
+  date_month  <- data.table::month(date)
+  date_day    <- data.table::mday(date)
 
   pos <- date_month - first_month + 1L
 
@@ -315,12 +312,12 @@ calculate_month_position_min <- function(date, year, quarter, day_threshold = 3L
 #' @noRd
 calculate_month_position_max <- function(date, year, quarter, day_threshold = 3L) {
   first_month <- PNADCperiods:::quarter_first_month(quarter)
-  date_day    <- data.table:::mday(date)
+  date_day    <- data.table::mday(date)
 
   # When day <= threshold, use the month of (date - 3 days)
   needs_adjust   <- date_day <= day_threshold
   adjusted_date  <- date - needs_adjust * 3L
-  adjusted_month <- data.table:::month(adjusted_date)
+  adjusted_month <- data.table::month(adjusted_date)
 
   pos <- adjusted_month - first_month + 1L
 
@@ -344,8 +341,8 @@ calculate_month_position_max <- function(date, year, quarter, day_threshold = 3L
 #' @noRd
 calculate_month_position_min_dynamic <- function(date, year, quarter, exc_m1, exc_m2, exc_m3) {
   first_month <- quarter_first_month(quarter)
-  date_month <- data.table:::month(date)
-  date_day <- data.table:::mday(date)
+  date_month <- data.table::month(date)
+  date_day <- data.table::mday(date)
 
   pos <- date_month - first_month + 1L
 
@@ -357,7 +354,6 @@ calculate_month_position_min_dynamic <- function(date, year, quarter, exc_m1, ex
   month_in_quarter <- ((date_month - 1L) %% 3L) + 1L  # 1, 2, or 3
 
   # Threshold is 2 if exception applies for this month, 3 otherwise
-  # OPTIMIZATION: Use fifelse instead of rep() + subsetting
   threshold <- fifelse(
     (month_in_quarter == 1L & exc_m1 == 1L) |
       (month_in_quarter == 2L & exc_m2 == 1L) |
@@ -389,15 +385,14 @@ calculate_month_position_min_dynamic <- function(date, year, quarter, exc_m1, ex
 #' @noRd
 calculate_month_position_max_dynamic <- function(date, year, quarter, exc_m1, exc_m2, exc_m3) {
   first_month <- quarter_first_month(quarter)
-  date_month  <- data.table:::month(date)
-  date_day    <- data.table:::mday(date)
+  date_month  <- data.table::month(date)
+  date_day    <- data.table::mday(date)
 
   # Determine threshold based on which month the date falls in
   # Use modular arithmetic to identify position in quarter
   month_in_quarter <- ((date_month - 1L) %% 3L) + 1L  # 1, 2, or 3
 
   # Threshold is 2 if exception applies for this month, 3 otherwise
-  # OPTIMIZATION: Use fifelse instead of rep() + subsetting
   threshold <- fifelse(
     (month_in_quarter == 1L & exc_m1 == 1L) |
       (month_in_quarter == 2L & exc_m2 == 1L) |
@@ -408,7 +403,7 @@ calculate_month_position_max_dynamic <- function(date, year, quarter, exc_m1, ex
   # When day <= threshold, use the month of (date - 3 days)
   needs_adjust <- date_day <= threshold
   adjusted_date <- date - needs_adjust * 3L
-  adjusted_month <- data.table:::month(adjusted_date)
+  adjusted_month <- data.table::month(adjusted_date)
 
   pos <- adjusted_month - first_month + 1L
 

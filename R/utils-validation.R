@@ -505,15 +505,11 @@ ensure_data_table <- function(data, copy = FALSE) {
   }
 }
 
-# ============================================================================
-# PERFORMANCE OPTIMIZATION: Helper functions for memory-efficient operations
-# ============================================================================
 
 #' Subset Data to Required Columns and Copy
 #'
-#' OPTIMIZATION: Instead of copying the entire data.table (potentially 50+ columns),
+#' Instead of copying the entire data.table (potentially 50+ columns),
 #' this function first subsets to only the required columns, then copies.
-#' This can reduce memory usage by 80-90% for typical PNADC datasets.
 #'
 #' @param data A data.frame or data.table
 #' @param required_cols Character vector of required column names
@@ -574,8 +570,7 @@ convert_pnadc_columns <- function(dt,
 
 #' Fix Infinite Values in Columns
 #'
-#' OPTIMIZATION: Replaces infinite values (from max/min on empty groups) with NA.
-#' Uses data.table's efficient subsetting instead of which() + set() pattern.
+#' Replaces infinite values (from max/min on empty groups) with NA.
 #'
 #' @param dt A data.table (modified in place)
 #' @param cols Character vector of column names to check
@@ -595,7 +590,6 @@ fix_infinite_values <- function(dt, cols, replacement = NA_integer_) {
 
 #' Apply Birthday Constraints to Date Bounds
 #'
-#' OPTIMIZATION: Consolidates repeated birthday constraint code.
 #' Applies constraints to narrow the interview date window based on birthday.
 #'
 #' @param dt A data.table with visit_before_birthday, first_sat_after_birthday columns
@@ -620,10 +614,7 @@ apply_birthday_constraints <- function(dt, date_min_col, date_max_col) {
   invisible(dt)
 }
 
-#' Compute Determination Statistics Efficiently
-#'
-#' OPTIMIZATION: Uses uniqueN with direct column access instead of
-#' aggregation with get() (which is extremely slow in data.table).
+#' Compute Determination Statistics
 #'
 #' @param dt A data.table
 #' @param by_cols Grouping columns for counting unique combinations
