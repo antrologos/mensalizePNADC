@@ -45,7 +45,7 @@ This averaging has three important consequences:
 
 3. **Turning point detection**: The precise month when a trend reversed direction becomes blurred. Did the economy start recovering in May or June? Quarterly data can't tell you.
 
-The `PNADCperiods` package solves this problem by identifying which specific month each interview refers to, using birthday information and IBGE's interview scheduling rules. With stacked data spanning multiple quarters, the algorithm achieves a **97% determination rate**---meaning we can assign specific reference months to nearly all observations.
+The `PNADCperiods` package solves this problem by identifying which specific month each interview refers to, using birthday information and IBGE's interview scheduling rules. With stacked multi-quarter data, the algorithm achieves a **94.3% determination rate (8 quarters) or 97.0% (full 2012-2025 history)** for monthly identification---meaning we can assign specific reference months to nearly all observations.
 
 This vignette demonstrates three compelling cases where monthly data reveals dynamics that quarterly data hides, culminating in a powerful validation using minimum wage transitions.
 
@@ -599,27 +599,30 @@ However, finer granularity comes at a cost: **smaller samples**.
 
 | Granularity | Determination Rate | Typical Obs/Period | Best For |
 |-------------|-------------------|-------------------|----------|
-| Monthly | ~97% | ~65,000 | Most analyses |
-| Fortnightly | ~6% | ~3,000 | Transition timing |
-| Weekly | ~1.5% | ~500 | Shock detection |
+| Monthly | **94.3%** (8Q) / **97.0%** (full) | ~65,000 | Most analyses |
+| Fortnightly | **8.9%** | ~3,000 | Transition timing |
+| Weekly | **3.3%** | ~500 | Shock detection |
 
 **Why the low rates for fortnights and weeks?** Unlike months, which aggregate constraints across multiple quarterly visits (leveraging the panel design), fortnights and weeks can only use information from within a single quarter. The birthday constraints rarely narrow the interview window to a single 15-day or 7-day period.
 
 ### Boosting Sub-Monthly Sample Sizes with Experimental Strategies
 
-The strict determination rates above can be significantly improved using `pnadc_experimental_periods()`. This function applies two strategies:
+The strict rates above can be improved using `pnadc_experimental_periods()`. This function applies two strategies:
 
-1. **Probabilistic assignment** (`confidence_threshold = 0.9`): When the interview window spans exactly two consecutive periods and ≥90% of the interval falls in one period, assign to that period.
+1. **Probabilistic assignment**: When the interview window spans exactly two consecutive periods and ≥X% of the interval falls in one period, assign to that period. Threshold X set by `confidence_threshold` parameter.
 
-2. **UPA aggregation** (`upa_proportion_threshold = 0.7`): When ≥70% of strictly identified observations within a UPA have the same determined period, extend that assignment to undetermined observations. This leverages the empirical finding of 100% UPA homogeneity.
+2. **UPA aggregation**: When ≥Y% of strictly identified observations within a UPA-V1014 group have the same period, extend that assignment to undetermined observations. Threshold Y set by `upa_proportion_threshold`.
 
-With both strategies (`strategy = "both"`):
-| Granularity | Strict Rate | Experimental Rate | Improvement |
-|-------------|-------------|-------------------|-------------|
-| Fortnight | ~6% | ~27-28% | ~4-5× more data |
-| Weekly | ~1.5% | ~2% | ~1.3× more data |
+With experimental strategies (`strategy = "both"`, conf=0.85, upa=0.80):
 
-The examples below use experimental strategies to maximize sample sizes for sub-monthly analysis.
+| Granularity | Strict Rate (8Q) | Experimental Rate | Improvement |
+|-------------|------------------|-------------------|-------------|
+| Fortnight | 8.9% | **~12-13%** | ~1.4× more data |
+| Weekly | 3.3% | **~5-6%** | ~1.6-1.8× more data |
+
+**Note:** The improvement is modest but meaningful. For comparison, using conf=0.8 (less conservative) achieves fortnight 13.5% and week 7.5%, while conf=0.9 (more conservative) achieves fortnight 13.5% and week 3.6%. The fortnight rate doesn't vary much with threshold, but weekly rate is threshold-sensitive.
+
+The examples below use experimental strategies to maximize fortnight/week sample sizes while maintaining reasonable confidence.
 
 ### Example: COVID-19 Lockdown at Fortnightly Resolution
 
@@ -628,18 +631,19 @@ The COVID-19 pandemic provides a compelling test case. Brazilian lockdowns began
 We examine **labor force participation**, which dropped sharply as workers exited the labor market entirely (not just becoming unemployed, but stopping their job search):
 
 ```{r covid-fortnight}
-# Apply experimental strategies to boost fortnight determination rate
-# Thresholds: 90% confidence for probabilistic, 70% UPA proportion for aggregation
+# Apply experimental strategies to boost fortnight determination
+# conf=0.85 (85% confidence), upa=0.80 (80% consensus)
 crosswalk_exp <- pnadc_experimental_periods(
-  crosswalk = crosswalk,
-  data = pnadc,
+  crosswalk,
   strategy = "both",  # probabilistic + UPA aggregation
-  confidence_threshold = 0.9,       # >=90% of interval in one period
-  upa_proportion_threshold = 0.7,   # >=70% UPA consensus for extension
-  include_derived = TRUE
+  confidence_threshold = 0.85,       # >=85% of interval in one period
+  upa_proportion_threshold = 0.80,   # >=80% UPA consensus for extension
+  verbose = TRUE
 )
 
-# The experimental crosswalk now has ~27-28% fortnight determination vs ~6% strict
+# The experimental crosswalk now has ~12-13% fortnight determination
+# vs 8.9% strict. At conf=0.85, upa=0.80, we balance coverage with
+# assignment confidence.
 # For fortnightly analysis, we use the experimental crosswalk
 pnadc_fortnight <- merge(pnadc, crosswalk_exp[, .(Ano, Trimestre, UPA, V1008, V1014,
                                                     ref_fortnight_in_quarter, ref_fortnight_yyyyff)],
@@ -692,7 +696,7 @@ ggplot() +
     title = "COVID-19 Labor Force Participation: Monthly vs Fortnightly",
     subtitle = "Fortnightly data (orange) reveals sharper discontinuity at lockdown onset (experimental strategies)",
     x = NULL, y = "Labor Force Participation Rate",
-    caption = "Uses pnadc_experimental_periods(strategy='both', confidence=0.9, upa_prop=0.7) for ~27-28% fortnight rate."
+    caption = "Uses pnadc_experimental_periods(strategy='both', conf=0.85, upa=0.80) for ~12-13% fortnight rate."
   ) +
   theme_minimal(base_size = 11)
 ```
@@ -760,7 +764,7 @@ ggplot(weekly_carnival,
     subtitle = "Pooled data from Q1 2019, 2022-2025 (experimental strategies)",
     x = NULL, y = "Average Hours Worked (per week)",
     fill = "Region",
-    caption = "Uses pnadc_experimental_periods(strategy='both', confidence=0.9, upa_prop=0.7) for ~2% weekly rate. Data pooled across 5 years."
+    caption = "Uses pnadc_experimental_periods(strategy='both', conf=0.85, upa=0.80) for ~5-6% weekly rate. Pooled across 5 years."
   ) +
   theme_minimal(base_size = 11)
 ```
@@ -779,9 +783,10 @@ The comparison shows that workers in Carnival-intensive states (BA/RJ/PE) reduce
 
 **Key takeaways:**
 
-1. **Monthly analysis handles most use cases** with ~97% strict determination rate
-2. **Fortnightly analysis** is practical with `pnadc_experimental_periods()` (~27-28% rate vs ~6% strict)
-3. **Weekly analysis** benefits from experimental strategies (~2% vs ~1.5% strict); pooling years essential for subgroup analysis
+1. **Monthly analysis handles most use cases** with 94.3% determination (8Q) or 97.0% (full history)
+2. **Fortnightly analysis** becomes practical with experimental strategies (~12-13% with conf=0.85 vs ~8.9% strict)
+3. **Weekly analysis** benefits from experimental strategies (~5-6% with conf=0.85 vs ~3.3% strict); pool multiple years essential for subgroup analysis
+4. **Confidence threshold trade-off**: Use 0.85-0.9 for balance; use 0.8 only if you need maximum weekly coverage
 
 ---
 

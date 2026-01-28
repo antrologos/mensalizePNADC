@@ -78,9 +78,7 @@
 PNADC (Pesquisa Nacional por Amostra de Domicilios Continua) survey data
 into sub-quarterly time series. It identifies which specific
 <strong>month</strong>, <strong>fortnight</strong> (quinzena), or
-<strong>week</strong> each survey observation refers to, achieving a
-<strong>~97% determination rate</strong> for months when using stacked
-multi-quarter data.</p>
+<strong>week</strong> each survey observation refers to.</p>
 <p><strong>Why does this matter?</strong> PNADC quarterly statistics are
 actually moving averages of three months, which obscures:</p>
 <ul>
@@ -172,22 +170,18 @@ flexibly</p>
 <td>Panel identifier (rotation group 1-8)</td>
 </tr>
 <tr class="even">
-<td><code>V2003</code></td>
-<td>Person identifier</td>
-</tr>
-<tr class="odd">
 <td><code>V2008</code></td>
 <td>Birth day (1-31, or 99 for unknown)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>V20081</code></td>
 <td>Birth month (1-12, or 99 for unknown)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>V20082</code></td>
 <td>Birth year (or 9999 for unknown)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>V2009</code></td>
 <td>Age</td>
 </tr>
@@ -199,15 +193,15 @@ flexibly</p>
 </h3>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load your stacked quarterly PNADC data</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span><span class="op">)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check data dimensions</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Rows:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Quarters:"</span>, <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/duplicated.html" class="external-link">uniqueN</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Quarters:"</span>, <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/duplicated.html" class="external-link">uniqueN</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">Ano</span>, <span class="va">Trimestre</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
 <p><strong>Important:</strong> The algorithm works best with
 <strong>stacked multi-quarter data</strong>. Processing a single quarter
-yields only ~73% determination rate, while stacking 2+ years achieves
-~97%.</p>
+yields only ~70% month determination rate, while stacking all available
+years achieves ~97%.</p>
 </div>
 <div class="section level3">
 <h3 id="step-2-build-the-crosswalk">Step 2: Build the Crosswalk<a class="anchor" aria-label="anchor" href="#step-2-build-the-crosswalk"></a>
@@ -215,48 +209,46 @@ yields only ~73% determination rate, while stacking 2+ years achieves
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Identify reference periods (month, fortnight, week)</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>Output (from real PNADC 2012-2025 data):</p>
+<p>Output (from real PNADC 2012-2025 data, 55 quarters):</p>
 <pre><code>Building reference period crosswalk (nested identification)...
 
 Phase 1: Identifying MONTHS (all observations)...
   Step 1.1: Preprocessing data...
   Step 1.2: Computing valid interview Saturdays...
-  Step 1.3: Applying birthday constraints...
+  Step 1.3: Calculating birthdays and adjusting for leap years...
+  Step 1.4: Applying birthday constraints...
   Step 1.5: Converting to month positions...
   Step 1.6: Aggregating at UPA-panel level (cross-quarter)...
   Step 1.7: Detecting exception cases...
+  Step 1.7b: Applying exception rules...
   Step 1.8: Determining reference months...
-  -&gt; Month determination: 96.7% (9,281,135 of 9,598,723 households)
+  -&gt; Month determination: 97.0% (27,536,744 of 28,395,273 observations)
 
 Phase 2: Identifying FORTNIGHTS (within determined months)...
   Processing 27,536,744 observations with determined months...
+  Step 2.1: Calculate fortnight bounds WITHIN the determined month...
   Step 2.2: Aggregating at household level (within quarter)...
-  Step 2.4: Determining reference fortnights...
-  -&gt; Fortnight determination: 7.4% (705,580 of 9,598,723 households)
+  Step 2.3: Determining reference fortnights...
+  -&gt; Fortnight determination: 9.2% (2,601,164 of 28,395,273 observations)
 
 Phase 3: Identifying WEEKS (within determined fortnights)...
-  Processing 2,582,636 observations with determined fortnights...
+  Processing 2,601,164 observations with determined fortnights...
   Step 3.2: Aggregating at household level (within quarter)...
   Step 3.4: Determining reference weeks...
-  -&gt; Week determination: 1.6% (152,764 of 9,598,723 households)
+  -&gt; Week determination: 3.3% (946,070 of 28,395,273 observations)
 
 Phase 4: Building crosswalk...
 
 ========================================
 Crosswalk complete (nested identification):
-  - 9,598,723 unique household-quarter observations
-  - Month determination:     96.69%
-  - Fortnight determination:   7.35% (nested within months)
-  - Week determination:        1.59% (nested within fortnights)
 ========================================</code></pre>
 </div>
 <div class="section level3">
 <h3 id="step-3-understand-the-crosswalk">Step 3: Understand the Crosswalk<a class="anchor" aria-label="anchor" href="#step-3-understand-the-crosswalk"></a>
 </h3>
-<p>The crosswalk contains one row per <strong>household-quarter</strong>
-combination (keyed by <code>Ano</code>, <code>Trimestre</code>,
-<code>UPA</code>, <code>V1008</code>, <code>V1014</code>) with IBGE
-calendar-based output columns:</p>
+<p>The crosswalk contains one row per <strong>observation</strong>
+(keyed by <code>UPA</code>, <code>V1014</code>) with IBGE calendar-based
+output columns:</p>
 <table class="table">
 <colgroup>
 <col width="44%">
@@ -305,24 +297,14 @@ calendar-based output columns:</p>
 <td></td>
 </tr>
 <tr class="even">
-<td><code>ref_month_start</code></td>
-<td>Date</td>
-<td>First day (Sunday) of the IBGE reference month</td>
-</tr>
-<tr class="odd">
-<td><code>ref_month_end</code></td>
-<td>Date</td>
-<td>Last day (Saturday) of the IBGE reference month</td>
-</tr>
-<tr class="even">
-<td><code>ref_month_weeks</code></td>
-<td>Integer</td>
-<td>Number of weeks in the reference month (4 or 5)</td>
-</tr>
-<tr class="odd">
 <td><code>ref_month_in_quarter</code></td>
 <td>Integer</td>
 <td>Position in quarter: 1, 2, 3, or NA</td>
+</tr>
+<tr class="odd">
+<td><code>ref_month_in_year</code></td>
+<td>Integer</td>
+<td>Position in year: 1-12, or NA</td>
 </tr>
 <tr class="even">
 <td><code>ref_month_yyyymm</code></td>
@@ -340,49 +322,39 @@ calendar-based output columns:</p>
 <td></td>
 </tr>
 <tr class="odd">
-<td><code>ref_fortnight_start</code></td>
-<td>Date</td>
-<td>First day (Sunday) of the reference fortnight</td>
+<td><code>ref_fortnight_in_month</code></td>
+<td>Integer</td>
+<td>Position in month: 1 or 2, or NA</td>
 </tr>
 <tr class="even">
-<td><code>ref_fortnight_end</code></td>
-<td>Date</td>
-<td>Last day (Saturday) of the reference fortnight</td>
-</tr>
-<tr class="odd">
 <td><code>ref_fortnight_in_quarter</code></td>
 <td>Integer</td>
 <td>Position 1-6, or NA</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>ref_fortnight_yyyyff</code></td>
 <td>Integer</td>
 <td>YYYYFF format (e.g., 202303 = 3rd fortnight of 2023)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>determined_fortnight</code></td>
 <td>Logical</td>
 <td>TRUE if fortnight was determined</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><strong>Week</strong></td>
 <td></td>
 <td></td>
 </tr>
-<tr class="odd">
-<td><code>ref_week_start</code></td>
-<td>Date</td>
-<td>First day (Sunday) of the reference week</td>
-</tr>
 <tr class="even">
-<td><code>ref_week_end</code></td>
-<td>Date</td>
-<td>Last day (Saturday) of the reference week</td>
+<td><code>ref_week_in_month</code></td>
+<td>Integer</td>
+<td>Position in month: 1-4, or NA</td>
 </tr>
 <tr class="odd">
 <td><code>ref_week_in_quarter</code></td>
 <td>Integer</td>
-<td>Position 1-13, or NA</td>
+<td>Position 1-12, or NA</td>
 </tr>
 <tr class="even">
 <td><code>ref_week_yyyyww</code></td>
@@ -400,11 +372,12 @@ calendar-based output columns:</p>
 <code class="sourceCode R"><span><span class="co"># View the crosswalk</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">crosswalk</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Check determination rates (stored as attribute)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">crosswalk</span>, <span class="st">"determination_rates"</span><span class="op">)</span></span></code></pre></div>
-<p>The determination rates attribute returns a list with rates for each
-period type. See the “Understanding Determination Rates” section below
-for expected values.</p>
+<span><span class="co"># Check determination rates</span></span>
+<span><span class="va">crosswalk</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
+<span>  month_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_month</span><span class="op">)</span>,</span>
+<span>  fortnight_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span><span class="op">)</span>,</span>
+<span>  week_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="step-4-apply-to-your-data">Step 4: Apply to Your Data<a class="anchor" aria-label="anchor" href="#step-4-apply-to-your-data"></a>
@@ -501,14 +474,12 @@ granularity for weight calibration.</p>
 <tr class="even">
 <td><code>"fortnight"</code></td>
 <td>Fortnightly totals</td>
-<td>Short-term analysis (strict rate ~7%, up to ~60% with
-experimental)</td>
+<td>Short-term analysis (strict rate ~9%)</td>
 </tr>
 <tr class="odd">
 <td><code>"week"</code></td>
 <td>Weekly totals</td>
-<td>High-frequency monitoring (strict rate ~1.5%, up to ~15% with
-experimental)</td>
+<td>High-frequency monitoring (strict rate ~3%)</td>
 </tr>
 </tbody>
 </table>
@@ -527,11 +498,11 @@ with 4/2/1 cell levels for month/fortnight/week respectively.</p>
 <div class="section level3">
 <h3 id="building-vs--applying">Building vs. Applying<a class="anchor" aria-label="anchor" href="#building-vs--applying"></a>
 </h3>
-<p><strong>Build the crosswalk once</strong> from stacked data (2+ years
-recommended):</p>
+<p><strong>Build the crosswalk once</strong> from stacked data (all
+available years recommended):</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Stack multiple years of quarterly data</span></span>
-<span><span class="va">pnadc_stacked</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">pnadc_2020</span>, <span class="va">pnadc_2021</span>, <span class="va">pnadc_2022</span>, <span class="va">pnadc_2023</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">pnadc_stacked</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">pnadc_2020</span>, <span class="va">pnadc_2021</span>, <span class="va">pnadc_2022</span>, <span class="va">pnadc_2023</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Build crosswalk (only needs the identification columns)</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span><span class="op">)</span></span>
@@ -589,7 +560,7 @@ of weight calibration:</p>
 <span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
 <span>                               anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
 <span>                               calibrate <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co"># Result has ref_month_start/end, ref_fortnight_start/end, ref_week_start/end</span></span>
+<span><span class="co"># Result has ref_month_in_quarter, ref_fortnight_in_quarter, ref_week_in_quarter</span></span>
 <span><span class="co"># but no weight_monthly column</span></span></code></pre></div>
 <hr>
 </div>
@@ -635,6 +606,8 @@ determine the month for <strong>all</strong> quarters:</p>
 Cross-quarter aggregation:
   Since 2023-Q3 must be month 2, ALL quarters must be month 2.
   Result: ALL 5 quarters are determined!</code></pre>
+<p><strong>Benchmark results (2012-2025, 55 quarters, 28.4M
+observations):</strong></p>
 <table class="table">
 <thead><tr class="header">
 <th>Processing Mode</th>
@@ -644,21 +617,27 @@ Cross-quarter aggregation:
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>Single quarter</td>
-<td>~73%</td>
-<td>~6%</td>
-<td>~1.5%</td>
+<td>Single quarter (1Q)</td>
+<td>~70%</td>
+<td>~7%</td>
+<td>~2%</td>
 </tr>
 <tr class="even">
-<td>Stacked (2+ years)</td>
-<td><strong>~97%</strong></td>
-<td>~6%</td>
-<td>~1.5%</td>
+<td>8 quarters (2 years)</td>
+<td>~94%</td>
+<td>~9%</td>
+<td>~3%</td>
+</tr>
+<tr class="odd">
+<td>55 quarters (full history)</td>
+<td><strong>97.0%</strong></td>
+<td><strong>9.2%</strong></td>
+<td><strong>3.3%</strong></td>
 </tr>
 </tbody>
 </table>
 <p><strong>Important:</strong> Strict fortnight and week determination
-rates remain at ~6% and ~1.5% regardless of stacking because their
+rates remain at ~9% and ~3% regardless of stacking because their
 constraints cannot aggregate across quarters - each quarter’s interview
 timing is independent at the sub-monthly level. Only month determination
 benefits from cross-quarter aggregation through the rotating panel
@@ -689,32 +668,39 @@ all quarters</li>
 <div class="section level2">
 <h2 id="experimental-strategies-for-improved-rates">Experimental Strategies for Improved Rates<a class="anchor" aria-label="anchor" href="#experimental-strategies-for-improved-rates"></a>
 </h2>
-<p>For fortnight and week analysis, experimental strategies can
-significantly improve determination rates by leveraging a key empirical
-finding: <strong>100% UPA homogeneity</strong> - when any household in a
-UPA has a strictly determined period, ALL households with determined
-periods in that UPA have the SAME period.</p>
+<p>For analyses requiring higher determination rates, experimental
+strategies can improve rates by making informed probabilistic
+assignments:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Build standard crosswalk first</span></span>
-<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Build standard crosswalk first (with date bounds for experimental strategies)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc_stacked</span>, store_date_bounds <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Apply experimental strategies</span></span>
 <span><span class="va">crosswalk_exp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_experimental_periods.html">pnadc_experimental_periods</a></span><span class="op">(</span></span>
 <span>  <span class="va">crosswalk</span>,</span>
-<span>  data <span class="op">=</span> <span class="va">pnadc_stacked</span>,</span>
-<span>  strategy <span class="op">=</span> <span class="st">"both"</span>  <span class="co"># or "probabilistic" or "upa_aggregation"</span></span>
+<span>  strategy <span class="op">=</span> <span class="st">"both"</span>,              <span class="co"># "probabilistic", "upa_aggregation", or "both"</span></span>
+<span>  confidence_threshold <span class="op">=</span> <span class="fl">0.9</span>,     <span class="co"># Only assign when &gt;= 90% confident</span></span>
+<span>  upa_proportion_threshold <span class="op">=</span> <span class="fl">0.5</span>  <span class="co"># UPA consensus threshold</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check improvement</span></span>
 <span><span class="va">crosswalk_exp</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  fortnight_strict <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span><span class="op">)</span>,</span>
-<span>  fortnight_with_exp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span> <span class="op">|</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_fortnight_exp</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  week_strict <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span><span class="op">)</span>,</span>
-<span>  week_with_exp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span> <span class="op">|</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ref_week_exp</span><span class="op">)</span><span class="op">)</span></span>
+<span>  month_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_month</span><span class="op">)</span>,</span>
+<span>  fortnight_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span><span class="op">)</span>,</span>
+<span>  week_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
-<table class="table">
+<p><strong>Benchmark results (2019-2020, 8 quarters):</strong></p>
+<table style="width:100%;" class="table">
+<colgroup>
+<col width="28%">
+<col width="17%">
+<col width="25%">
+<col width="15%">
+<col width="13%">
+</colgroup>
 <thead><tr class="header">
-<th>Strategy</th>
+<th>Configuration</th>
+<th>Month %</th>
 <th>Fortnight %</th>
 <th>Week %</th>
 <th>Notes</th>
@@ -722,35 +708,165 @@ periods in that UPA have the SAME period.</p>
 <tbody>
 <tr class="odd">
 <td>Strict only</td>
-<td>~6%</td>
-<td>~1.5%</td>
-<td>Definitive determinations only</td>
+<td>94.3%</td>
+<td>8.9%</td>
+<td>3.3%</td>
+<td>Deterministic only</td>
 </tr>
 <tr class="even">
-<td>+ Probabilistic</td>
-<td>~21%</td>
-<td>~0.6%</td>
-<td>Adds confidence scores</td>
+<td>+ Probabilistic (conf=0.8)</td>
+<td><strong>97.3%</strong></td>
+<td><strong>13.5%</strong></td>
+<td><strong>7.5%</strong></td>
+<td>Best for week determination</td>
 </tr>
 <tr class="odd">
-<td>+ UPA aggregation</td>
-<td>~22%</td>
-<td>~0.6%</td>
-<td>Leverages 100% UPA homogeneity</td>
+<td>+ Probabilistic (conf=0.9)</td>
+<td><strong>97.3%</strong></td>
+<td><strong>13.5%</strong></td>
+<td>3.6%</td>
+<td>Conservative</td>
 </tr>
 <tr class="even">
-<td>+ Both</td>
-<td><strong>~27-28%</strong></td>
-<td><strong>~2%</strong></td>
-<td>Maximum coverage</td>
+<td>+ Both (conf=0.9)</td>
+<td><strong>97.3%</strong></td>
+<td><strong>13.5%</strong></td>
+<td>3.6%</td>
+<td>Recommended</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Note:</strong> Experimental strategies are intended for
-sensitivity analysis and research purposes. For rigorous causal
-analysis, strict determination should be preferred.</p>
+<p><strong>Note:</strong> The UPA aggregation strategy provides minimal
+additional improvement (~0.1pp) because the probabilistic strategy
+already captures most cases. Using <code>strategy = "both"</code> is
+recommended for future-proofing.</p>
+<p><strong>Recommended settings:</strong></p>
+<ul>
+<li>
+<strong>Conservative:</strong>
+<code>confidence_threshold = 0.9</code> - maximizes month/fortnight
+while being cautious on weeks</li>
+<li>
+<strong>Maximum coverage:</strong>
+<code>confidence_threshold = 0.8</code> - best week determination
+(7.5%)</li>
+</ul>
 <p>See the <a href="how-it-works.html">How PNADCperiods Works</a>
 vignette for detailed documentation on experimental strategies.</p>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="annual-data-workflow">Annual Data Workflow<a class="anchor" aria-label="anchor" href="#annual-data-workflow"></a>
+</h2>
+<p>Annual PNADC data achieves even higher determination rates because
+the crosswalk covers more complete panel cycles:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Apply crosswalk to annual data</span></span>
+<span><span class="va">result_annual</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span></span>
+<span>  <span class="va">pnadc_annual</span>,</span>
+<span>  <span class="va">crosswalk</span>,</span>
+<span>  weight_var <span class="op">=</span> <span class="st">"V1032"</span>,  <span class="co"># Annual weight variable</span></span>
+<span>  anchor <span class="op">=</span> <span class="st">"year"</span>,       <span class="co"># Annual anchor</span></span>
+<span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  calibration_unit <span class="op">=</span> <span class="st">"month"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><strong>Annual data benchmark (2019-2020):</strong></p>
+<table class="table">
+<thead><tr class="header">
+<th>Metric</th>
+<th>Value</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Month match rate</td>
+<td><strong>98.0%</strong></td>
+</tr>
+<tr class="even">
+<td>Weight CV</td>
+<td>1.05</td>
+</tr>
+<tr class="odd">
+<td>Negative weights</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="calibration-quality">Calibration Quality<a class="anchor" aria-label="anchor" href="#calibration-quality"></a>
+</h2>
+<p>All calibration configurations produce high-quality weights with no
+negative values:</p>
+<table class="table">
+<thead><tr class="header">
+<th>Anchor</th>
+<th>Unit</th>
+<th>Smooth</th>
+<th>Match Rate</th>
+<th>Weight CV</th>
+<th>Negative Weights</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Quarter</td>
+<td>Month</td>
+<td>Yes</td>
+<td>94.3%</td>
+<td>1.19</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>Quarter</td>
+<td>Month</td>
+<td>No</td>
+<td>94.3%</td>
+<td>1.20</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>Quarter</td>
+<td>Fortnight</td>
+<td>Yes</td>
+<td>8.9%</td>
+<td>1.21</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>Quarter</td>
+<td>Week</td>
+<td>-</td>
+<td>3.3%</td>
+<td>2.83</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>Year</td>
+<td>Month</td>
+<td>Yes</td>
+<td>98.0%</td>
+<td>1.05</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>Year</td>
+<td>Month</td>
+<td>No</td>
+<td>98.0%</td>
+<td>1.06</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Weight CV (coefficient of variation) increases for finer time
+periods due to smaller sample sizes</li>
+<li>The <code>smooth</code> parameter applies rolling-window smoothing
+to population targets, reducing weight variability</li>
+<li>Annual data produces more stable weights due to larger sample sizes
+per period</li>
+</ul>
 <hr>
 </div>
 <div class="section level2">
@@ -781,11 +897,12 @@ exported functions.</p></li>
 <div class="section level3">
 <h3 id="main-functions">Main Functions<a class="anchor" aria-label="anchor" href="#main-functions"></a>
 </h3>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Step 1: Build crosswalk from stacked data</span></span>
 <span><span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span></span>
-<span>  <span class="va">data</span>,              <span class="co"># Stacked PNADC data</span></span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>     <span class="co"># Show progress?</span></span>
+<span>  <span class="va">data</span>,                    <span class="co"># Stacked PNADC data</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>,          <span class="co"># Show progress?</span></span>
+<span>  store_date_bounds <span class="op">=</span> <span class="cn">TRUE</span> <span class="co"># Store bounds for experimental strategies?</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Step 2: Apply crosswalk and optionally calibrate weights</span></span>
@@ -802,17 +919,16 @@ exported functions.</p></li>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>     <span class="co"># Show progress?</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Optional: Experimental strategies for improved fortnight/week rates</span></span>
+<span><span class="co"># Optional: Experimental strategies for improved rates</span></span>
 <span><span class="fu"><a href="../reference/pnadc_experimental_periods.html">pnadc_experimental_periods</a></span><span class="op">(</span></span>
-<span>  <span class="va">crosswalk</span>,         <span class="co"># Crosswalk from pnadc_identify_periods()</span></span>
-<span>  data <span class="op">=</span> <span class="cn">NULL</span>,       <span class="co"># Original data (required for probabilistic strategy)</span></span>
-<span>  strategy <span class="op">=</span> <span class="st">"both"</span>, <span class="co"># "none", "probabilistic", "upa_aggregation", or "both"</span></span>
-<span>  upa_proportion_threshold <span class="op">=</span> <span class="fl">0.9</span>,  <span class="co"># Threshold for UPA aggregation</span></span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>  <span class="va">crosswalk</span>,                     <span class="co"># Crosswalk from pnadc_identify_periods()</span></span>
+<span>  strategy <span class="op">=</span> <span class="st">"both"</span>,             <span class="co"># "probabilistic", "upa_aggregation", or "both"</span></span>
+<span>  confidence_threshold <span class="op">=</span> <span class="fl">0.9</span>,    <span class="co"># Threshold for probabilistic assignment</span></span>
+<span>  upa_proportion_threshold <span class="op">=</span> <span class="fl">0.5</span> <span class="co"># Threshold for UPA aggregation</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="performance">Performance<a class="anchor" aria-label="anchor" href="#performance"></a>
+<h3 id="performance-2012-2025-benchmark-28-4m-observations">Performance (2012-2025 benchmark, 28.4M observations)<a class="anchor" aria-label="anchor" href="#performance-2012-2025-benchmark-28-4m-observations"></a>
 </h3>
 <table class="table">
 <thead><tr class="header">
@@ -821,38 +937,29 @@ exported functions.</p></li>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>Month determination rate</td>
-<td>
-<strong>~97%</strong> (on stacked data)</td>
+<td>Month determination</td>
+<td><strong>97.0%</strong></td>
 </tr>
 <tr class="even">
-<td>Fortnight determination rate (strict)</td>
-<td>~6%</td>
+<td>Fortnight determination</td>
+<td><strong>9.2%</strong></td>
 </tr>
 <tr class="odd">
-<td>Week determination rate (strict)</td>
-<td>~1.5%</td>
+<td>Week determination</td>
+<td><strong>3.3%</strong></td>
 </tr>
 <tr class="even">
-<td>Fortnight rate (+ experimental)</td>
-<td><strong>~27-28%</strong></td>
+<td>Negative weights</td>
+<td>0</td>
 </tr>
 <tr class="odd">
-<td>Week rate (+ experimental)</td>
-<td><strong>~2%</strong></td>
-</tr>
-<tr class="even">
-<td>Processing time (identification)</td>
-<td>~2.5 minutes for 28M rows</td>
-</tr>
-<tr class="odd">
-<td>Processing time (with calibration)</td>
-<td>~5 minutes for 28M rows</td>
+<td>Errors</td>
+<td>0</td>
 </tr>
 </tbody>
 </table>
 <p>See the <a href="how-it-works.html">How PNADCperiods Works</a>
-vignette for comprehensive benchmarks on 2012-2025 data.</p>
+vignette for comprehensive benchmarks.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

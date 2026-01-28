@@ -76,13 +76,15 @@
 <li>
 <strong>Nested identification hierarchy</strong>: Weeks require fortnights, fortnights require months (enforced by construction)</li>
 <li>
-<strong>~97% monthly determination rate</strong> when using stacked multi-quarter data</li>
+<strong>97.0% monthly determination rate</strong> with full data stacking (2012-2025, 55 quarters)</li>
 <li>
-<strong>~6% strict fortnight rate</strong> (within-quarter constraints only)</li>
+<strong>Progressive improvement</strong>: 70% (1 quarter) → 94% (8 quarters) → 97% (55 quarters)</li>
 <li>
-<strong>~1.5% strict week rate</strong> (within-quarter constraints only)</li>
+<strong>9.2% strict fortnight rate</strong> (within-quarter constraints only)</li>
 <li>
-<strong>Experimental strategies</strong> boost fortnight to ~27% and week to ~2% via probabilistic + UPA aggregation</li>
+<strong>3.3% strict week rate</strong> (within-quarter constraints only)</li>
+<li>
+<strong>Experimental strategies</strong> boost rates: month→97.3%, fortnight→13.5%, week→7.5% (probabilistic conf=0.8)</li>
 <li>
 <strong>IBGE-based calendar</strong>: All periods use IBGE’s official Sunday-Saturday week boundaries</li>
 <li>
@@ -90,7 +92,9 @@
 <li>
 <strong>SIDRA integration</strong>: Automatic population target fetching from IBGE API</li>
 <li>
-<strong>Fast</strong>: Processes ~450,000 rows/sec (~1 minute for 28M rows)</li>
+<strong>Zero negative weights</strong>: All calibrations in comprehensive tests produced 0 negative weights</li>
+<li>
+<strong>Fast</strong>: Processes ~28M rows in ~30 seconds for crosswalk generation</li>
 </ul>
 </div>
 </div>
@@ -113,8 +117,8 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://antrologos.github.io/PNADCperiods/">PNADCperiods</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Load stacked PNADC data (2+ years recommended for best determination rate)</span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span><span class="op">)</span></span>
+<span><span class="co"># Load stacked PNADC data (all available years recommended for best determination)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"pnadc_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Step 1: Build crosswalk (identify reference periods)</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span>
@@ -155,10 +159,6 @@
 <td>Experimental probabilistic/UPA aggregation strategies</td>
 </tr>
 <tr>
-<td><code><a href="reference/combine_period_crosswalks.html">combine_period_crosswalks()</a></code></td>
-<td>Merge strict and experimental crosswalks</td>
-</tr>
-<tr>
 <td><code><a href="reference/fetch_monthly_population.html">fetch_monthly_population()</a></code></td>
 <td>Fetch population totals from IBGE SIDRA API</td>
 </tr>
@@ -183,6 +183,58 @@
 <strong>Phase 3</strong>: Identify WEEKS only within determined fortnights (household level, within-quarter)</li>
 </ul>
 <p>This means fortnights can <strong>only</strong> be identified for observations with determined months, and weeks can <strong>only</strong> be identified for observations with determined fortnights.</p>
+</div>
+<div class="section level2">
+<h2 id="determination-rates-impact-of-data-stacking">Determination Rates: Impact of Data Stacking<a class="anchor" aria-label="anchor" href="#determination-rates-impact-of-data-stacking"></a>
+</h2>
+<p>Month determination rates improve dramatically with more stacked data due to PNADC’s rotating panel design. Each household (UPA + V1014) is interviewed for 5 consecutive quarters, always in the <strong>same relative month position</strong>. This means birthday constraints from <strong>any</strong> quarter can determine the month for <strong>all</strong> quarters.</p>
+<p><strong>Benchmark progression (strict identification only):</strong></p>
+<table style="width:100%;" class="table">
+<colgroup>
+<col width="21%">
+<col width="14%">
+<col width="20%">
+<col width="13%">
+<col width="18%">
+<col width="11%">
+</colgroup>
+<thead><tr>
+<th>Data Coverage</th>
+<th>Quarters</th>
+<th>Observations</th>
+<th>Month %</th>
+<th>Fortnight %</th>
+<th>Week %</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Single quarter</td>
+<td>1</td>
+<td>~516K</td>
+<td><strong>~70%</strong></td>
+<td>~7%</td>
+<td>~2%</td>
+</tr>
+<tr>
+<td>Two years</td>
+<td>8</td>
+<td>3.76M</td>
+<td><strong>~94%</strong></td>
+<td>~9%</td>
+<td>~3%</td>
+</tr>
+<tr>
+<td>Full history (2012-2025)</td>
+<td>55</td>
+<td>28.4M</td>
+<td><strong>97.0%</strong></td>
+<td>9.2%</td>
+<td>3.3%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why doesn’t fortnight/week improve?</strong> These periods use within-quarter constraints only (household aggregation). Each quarter’s interview timing is independent at the sub-monthly level, so cross-quarter aggregation doesn’t help.</p>
+<p><strong>Practical implication</strong>: Stack all available years for best monthly determination. For 2019-2020 analysis, include 2012-2018 data when building the crosswalk - it dramatically improves month identification.</p>
 </div>
 <div class="section level2">
 <h2 id="period-definitions">Period Definitions<a class="anchor" aria-label="anchor" href="#period-definitions"></a>
@@ -219,31 +271,28 @@
 <div class="section level3">
 <h3 id="output-columns">Output Columns<a class="anchor" aria-label="anchor" href="#output-columns"></a>
 </h3>
-<p>The crosswalk contains IBGE-based period boundaries:</p>
+<p>The crosswalk contains period identifiers (keyed by UPA, V1014):</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Join keys (for merging with PNADC data)</span></span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>Ano, Trimestre, UPA, V1008, V1014</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co"># Month columns</span></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>ref_month_start      <span class="co"># Sunday of first IBGE week of the month</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>ref_month_end        <span class="co"># Saturday of last IBGE week of the month</span></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>ref_month_in_quarter <span class="co"># Position in quarter (1, 2, 3)</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>ref_month_yyyymm     <span class="co"># Integer YYYYMM format (e.g., 202301)</span></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>ref_month_weeks      <span class="co"># Number of IBGE weeks in month (always 4)</span></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>determined_month     <span class="co"># TRUE if month was determined</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co"># Fortnight columns</span></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>ref_fortnight_start       <span class="co"># Sunday of first IBGE week of the fortnight</span></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>ref_fortnight_end         <span class="co"># Saturday of last IBGE week of the fortnight</span></span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>ref_fortnight_in_quarter  <span class="co"># Position in quarter (1-6)</span></span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>ref_fortnight_yyyyff      <span class="co"># Integer YYYYFF format (01-24 per year)</span></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>determined_fortnight      <span class="co"># TRUE if fortnight was determined</span></span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a></span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co"># Week columns</span></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>ref_week_start       <span class="co"># Sunday of the IBGE week</span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>ref_week_end         <span class="co"># Saturday of the IBGE week</span></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>ref_week_in_quarter  <span class="co"># Position in quarter (1-12)</span></span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a>ref_week_yyyyww      <span class="co"># Integer IBGE YYYYWW format</span></span>
-<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a>determined_week      <span class="co"># TRUE if week was determined</span></span></code></pre></div>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>ref_month_in_quarter <span class="co"># Position in quarter (1, 2, 3, or NA)</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>ref_month_in_year    <span class="co"># Position in year (1-12, or NA)</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>ref_month_yyyymm     <span class="co"># Integer YYYYMM format (e.g., 202301)</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>determined_month     <span class="co"># TRUE if month was determined</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># Fortnight columns</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>ref_fortnight_in_month    <span class="co"># Position in month (1, 2, or NA)</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>ref_fortnight_in_quarter  <span class="co"># Position in quarter (1-6, or NA)</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>ref_fortnight_yyyyff      <span class="co"># Integer YYYYFF format (01-24 per year)</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>determined_fortnight      <span class="co"># TRUE if fortnight was determined</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co"># Week columns</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>ref_week_in_month    <span class="co"># Position in month (1-4, or NA)</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>ref_week_in_quarter  <span class="co"># Position in quarter (1-12, or NA)</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>ref_week_yyyyww      <span class="co"># Integer IBGE YYYYWW format</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>determined_week      <span class="co"># TRUE if week was determined</span></span></code></pre></div>
+<p><strong>Note:</strong> Use <code><a href="reference/pnadc_apply_periods.html">pnadc_apply_periods()</a></code> to merge these periods back to your full data and compute calibrated weights.</p>
 </div>
 </div>
 <div class="section level2">
@@ -365,31 +414,81 @@
 </tbody>
 </table>
 <p>All strategies enforce proper nesting: experimental fortnights require identified months (strict or experimental), and experimental weeks require identified fortnights.</p>
-<p><strong>Key finding</strong>: UPA homogeneity rate = 100% for fortnights and weeks within quarters.</p>
+<div class="section level3">
+<h3 id="benchmark-results-2019-2020-data-8-quarters">Benchmark Results (2019-2020 data, 8 quarters)<a class="anchor" aria-label="anchor" href="#benchmark-results-2019-2020-data-8-quarters"></a>
+</h3>
+<table class="table">
+<thead><tr>
+<th>Strategy</th>
+<th>Threshold</th>
+<th>Month %</th>
+<th>Fortnight %</th>
+<th>Week %</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Strict (baseline)</td>
+<td>-</td>
+<td>94.3%</td>
+<td>8.9%</td>
+<td>3.3%</td>
+</tr>
+<tr>
+<td>Probabilistic</td>
+<td>0.8</td>
+<td><strong>97.3%</strong></td>
+<td><strong>13.5%</strong></td>
+<td><strong>7.5%</strong></td>
+</tr>
+<tr>
+<td>Probabilistic</td>
+<td>0.9</td>
+<td>97.3%</td>
+<td>13.5%</td>
+<td>3.6%</td>
+</tr>
+<tr>
+<td>UPA aggregation</td>
+<td>0.9</td>
+<td>94.3%</td>
+<td>8.9%</td>
+<td>3.3%</td>
+</tr>
+<tr>
+<td>Both</td>
+<td>0.9</td>
+<td>97.3%</td>
+<td>13.5%</td>
+<td>3.6%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key finding</strong>: Probabilistic strategy provides the main improvement (+3pp month, +4.6pp fortnight). UPA aggregation adds minimal benefit.</p>
+<p><strong>Note:</strong> These benchmarks use 8-quarter data. With full data stacking (55 quarters), the strict baseline improves to 97.0% month / 9.2% fortnight / 3.3% week, matching the probabilistic strategy’s month rate without experimental methods.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Build strict crosswalk</span></span>
-<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># Build strict crosswalk (with store_date_bounds for experimental use)</span></span>
+<span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, store_date_bounds <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Apply experimental strategies (output is directly compatible with pnadc_apply_periods)</span></span>
 <span><span class="va">crosswalk_exp</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_experimental_periods.html">pnadc_experimental_periods</a></span><span class="op">(</span></span>
 <span>  <span class="va">crosswalk</span>,</span>
-<span>  <span class="va">pnadc</span>,</span>
 <span>  strategy <span class="op">=</span> <span class="st">"both"</span>,</span>
 <span>  confidence_threshold <span class="op">=</span> <span class="fl">0.9</span>,</span>
 <span>  upa_proportion_threshold <span class="op">=</span> <span class="fl">0.5</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Check results - the output includes a probabilistic_assignment flag</span></span>
+<span><span class="co"># Check improvement vs strict</span></span>
 <span><span class="va">crosswalk_exp</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span></span>
-<span>  strict_months <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">determined_month</span> <span class="op">&amp;</span> <span class="op">!</span><span class="va">probabilistic_assignment</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  experimental_months <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">probabilistic_assignment</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  total_fortnights <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">determined_fortnight</span><span class="op">)</span></span>
+<span>  month_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_month</span><span class="op">)</span>,</span>
+<span>  fortnight_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_fortnight</span><span class="op">)</span>,</span>
+<span>  week_rate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">determined_week</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
 <span><span class="co"># Use directly with calibration (experimental output is fully compatible)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pnadc_apply_periods.html">pnadc_apply_periods</a></span><span class="op">(</span><span class="va">pnadc</span>, <span class="va">crosswalk_exp</span>,</span>
 <span>                               weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
 <span>                               anchor <span class="op">=</span> <span class="st">"quarter"</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="test-coverage">Test Coverage<a class="anchor" aria-label="anchor" href="#test-coverage"></a>
@@ -466,16 +565,108 @@
 </h2>
 <ol style="list-style-type: decimal">
 <li>
-<strong>Stack multiple quarters</strong>: Use 2+ years of data for best monthly determination rates (~97%)</li>
+<strong>Stack ALL available quarters</strong>: Full history (2012-2025) achieves 97% monthly determination. Using 8 quarters yields ~94%, single quarter only ~70%</li>
+<li>
+<strong>Include extra years for your analysis period</strong>: Even if analyzing 2019-2020, include 2012-2018 in the crosswalk for better month determination</li>
 <li>
 <strong>Use <code><a href="reference/validate_pnadc.html">validate_pnadc()</a></code></strong>: Check your data has all required columns before processing</li>
 <li>
 <strong>Choose the right anchor</strong>: Use <code>anchor = "quarter"</code> with V1028 weights, <code>anchor = "year"</code> with V1032 weights</li>
 <li>
-<strong>Check determination rates</strong>: The crosswalk has a <code>determination_rates</code> attribute with rates for each period type</li>
+<strong>Annual data achieves 98% match</strong>: Annual visit data with year anchor has highest determination rate</li>
 <li>
-<strong>Consider experimental strategies</strong>: If you need higher fortnight/week rates and can accept probabilistic assignments</li>
+<strong>For fortnightly analysis</strong>: Use experimental probabilistic strategy (conf=0.9) to boost from 9.2% to 13.5%</li>
+<li>
+<strong>For weekly analysis</strong>: Use conf=0.8 threshold to boost from 3.3% to 7.5% (if willing to accept lower confidence)</li>
+<li>
+<strong>COVID-19 impact</strong>: 2020-Q4 shows degraded rates (~83% month) due to collection disruptions</li>
 </ol>
+</div>
+<div class="section level2">
+<h2 id="comprehensive-test-results">Comprehensive Test Results<a class="anchor" aria-label="anchor" href="#comprehensive-test-results"></a>
+</h2>
+<p>The package was comprehensively tested on 2019-2020 PNADC data (8 quarters, 3.76M observations):</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr>
+<th>Metric</th>
+<th>Result</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Total test operations</td>
+<td>42 (16 crosswalks + 16 quarterly applies + 4 annual applies + 6 data ops)</td>
+</tr>
+<tr>
+<td>Errors encountered</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>Negative weights produced</td>
+<td>
+<strong>0</strong> (across all calibration configurations)</td>
+</tr>
+<tr>
+<td>Processing time (full suite)</td>
+<td>~6.5 minutes</td>
+</tr>
+</tbody>
+</table>
+<div class="section level3">
+<h3 id="calibration-quality-2019-2020-test-subset">Calibration Quality (2019-2020 test subset)<a class="anchor" aria-label="anchor" href="#calibration-quality-2019-2020-test-subset"></a>
+</h3>
+<table style="width:100%;" class="table">
+<colgroup>
+<col width="18%">
+<col width="13%">
+<col width="27%">
+<col width="25%">
+<col width="15%">
+</colgroup>
+<thead><tr>
+<th>Anchor</th>
+<th>Unit</th>
+<th>Match Rate</th>
+<th>Weight CV</th>
+<th>Notes</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Quarter</td>
+<td>Month (smooth)</td>
+<td>94.3%</td>
+<td>1.19</td>
+<td>With 8-quarter crosswalk</td>
+</tr>
+<tr>
+<td>Quarter</td>
+<td>Fortnight (smooth)</td>
+<td>8.9%</td>
+<td>1.21</td>
+<td>Sparse but stable</td>
+</tr>
+<tr>
+<td>Quarter</td>
+<td>Week</td>
+<td>3.3%</td>
+<td>2.83</td>
+<td>High CV due to sparsity</td>
+</tr>
+<tr>
+<td>Year</td>
+<td>Month (smooth)</td>
+<td><strong>98.0%</strong></td>
+<td><strong>1.05</strong></td>
+<td>Best overall configuration</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note:</strong> These rates are from an 8-quarter crosswalk. Using a full-history crosswalk (2012-2025, 55 quarters) improves quarterly month determination to 97.0%.</p>
+<p>See <code>test_results/summaries/</code> for detailed benchmark data.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>

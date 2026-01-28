@@ -66,8 +66,6 @@
 <th>Purpose</th>
 </tr></thead><tbody><tr><td><code><a href="reference/pnadc_experimental_periods.html">pnadc_experimental_periods()</a></code></td>
 <td>Probabilistic + UPA aggregation strategies for higher determination rates</td>
-</tr><tr><td><code><a href="reference/combine_period_crosswalks.html">combine_period_crosswalks()</a></code></td>
-<td>Merge strict and experimental crosswalks</td>
 </tr></tbody></table></div>
 <div class="section level3">
 <h3 id="supporting-functions">Supporting Functions<a class="anchor" aria-label="anchor" href="#supporting-functions"></a></h3>
@@ -194,7 +192,7 @@
 <pre><code>R/
 ├── pnadc-identify-periods.R         # pnadc_identify_periods() - nested 4-phase algorithm
 ├── pnadc-apply-periods.R            # pnadc_apply_periods() - adaptive calibration + smoothing
-├── experimental-period-identification.R  # pnadc_experimental_periods() + combine_period_crosswalks()
+├── experimental-period-identification.R  # pnadc_experimental_periods()
 ├── identify-reference-month.R       # Core month algorithm with dynamic exceptions (internal)
 ├── identify-reference-fortnight.R   # Core fortnight algorithm (internal)
 ├── identify-reference-week.R        # Core week algorithm + technical stop handling (internal)
@@ -355,7 +353,7 @@
 <strong>Lookup tables:</strong> Pre-computed date tables for 20x faster date creation vs <code><a href="https://rdrr.io/r/base/ISOdatetime.html" class="external-link">ISOdate()</a></code>
 </li>
 <li>
-<strong>Integer arithmetic:</strong> ISO week calculations use pure integer math (300x faster than <code><a href="https://rdatatable.gitlab.io/data.table/reference/IDateTime.html" class="external-link">data.table::isoweek()</a></code>)</li>
+<strong>Integer arithmetic:</strong> ISO week calculations use pure integer math (300x faster than <code><a href="https://rdrr.io/pkg/data.table/man/IDateTime.html" class="external-link">data.table::isoweek()</a></code>)</li>
 <li>
 <strong>data.table threading:</strong> Enabled via <code>setDTthreads(0)</code> at package load</li>
 <li>

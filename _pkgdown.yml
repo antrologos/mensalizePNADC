@@ -56,13 +56,6 @@ reference:
   - pnadc_apply_periods
   - PNADCperiods-package
 
-- title: Internal Identification
-  desc: Internal functions for period identification
-  contents:
-  - identify_reference_month
-  - identify_reference_fortnight
-  - identify_reference_week
-
 - title: Data Fetching
   desc: Functions for fetching external data
   contents:

@@ -381,7 +381,7 @@ algorithm:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load and stack quarterly data</span></span>
-<span><span class="va">quarterly_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span></span>
+<span><span class="va">quarterly_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">quarterly_files</span>, <span class="kw">function</span><span class="op">(</span><span class="va">f</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="va">f</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span>, columns <span class="op">=</span> <span class="va">quarterly_vars</span><span class="op">)</span></span>
 <span>  <span class="op">}</span><span class="op">)</span>,</span>
@@ -408,7 +408,7 @@ other years use visit 1:</p>
 <code class="sourceCode R"><span><span class="va">pnad_annual_dir</span> <span class="op">&lt;-</span> <span class="st">"path/to/annual/data"</span></span>
 <span></span>
 <span><span class="co"># Define which visit to use for each year</span></span>
-<span><span class="va">visit_selection</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
+<span><span class="va">visit_selection</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
 <span>  ano <span class="op">=</span> <span class="fl">2015</span><span class="op">:</span><span class="fl">2024</span>,</span>
 <span>  visita <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">5</span>, <span class="fl">5</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span>  <span class="co"># 2020-2021 use visit 5</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -441,10 +441,10 @@ income analysis during this period.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load and stack annual data</span></span>
-<span><span class="va">annual_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span></span>
+<span><span class="va">annual_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">annual_files</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">file</span><span class="op">)</span>, <span class="va">file</span><span class="op">]</span>, <span class="kw">function</span><span class="op">(</span><span class="va">f</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="va">dt</span> <span class="op">&lt;-</span> <span class="fu"><a href="http://www.fstpackage.org/reference/write_fst.html" class="external-link">read_fst</a></span><span class="op">(</span><span class="va">f</span>, as.data.table <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="va">dt</span>, <span class="fu"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">tolower</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">dt</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="va">dt</span>, <span class="fu"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">tolower</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">dt</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="va">cols_present</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">intersect</a></span><span class="op">(</span><span class="va">annual_vars</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">dt</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="va">dt</span><span class="op">[</span>, <span class="va">..cols_present</span><span class="op">]</span></span>
 <span>  <span class="op">}</span><span class="op">)</span>,</span>
@@ -514,7 +514,7 @@ vignette.</p>
 <span></span>
 <span><span class="co"># Use IBGE's pre-calculated per capita household income</span></span>
 <span><span class="co"># VD5008 already accounts for all income sources and household size</span></span>
-<span><span class="va">d</span><span class="op">[</span>, <span class="va">hhinc_pc_nominal</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">vd5008</span><span class="op">)</span>, <span class="fl">0</span>, <span class="va">vd5008</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<span><span class="va">d</span><span class="op">[</span>, <span class="va">hhinc_pc_nominal</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">vd5008</span><span class="op">)</span>, <span class="fl">0</span>, <span class="va">vd5008</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="step-5-apply-deflation">Step 5: Apply Deflation<a class="anchor" aria-label="anchor" href="#step-5-apply-deflation"></a>
@@ -523,12 +523,12 @@ vignette.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Load deflator data (from IBGE documentation)</span></span>
 <span><span class="va">deflator</span> <span class="op">&lt;-</span> <span class="fu">readxl</span><span class="fu">::</span><span class="fu"><a href="https://readxl.tidyverse.org/reference/read_excel.html" class="external-link">read_excel</a></span><span class="op">(</span><span class="st">"path/to/deflator_pnadc_2024.xls"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setDT.html" class="external-link">setDT</a></span><span class="op">(</span><span class="va">deflator</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setDT.html" class="external-link">setDT</a></span><span class="op">(</span><span class="va">deflator</span><span class="op">)</span></span>
 <span><span class="va">deflator</span> <span class="op">&lt;-</span> <span class="va">deflator</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">ano</span>, trimestre <span class="op">=</span> <span class="va">trim</span>, <span class="va">uf</span>, <span class="va">CO2</span>, <span class="va">CO2e</span>, <span class="va">CO3</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
 <span><span class="co"># Merge deflators with data</span></span>
-<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">deflator</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ano"</span>, <span class="st">"trimestre"</span>, <span class="st">"uf"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">d</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ano"</span>, <span class="st">"trimestre"</span>, <span class="st">"uf"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">deflator</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ano"</span>, <span class="st">"trimestre"</span>, <span class="st">"uf"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setkey.html" class="external-link">setkeyv</a></span><span class="op">(</span><span class="va">d</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ano"</span>, <span class="st">"trimestre"</span>, <span class="st">"uf"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">d</span> <span class="op">&lt;-</span> <span class="va">deflator</span><span class="op">[</span><span class="va">d</span><span class="op">]</span></span>
 <span></span>
 <span><span class="co"># INPC adjustment factor to reference date (December 2025)</span></span>
@@ -690,7 +690,7 @@ smoothing to your aggregated estimates:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Three-month centered rolling average (using data.table::frollmean)</span></span>
 <span><span class="va">monthly_poverty</span><span class="op">[</span>, <span class="va">poverty_rate_smoothed</span> <span class="op">:=</span></span>
-<span>                  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/froll.html" class="external-link">frollmean</a></span><span class="op">(</span><span class="va">poverty_rate</span>, <span class="fl">3</span>, align <span class="op">=</span> <span class="st">"center"</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<span>                  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/froll.html" class="external-link">frollmean</a></span><span class="op">(</span><span class="va">poverty_rate</span>, <span class="fl">3</span>, align <span class="op">=</span> <span class="st">"center"</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 <div class="float">
 <img src="figures/annual-poverty-analysis/fig-smoothing-comparison.png" style="width:100.0%" alt="Raw vs Smoothed Monthly Poverty Rate"><div class="figcaption">Raw vs Smoothed Monthly Poverty Rate</div>
 </div>

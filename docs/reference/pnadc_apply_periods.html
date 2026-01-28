@@ -87,13 +87,13 @@ join keys <code>UPA</code> and <code>V1014</code> to merge with the crosswalk.</
 
 <dt id="arg-weight-var">weight_var<a class="anchor" aria-label="anchor" href="#arg-weight-var"></a></dt>
 <dd><p>Character. Name of the survey weight column. Must be specified:</p><ul><li><p><code>"V1028"</code> for quarterly PNADC data</p></li>
-<li><p><code>"V1032"</code> for annual PNADC data (visit-specific)</p></li>
+<li><p><code>"V1032"</code> for annual PNADC data (visit-specific or annual releases organized by quarters)</p></li>
 </ul></dd>
 
 
 <dt id="arg-anchor">anchor<a class="anchor" aria-label="anchor" href="#arg-anchor"></a></dt>
-<dd><p>Character. How to anchor the weight redistribution. Must be specified:</p><ul><li><p><code>"quarter"</code> for quarterly data (preserves quarterly totals)</p></li>
-<li><p><code>"year"</code> for annual data (preserves yearly totals)</p></li>
+<dd><p>Character. How to anchor the weight redistribution. Must be specified:</p><ul><li><p><code>"quarter"</code> for quarterly data or annual releases organized by quarters (preserves quarterly totals)</p></li>
+<li><p><code>"year"</code> for annual visit-specific data (preserves yearly totals)</p></li>
 </ul></dd>
 
 
@@ -150,7 +150,7 @@ those with undetermined reference periods. If FALSE, drop undetermined rows.</p>
 <dd><p>Integer period codes</p></dd>
 
 <dt>ref_month_weeks</dt>
-<dd><p>Number of IBGE reference weeks in month (4 or 5)</p></dd>
+<dd><p>Number of IBGE reference weeks in month (always 4)</p></dd>
 
 <dt>determined_month, determined_fortnight, determined_week</dt>
 <dd><p>Logical determination flags</p></dd>

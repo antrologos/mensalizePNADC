@@ -149,33 +149,58 @@ quarterly release contains approximately 500,000 observations.</p>
 <p><strong>Why stack multiple quarters?</strong> The mensalization
 algorithm identifies reference months by tracking households across
 their panel interviews. With a single quarter, the determination rate is
-only ~73%. By stacking multiple quarters, the algorithm can leverage the
-rotating panel structure to achieve a <strong>97% determination
-rate</strong>.</p>
+only ~70%. By stacking multiple quarters, the algorithm can leverage the
+rotating panel structure to achieve <strong>over 97%
+determination</strong>.</p>
 <table class="table">
+<colgroup>
+<col width="32%">
+<col width="16%">
+<col width="23%">
+<col width="14%">
+<col width="14%">
+</colgroup>
 <thead><tr class="header">
 <th>Quarters Stacked</th>
-<th>Determination Rate</th>
+<th>Month %</th>
+<th>Fortnight %</th>
+<th>Week %</th>
+<th>Source</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td>1 (single quarter)</td>
-<td>73%</td>
+<td>70%</td>
+<td>7%</td>
+<td>2%</td>
+<td>Test data (2019-Q1)</td>
 </tr>
 <tr class="even">
-<td>4 (1 year)</td>
+<td>8 (2 years)</td>
 <td>94%</td>
+<td>9%</td>
+<td>3%</td>
+<td>2019-2020 benchmark</td>
 </tr>
 <tr class="odd">
-<td>8 (2 years)</td>
-<td>96%</td>
+<td>20 (5 years)</td>
+<td>95%</td>
+<td>8%</td>
+<td>3%</td>
+<td>2020-2024 example</td>
 </tr>
 <tr class="even">
-<td>20+ (5+ years)</td>
+<td>55+ (full history)</td>
 <td><strong>97%</strong></td>
+<td><strong>9%</strong></td>
+<td><strong>3%</strong></td>
+<td>2012-2025 complete data</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Note:</strong> Determination rates vary by time period due to
+data quality. The 2020-2024 period shows slightly lower rates due to
+COVID-19 collection disruptions in 2020.</p>
 <p>For most applications, we recommend stacking at least 2 years (8
 quarters) of data. For a detailed explanation of how determination rates
 improve with stacking, including a figure computed from real data, see
@@ -325,25 +350,46 @@ calibrated weights:</p>
 <span>  weight_var <span class="op">=</span> <span class="st">"V1028"</span>,</span>
 <span>  anchor <span class="op">=</span> <span class="st">"quarter"</span>,</span>
 <span>  calibrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  calibration_unit <span class="op">=</span> <span class="st">"month"</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Output (from real PNADC 2020-2024 data):</p>
-<pre><code>Building reference period crosswalk...
-  Preprocessing data (shared computation)...
-  Converting date bounds to period positions...
-  Aggregating constraints and determining periods...
-  Applying exception rules...
-  Assigning reference periods...
-  Building crosswalk...
+<pre><code>Building reference period crosswalk (nested identification)...
 
-Crosswalk complete:
-  - 3,159,265 unique household-quarter observations
-  - Month determination: 94.2%
-  - Fortnight determination: 6.8%
-  - Week determination: 1.6%</code></pre>
+Phase 1: Identifying MONTHS (all observations)...
+  Step 1.1: Preprocessing data...
+  Step 1.2: Computing valid interview Saturdays...
+  Step 1.3: Calculating birthdays and adjusting for leap years...
+  Step 1.4: Applying birthday constraints...
+  Step 1.5: Converting to month positions...
+  Step 1.6: Aggregating at UPA-panel level (cross-quarter)...
+  Step 1.7: Detecting exception cases...
+  Step 1.7b: Applying exception rules...
+  Step 1.8: Determining reference months...
+  -&gt; Month determination: 94.6% (8,386,003 of 8,868,247 observations)
+
+Phase 2: Identifying FORTNIGHTS (within determined months)...
+  Processing 8,386,003 observations with determined months...
+  Step 2.1: Calculate fortnight bounds WITHIN the determined month...
+  Step 2.2: Aggregating at household level (within quarter)...
+  Step 2.3: Determining reference fortnights...
+  -&gt; Fortnight determination: 8.4% (748,904 of 8,868,247 observations)
+
+Phase 3: Identifying WEEKS (within determined fortnights)...
+  Processing 748,904 observations with determined fortnights...
+  Step 3.2: Aggregating at household level (within quarter)...
+  Step 3.4: Determining reference weeks...
+  -&gt; Week determination: 3.0% (269,288 of 8,868,247 observations)
+
+Phase 4: Building crosswalk...
+
+========================================
+Crosswalk complete (nested identification):
+========================================</code></pre>
 <p>The determination rate tells you what percentage of observations have
 their reference period identified. With 20 quarters stacked (2020-2024),
-we achieve 94.2% for months.</p>
+we achieve 94.6% for months, 8.4% for fortnights, and 3.0% for
+weeks.</p>
 </div>
 <div class="section level2">
 <h2 id="step-6-explore-the-results">Step 6: Explore the Results<a class="anchor" aria-label="anchor" href="#step-6-explore-the-results"></a>
@@ -365,8 +411,20 @@ we achieve 94.2% for months.</p>
 4:                   NA  482244   5.4</code></pre>
 <p>The distribution is approximately equal across months 1, 2, and 3
 (each around 31-32%), with 5.4% having <code>NA</code> for indeterminate
-cases (this is higher than the ~3% seen with full 2012-2025 data because
-boundary quarters have lower determination rates).</p>
+cases. The 94.6% determination rate for this 2020-2024 subset is
+slightly lower than the 97.0% achieved with full 2012-2025 data due
+to:</p>
+<ul>
+<li>
+<strong>Boundary effects</strong>: The first and last 4 quarters in
+any dataset have incomplete panel coverage</li>
+<li>
+<strong>COVID-19 impact</strong>: 2020 data shows degraded
+determination rates due to IBGE collection disruptions</li>
+<li>
+<strong>Panel accumulation</strong>: More years of data = more panel
+cycles = higher cross-quarter determination</li>
+</ul>
 <p>The output columns include:</p>
 <table class="table">
 <thead><tr class="header">

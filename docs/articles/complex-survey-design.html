@@ -234,7 +234,7 @@ quarterly microdata</strong>:</p>
 <span><span class="co">#             V1028001-V1028200 (for Strategy 2)</span></span>
 <span><span class="co">#             Plus any analysis variables (VD4001, VD4002, V2007, etc.)</span></span>
 <span></span>
-<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"path/to/your/pnadc_full_stacked.csv"</span><span class="op">)</span></span>
+<span><span class="va">pnadc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"path/to/your/pnadc_full_stacked.csv"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Step 1: Build crosswalk (identify reference periods)</span></span>
 <span><span class="va">crosswalk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pnadc_identify_periods.html">pnadc_identify_periods</a></span><span class="op">(</span><span class="va">pnadc</span><span class="op">)</span></span>
@@ -349,7 +349,7 @@ results:</p>
 <span>  <span class="co"># Compute overall participation</span></span>
 <span>  <span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survey/man/surveysummary.html" class="external-link">svymean</a></span><span class="op">(</span><span class="op">~</span><span class="fu"><a href="https://rdrr.io/r/base/AsIs.html" class="external-link">I</a></span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span>, <span class="va">design</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
 <span>    ref_month_yyyymm <span class="op">=</span> <span class="va">month_yyyymm</span>,</span>
 <span>    participation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span>,</span>
 <span>    se <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/survey/man/SE.html" class="external-link">SE</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span><span class="op">)</span></span>
@@ -361,7 +361,7 @@ results:</p>
 <span></span>
 <span><span class="co"># Compute for all months (this may take a few minutes)</span></span>
 <span><span class="va">results_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">months</span>, <span class="va">compute_participation</span>, data <span class="op">=</span> <span class="va">pnadc_monthly</span><span class="op">)</span></span>
-<span><span class="va">monthly_participation</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="va">results_list</span><span class="op">)</span></span>
+<span><span class="va">monthly_participation</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="va">results_list</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Add confidence intervals</span></span>
 <span><span class="va">monthly_participation</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
@@ -492,8 +492,8 @@ dynamics precisely.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Prepare analysis data</span></span>
 <span><span class="va">pnadc_analysis</span> <span class="op">&lt;-</span> <span class="va">pnadc_monthly</span><span class="op">[</span><span class="va">V2009</span> <span class="op">&gt;=</span> <span class="fl">14</span><span class="op">]</span></span>
-<span><span class="va">pnadc_analysis</span><span class="op">[</span>, <span class="va">in_labor_force</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="va">pnadc_analysis</span><span class="op">[</span>, <span class="va">sex</span> <span class="op">:=</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">V2007</span> <span class="op">==</span> <span class="fl">1</span>, <span class="st">"Men"</span>, <span class="st">"Women"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">pnadc_analysis</span><span class="op">[</span>, <span class="va">in_labor_force</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">VD4001</span> <span class="op">==</span> <span class="fl">1</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">pnadc_analysis</span><span class="op">[</span>, <span class="va">sex</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fifelse.html" class="external-link">fifelse</a></span><span class="op">(</span><span class="va">V2007</span> <span class="op">==</span> <span class="fl">1</span>, <span class="st">"Men"</span>, <span class="st">"Women"</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
 <span><span class="co"># Function to compute participation by sex for one month</span></span>
 <span><span class="va">compute_participation_by_sex</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">month_yyyymm</span>, <span class="va">data</span><span class="op">)</span> <span class="op">{</span></span>
@@ -521,7 +521,7 @@ dynamics precisely.</p>
 <span>    vartype <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"se"</span>, <span class="st">"ci"</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setDT.html" class="external-link">setDT</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setDT.html" class="external-link">setDT</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span>  <span class="va">result</span><span class="op">[</span>, <span class="va">ref_month_yyyymm</span> <span class="op">:=</span> <span class="va">month_yyyymm</span><span class="op">]</span></span>
 <span></span>
 <span>  <span class="va">result</span></span>
@@ -529,10 +529,10 @@ dynamics precisely.</p>
 <span></span>
 <span><span class="co"># Compute for all months</span></span>
 <span><span class="va">months</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">pnadc_analysis</span><span class="op">$</span><span class="va">ref_month_yyyymm</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">results_by_sex</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">months</span>, <span class="va">compute_participation_by_sex</span>, data <span class="op">=</span> <span class="va">pnadc_analysis</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">results_by_sex</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">months</span>, <span class="va">compute_participation_by_sex</span>, data <span class="op">=</span> <span class="va">pnadc_analysis</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Rename columns for clarity</span></span>
-<span><span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="va">results_by_sex</span>,</span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/setattr.html" class="external-link">setnames</a></span><span class="op">(</span><span class="va">results_by_sex</span>,</span>
 <span>         <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"in_labor_force"</span>, <span class="st">"se"</span>, <span class="st">"ci_l"</span>, <span class="st">"ci_u"</span><span class="op">)</span>,</span>
 <span>         <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"participation"</span>, <span class="st">"se"</span>, <span class="st">"ci_lower"</span>, <span class="st">"ci_upper"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -645,7 +645,7 @@ survey estimates. We need the standard error of this difference:</p>
 <span>  <span class="va">se_women</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survey/man/SE.html" class="external-link">SE</a></span><span class="op">(</span><span class="va">by_sex</span><span class="op">)</span><span class="op">[</span><span class="st">"Women"</span><span class="op">]</span></span>
 <span>  <span class="va">se_gap</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">se_men</span><span class="op">^</span><span class="fl">2</span> <span class="op">+</span> <span class="va">se_women</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
 <span>    ref_month_yyyymm <span class="op">=</span> <span class="va">month_yyyymm</span>,</span>
 <span>    gap <span class="op">=</span> <span class="va">men_rate</span> <span class="op">-</span> <span class="va">women_rate</span>,</span>
 <span>    se <span class="op">=</span> <span class="va">se_gap</span>,</span>
@@ -655,7 +655,7 @@ survey estimates. We need the standard error of this difference:</p>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="co"># Compute for all months</span></span>
-<span><span class="va">gap_results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">months</span>, <span class="va">compute_gender_gap</span>, data <span class="op">=</span> <span class="va">pnadc_analysis</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">gap_results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">months</span>, <span class="va">compute_gender_gap</span>, data <span class="op">=</span> <span class="va">pnadc_analysis</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Add confidence intervals and date</span></span>
 <span><span class="va">gap_results</span><span class="op">[</span>, <span class="fu">`:=`</span><span class="op">(</span></span>
