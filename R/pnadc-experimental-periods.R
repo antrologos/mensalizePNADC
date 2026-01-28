@@ -215,6 +215,7 @@ pnadc_experimental_periods <- function(
 #' @noRd
 .apply_probabilistic <- function(crosswalk, confidence_threshold, verbose) {
 
+
   # Helper functions for safe min/max that don't produce warnings on all-NA vectors
   safe_min <- function(x) { x <- x[!is.na(x)]; if (length(x) == 0L) NA_real_ else min(x) }
   safe_max <- function(x) { x <- x[!is.na(x)]; if (length(x) == 0L) NA_real_ else max(x) }

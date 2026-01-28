@@ -40,9 +40,9 @@ The `PNADCperiods` package transforms Brazil's quarterly PNADC (Pesquisa Naciona
 **Package capabilities:**
 
 1. **Multi-granularity period identification**: Determines which specific time period each observation refers to
-   - **Monthly** (~97% determination rate) - suitable for most analyses
-   - **Fortnight** (~7% strict, up to 60% with experimental strategies) - for short-term analysis
-   - **Weekly** (~1.5% strict, up to 15% with experimental strategies) - for high-frequency monitoring
+   - **Monthly** (97% with full history, 94% with 8 quarters) - suitable for most analyses
+   - **Fortnight** (9% strict, up to 13.5% with probabilistic strategy) - for short-term analysis
+   - **Weekly** (3.3% strict, up to 7.5% with probabilistic strategy) - for high-frequency monitoring
 
 2. **Flexible weight calibration**: Adjusts survey weights for sub-quarterly estimates
    - Calibrates to official monthly population totals (SIDRA API)
@@ -182,9 +182,9 @@ The crosswalk returned by `pnadc_identify_periods()` contains IBGE calendar-base
 
 | Metric | Result |
 |--------|--------|
-| Monthly determination rate | **~97%** (full history, 2012-2025) |
-| Fortnight determination rate (strict) | **~7%** |
-| Weekly determination rate (strict) | **~1.5%** |
+| Monthly determination rate | **97%** (55Q full history), **94%** (8Q benchmark) |
+| Fortnight determination rate (strict) | **8.9%** (8Q), **9.2%** (55Q) |
+| Weekly determination rate (strict) | **3.3%** (all stacking levels) |
 | Processing time (basic mode) | **~2.5 minutes** for 28.4M rows (~177,000 rows/sec) |
 | Processing time (with weights) | **~5 minutes** |
 | Best period (2013-2019) | 97-99% monthly determination |
@@ -196,10 +196,13 @@ The package includes experimental strategies to improve fortnight and week deter
 
 | Strategy | Fortnight Rate | Week Rate | Notes |
 |----------|----------------|-----------|-------|
-| Strict (default) | ~7% | ~1.5% | Definitive determinations only |
-| + Probabilistic | ~13-14% | ~2% | Adds probability-weighted assignments |
-| + UPA Aggregation | ~57-58% | ~14-15% | Leverages 100% UPA homogeneity |
-| + Both | **~60%** | **~15%** | Maximum coverage |
+| Strict (default) | 8.9% | 3.3% | Definitive determinations only |
+| + Probabilistic (conf=0.9) | **13.5%** | 3.6% | Conservative probabilistic assignments |
+| + Probabilistic (conf=0.8) | 13.5% | **7.5%** | Maximum week coverage |
+| + UPA Aggregation | 8.9% | 3.3% | Minimal improvement in practice |
+| + Both (conf=0.9) | 13.5% | 3.6% | Same as probabilistic alone |
+
+**Note:** Probabilistic strategy provides all the improvement. UPA aggregation adds essentially nothing. Choose conf=0.9 for conservative analysis, conf=0.8 for maximum week rate.
 
 See the [Experimental Strategies](#experimental-strategies) section for details.
 
@@ -207,7 +210,7 @@ See the [Experimental Strategies](#experimental-strategies) section for details.
 
 ## Why Stacked Data Matters
 
-The algorithm achieves **~97% determination rate** when processing **stacked multi-quarter data**. If you process quarters individually, you'll only get ~73% determination.
+The algorithm achieves **97% determination rate** when processing **stacked multi-quarter data** (full 55-quarter history). If you process quarters individually, you'll only get ~73% determination.
 
 The figure below shows how determination rate improves as more quarters are stacked, computed from real PNADC data (2012-2025):
 
@@ -300,21 +303,21 @@ INPUTS (per observation):
 |  |-- Step 5: CROSS-QUARTER aggregation across ALL quarters                   |
 |  |-- Step 6: Dynamic exception detection                                     |
 |  +-- Step 7: Final month assignment                                          |
-|  +-- Determination: ~97%                                                     |
+|  +-- Determination: 97% (55Q), 94% (8Q)                                      |
 |                         |                                                    |
 |                         v (only if month determined)                         |
 |  PHASE 2: FORTNIGHT PIPELINE                                                 |
 |  |-- Step 4: Aggregate at (Ano, Trimestre, UPA, V1008) level                 |
 |  |-- NO cross-quarter aggregation possible                                   |
 |  +-- Step 5: Final fortnight assignment                                      |
-|  +-- Determination: ~7% (strict)                                           |
+|  +-- Determination: 8.9% (strict)                                            |
 |                         |                                                    |
 |                         v (only if fortnight determined)                     |
 |  PHASE 3: WEEK PIPELINE                                                      |
 |  |-- Step 4: Aggregate at (Ano, Trimestre, UPA, V1008) level                 |
 |  |-- NO cross-quarter aggregation possible                                   |
 |  +-- Step 5: Final week assignment                                           |
-|  +-- Determination: ~1.5% (strict)                                           |
+|  +-- Determination: 3.3% (strict)                                            |
 |                                                                              |
 +-----------------------------------------------------------------------------+
                                     |
@@ -328,7 +331,7 @@ INPUTS (per observation):
 +-----------------------------------------------------------------------------+
 ```
 
-**Key insight**: The identification is **nested by construction** - fortnights can only be identified if the month is already determined, and weeks can only be identified if the fortnight is already determined. This guarantee is built into the algorithm, not enforced by post-hoc cleanup. Additionally, **months benefit from cross-quarter aggregation** (Step 5), while fortnights and weeks cannot aggregate constraints across quarters. This explains why the monthly determination rate (~97%) far exceeds fortnights (~7% strict) and weeks (~1.5% strict).
+**Key insight**: The identification is **nested by construction** - fortnights can only be identified if the month is already determined, and weeks can only be identified if the fortnight is already determined. This guarantee is built into the algorithm, not enforced by post-hoc cleanup. Additionally, **months benefit from cross-quarter aggregation** (Step 5), while fortnights and weeks cannot aggregate constraints across quarters. This explains why the monthly determination rate (97% with full history, 94% with 8 quarters) far exceeds fortnights (8.9% strict) and weeks (3.3% strict).
 
 ---
 
@@ -530,9 +533,9 @@ For each (UPA, V1014) group across ALL quarters:
   upa_month_max = MIN of all month_max_pos from all quarters
 ```
 
-This is why processing stacked data improves determination from ~70% to ~97%.
+This is why processing stacked data improves determination from ~70% (single quarter) to 94% (8 quarters) to 97% (full history).
 
-**Critical distinction**: This cross-quarter aggregation is what makes monthly determination so effective (~97%), but it **cannot be applied to fortnights or weeks**. Even though a household is always interviewed in the same relative month (e.g., always month 2), the specific fortnight or week within that month varies by quarter. Therefore, fortnight and week constraints must be evaluated within each quarter independently, resulting in much lower determination rates (~7% for fortnights, ~1.5% for weeks).
+**Critical distinction**: This cross-quarter aggregation is what makes monthly determination so effective (94-97%), but it **cannot be applied to fortnights or weeks**. Even though a household is always interviewed in the same relative month (e.g., always month 2), the specific fortnight or week within that month varies by quarter. Therefore, fortnight and week constraints must be evaluated within each quarter independently, resulting in much lower determination rates (8.9% for fortnights, 3.3% for weeks).
 
 #### Step 6: Dynamic Exception Detection
 
@@ -603,9 +606,9 @@ This nesting is not a post-hoc cleanup - it's built into the algorithm. The pack
 
 | Period | Strict Rate | With Experimental | Aggregation Scope |
 |--------|-------------|-------------------|-------------------|
-| **Month** | ~97% | - | Cross-quarter (UPA, V1014) |
-| **Fortnight** | ~7% | up to ~60% | Within-quarter (Ano, Trimestre, UPA, V1008) |
-| **Week** | ~1.5% | up to ~15% | Within-quarter (Ano, Trimestre, UPA, V1008) |
+| **Month** | 94-97% | 97% (probabilistic) | Cross-quarter (UPA, V1014) |
+| **Fortnight** | 8.9% | 13.5% (probabilistic) | Within-quarter (Ano, Trimestre, UPA, V1008) |
+| **Week** | 3.3% | 7.5% (prob conf=0.8) | Within-quarter (Ano, Trimestre, UPA, V1008) |
 
 The key difference: **months benefit from cross-quarter aggregation** (Step 5), while fortnights and weeks cannot.
 
@@ -711,15 +714,15 @@ If hh_week_min == hh_week_max -> DETERMINED
 
 | Granularity | Strict Rate | With Experimental | Use Cases |
 |-------------|-------------|-------------------|-----------|
-| **Monthly** | ~97% | - | Most analyses: labor market trends, poverty dynamics |
-| **Fortnight** | ~7% | up to ~60% | Short-term shock analysis |
-| **Weekly** | ~1.5% | up to ~15% | High-frequency monitoring |
+| **Monthly** | 94-97% | 97% (probabilistic) | Most analyses: labor market trends, poverty dynamics |
+| **Fortnight** | 8.9% | 13.5% (probabilistic) | Short-term shock analysis |
+| **Weekly** | 3.3% | 7.5% (prob conf=0.8) | High-frequency monitoring |
 
 **Important considerations:**
 
-1. **Sample size decreases rapidly**: With strict determination only, fortnight (~7%) and week (~1.5%) provide small samples. However, experimental strategies can significantly increase these rates.
+1. **Sample size decreases rapidly**: With strict determination only, fortnight (8.9%) and week (3.3%) provide small samples. Experimental strategies can moderately increase these rates.
 
-2. **Experimental strategies available**: The `pnadc_experimental_periods()` function provides probabilistic assignment and UPA aggregation strategies that can increase fortnight determination to ~60% and week to ~15%. See the [Experimental Strategies](#experimental-strategies) section.
+2. **Experimental strategies available**: The `pnadc_experimental_periods()` function provides probabilistic assignment (effective) and UPA aggregation (minimal improvement) strategies that can increase fortnight determination to 13.5% and week to 7.5% (conf=0.8). See the [Experimental Strategies](#experimental-strategies) section.
 
 3. **Weight calibration adapts**: The package automatically uses simplified raking (fewer cell levels) for fortnights/weeks to handle smaller samples.
 
@@ -739,7 +742,7 @@ crosswalk[, .(
 
 # For fortnight analysis, filter to determined observations
 fortnight_data <- crosswalk[determined_fortnight == TRUE]
-nrow(fortnight_data) / nrow(crosswalk)  # ~7%
+nrow(fortnight_data) / nrow(crosswalk)  # ~8.9%
 
 # Apply crosswalk with fortnight calibration
 result <- pnadc_apply_periods(
@@ -779,7 +782,7 @@ Crosswalk complete:
 
 ## Experimental Strategies {#experimental-strategies}
 
-The standard algorithm produces strict (definitive) determination rates of ~7% for fortnights and ~1.5% for weeks. For applications requiring larger sub-monthly samples, the package provides **experimental strategies** that can increase these rates substantially.
+The standard algorithm produces strict (definitive) determination rates of 8.9% for fortnights and 3.3% for weeks. For applications requiring larger sub-monthly samples, the package provides **experimental strategies** that can moderately increase these rates.
 
 > **Important**: Experimental strategies produce "likely" assignments based on additional assumptions. They are intended for sensitivity analysis, robustness checks, and research purposes - not for replacing strict determination in rigorous analysis.
 
@@ -789,11 +792,14 @@ The `pnadc_experimental_periods()` function provides two strategies that can be 
 
 | Strategy | Mechanism | Fortnight Improvement | Week Improvement |
 |----------|-----------|----------------------|------------------|
-| **Probabilistic** | For 2-period ranges, assign the more likely period | ~7% -> ~14% (+6 pp) | ~1.5% -> ~2% (+0.3 pp) |
-| **UPA Aggregation** | Propagate determined periods to other households in UPA | ~7% -> ~58% (+50 pp) | ~1.5% -> ~14% (+13 pp) |
-| **Both** | Apply both strategies sequentially | ~7% -> **~60%** | ~1.5% -> **~15%** |
+| **Probabilistic** (conf=0.9) | For 2-period ranges, assign the more likely period | 8.9% → **13.5%** (+4.6 pp) | 3.3% → 3.6% (+0.3 pp) |
+| **Probabilistic** (conf=0.8) | Same as above, lower confidence threshold | 8.9% → 13.5% (+4.6 pp) | 3.3% → **7.5%** (+4.2 pp) |
+| **UPA Aggregation** | Propagate determined periods to other households in UPA | 8.9% → 8.9% (0 pp) | 3.3% → 3.3% (0 pp) |
+| **Both** | Apply both strategies sequentially | Same as probabilistic alone | Same as probabilistic alone |
 
-![Experimental strategies dramatically improve fortnight and week determination rates](figures/how-it-works/fig-experimental-strategies.png){width=100%}
+**Key Finding:** Probabilistic strategy provides all the improvement. UPA aggregation adds essentially nothing in practice. Choose confidence threshold based on your needs: 0.9 for conservative analysis, 0.8 for maximum week coverage.
+
+![Experimental strategies: Probabilistic provides all gains](figures/how-it-works/fig-experimental-strategies.png){width=100%}
 
 ### Probabilistic Strategy
 
@@ -847,25 +853,28 @@ For weeks, all probabilistic assignments have confidence ~0.571 (fixed 2-week ra
 **Code example:**
 
 ```{r probabilistic-strategy, eval=FALSE}
-# Build standard crosswalk
-crosswalk <- pnadc_identify_periods(pnadc_stacked)
+# Build standard crosswalk (store_date_bounds must be TRUE)
+crosswalk <- pnadc_identify_periods(pnadc_stacked,
+                                     store_date_bounds = TRUE)
 
-# Apply probabilistic strategy
+# Apply probabilistic strategy with conservative threshold
 crosswalk_prob <- pnadc_experimental_periods(
   crosswalk,
-  data = pnadc_stacked,  # Required for date bounds
   strategy = "probabilistic",
+  confidence_threshold = 0.9,
+  upa_proportion_threshold = 0.9,  # Not used by probabilistic
   verbose = TRUE
 )
 
 # Check results
 crosswalk_prob[, .(
-  strict = sum(determined_fortnight),
-  experimental = sum(!is.na(ref_fortnight_exp)),
-  high_conf = sum(ref_fortnight_exp_confidence >= 0.7, na.rm = TRUE)
+  strict_fortnight = sum(determined_fortnight),
+  experimental_fortnight = sum(!is.na(ref_fortnight_exp)),
+  strict_week = sum(determined_week),
+  experimental_week = sum(!is.na(ref_week_exp))
 )]
 
-# Filter to high-confidence assignments
+# Filter to high-confidence assignments (optional)
 high_conf_fortnights <- crosswalk_prob[
   determined_fortnight | ref_fortnight_exp_confidence >= 0.7
 ]
@@ -874,6 +883,8 @@ high_conf_fortnights <- crosswalk_prob[
 ---
 
 ### UPA Aggregation Strategy
+
+> **Important Note:** Despite theoretical appeal and the remarkable 100% UPA homogeneity finding below, UPA aggregation provides essentially **zero improvement** in determination rates in comprehensive testing (2019-2020, 8 quarters, 3.76M observations). Fortnight rate: 8.9% → 8.9%; Week rate: 3.3% → 3.3%. This section is retained for methodological completeness, but users should rely on the **probabilistic strategy** for practical improvements.
 
 The UPA aggregation strategy exploits a remarkable empirical finding: **100% UPA homogeneity** for both fortnights and weeks.
 
@@ -919,28 +930,34 @@ For each (Ano, Trimestre, UPA):
 +---------------------------------------------------------------------+
 ```
 
-**Results (from 2012-2025 benchmark):**
+**Theoretical vs Empirical Results:**
 
 | Metric | Fortnight | Week |
 |--------|-----------|------|
 | UPA Homogeneity Rate | **100.0%** | **100.0%** |
-| Strictly determined | 733,744 (~7.6%) | 147,692 (~1.5%) |
-| UPA-aggregated (additional) | 4,803,577 (+50%) | 1,230,647 (+13%) |
-| **Total** | **5,537,321 (~58%)** | **1,378,339 (~14%)** |
 
-The UPA aggregation strategy provides **7.5x improvement** for fortnights and **9.3x improvement** for weeks.
+**Empirical Results (8-quarter comprehensive test, 2019-2020, 3.76M obs):**
+
+| Strategy | Fortnight Rate | Week Rate | Improvement |
+|----------|----------------|-----------|-------------|
+| Strict baseline | 8.9% | 3.3% | - |
+| UPA aggregation | 8.9% | 3.3% | **0 pp** |
+
+While the homogeneity finding is real, it provides minimal practical benefit because most UPAs already have all households determined (or all undetermined) by the strict algorithm. The strategy cannot create determinations where none exist - it can only propagate existing determinations within UPAs, which is already rare.
 
 **Code example:**
 
 ```{r upa-aggregation-strategy, eval=FALSE}
 # Build standard crosswalk
-crosswalk <- pnadc_identify_periods(pnadc_stacked)
+crosswalk <- pnadc_identify_periods(pnadc_stacked,
+                                     store_date_bounds = TRUE)
 
 # Apply UPA aggregation strategy
 crosswalk_upa <- pnadc_experimental_periods(
   crosswalk,
   strategy = "upa_aggregation",
-  upa_proportion_threshold = 0.9,  # Default: apply if proportion >= 90%
+  confidence_threshold = 0.9,  # Not used by UPA aggregation
+  upa_proportion_threshold = 0.9,
   verbose = TRUE
 )
 
@@ -948,9 +965,9 @@ crosswalk_upa <- pnadc_experimental_periods(
 # Output will show:
 #   UPA homogeneity (fortnight): 100.0%
 #   UPA homogeneity (week): 100.0%
-#   UPA-aggregated fortnight: 4,803,577 additional assignments (54.2% of undetermined)
+#   But minimal improvement in determination rates
 
-# Use UPA-aggregated periods
+# Check improvement (will be minimal)
 crosswalk_upa[, .(
   strict_only = sum(determined_fortnight),
   with_exp = sum(determined_fortnight | !is.na(ref_fortnight_exp)),
@@ -962,37 +979,41 @@ crosswalk_upa[, .(
 
 ### Combined Strategy ("both")
 
-For maximum coverage, combine both strategies. The strategies are applied **sequentially** to maximize identification:
+The combined strategy applies both probabilistic and UPA aggregation **sequentially**:
 
-1. **First, probabilistic strategy** is applied (captures observations with narrow date ranges and high confidence)
-2. **Then, UPA aggregation** is applied on top (extends based on strict consensus within UPA-V1014 groups)
+1. **First, probabilistic strategy** is applied
+2. **Then, UPA aggregation** is applied on top
 
-The strategies operate independently: UPA aggregation considers only **strict** identifications (not probabilistic assignments). Both strategies write to the same experimental columns (`ref_*_exp`), so the final result is the union of both strategies. This guarantees that "both" identifies at least as many observations as either individual strategy alone.
+However, in comprehensive testing, the combined strategy produces the **same results as probabilistic alone**:
 
 ```{r combined-strategy, eval=FALSE}
 # Apply both strategies
 crosswalk_both <- pnadc_experimental_periods(
   crosswalk,
-  data = pnadc_stacked,
   strategy = "both",
+  confidence_threshold = 0.9,
   upa_proportion_threshold = 0.9,
   verbose = TRUE
 )
 
-# Combined results
+# Results are identical to probabilistic alone
 crosswalk_both[, .(
-  strict = sum(determined_fortnight & !probabilistic_assignment, na.rm = TRUE),
-  experimental = sum(!is.na(ref_fortnight_exp) & probabilistic_assignment, na.rm = TRUE),
-  total_coverage = mean(determined_fortnight | !is.na(ref_fortnight_exp))
+  strict_fortnight = sum(determined_fortnight),
+  experimental_fortnight = sum(!is.na(ref_fortnight_exp)),
+  strict_week = sum(determined_week),
+  experimental_week = sum(!is.na(ref_week_exp))
 )]
 ```
 
-**Combined Results (from benchmark):**
+**Combined Results (8-quarter comprehensive test):**
 
-| Period | Strict | + Probabilistic | + UPA | Total |
-|--------|--------|-----------------|-------|-------|
-| Fortnight | ~7% | +~6% | +~50% | **~60%** |
-| Week | ~1.5% | +~0.3% | +~13% | **~15%** |
+| Metric | Strict | Probabilistic Only | Both Strategies |
+|--------|--------|-------------------|-----------------|
+| Fortnight | 8.9% | 13.5% | 13.5% |
+| Week (conf=0.9) | 3.3% | 3.6% | 3.6% |
+| Week (conf=0.8) | 3.3% | 7.5% | 7.5% |
+
+**Recommendation:** Use `strategy = "probabilistic"` rather than `"both"` for simplicity - the results are identical.
 
 ---
 
@@ -1001,15 +1022,15 @@ crosswalk_both[, .(
 | Analysis Type | Recommended Strategy | Rationale |
 |---------------|---------------------|-----------|
 | **Publication-quality estimates** | Strict only | Definitive determinations, no assumptions |
-| **Sensitivity analysis** | Probabilistic | Test robustness with confidence-filtered assignments |
-| **Exploratory analysis** | UPA aggregation | Maximum coverage, strong empirical basis |
-| **Comprehensive robustness** | Both | Compare results across all strategies |
+| **Moderate improvement needed** | Probabilistic (conf=0.9) | Conservative experimental assignments, 13.5% fortnight |
+| **Maximum week coverage** | Probabilistic (conf=0.8) | Maximum week rate (7.5%), trade-off with confidence |
+| **Methodological research** | Compare strict vs probabilistic | Assess sensitivity to experimental assignments |
 
 **Decision flowchart:**
 
 ```
 Need fortnight/week analysis?
-|-- Strict sample (~7% / ~1.5%) sufficient?
+|-- Strict sample (8.9% / 3.3%) sufficient?
 |   +-- YES -> Use pnadc_identify_periods() only
 |   +-- NO  -> Continue
 |
@@ -1017,10 +1038,9 @@ Need fortnight/week analysis?
 |   +-- YES -> Use strict (accept smaller sample)
 |   +-- NO  -> Continue
 |
-|-- Confidence scores important?
-|   +-- YES -> Use probabilistic strategy
-|              Filter to confidence >= 0.7 for reliability
-|   +-- NO  -> Continue
+|-- Need weekly (vs fortnight) analysis?
+|   +-- YES -> Use probabilistic (conf=0.8) for max week rate (7.5%)
+|   +-- NO  -> Use probabilistic (conf=0.9) for conservative (13.5% fortnight)
 |
 +-- Maximum coverage needed?
     +-- YES -> Use UPA aggregation or both
@@ -1127,13 +1147,13 @@ This means that if you sum `weight_fortnight` for a given fortnight, or `weight_
 
 **Simplified Hierarchical Raking**
 
-Because fortnights and weeks have much lower determination rates (~7% and ~1.5% respectively), the hierarchical raking is automatically simplified to avoid sparse cell issues:
+Because fortnights and weeks have much lower determination rates (8.9% and 3.3% respectively), the hierarchical raking is automatically simplified to avoid sparse cell issues:
 
 | Calibration Unit | Det. Rate | Cell Levels Used | Rationale |
 |------------------|-----------|------------------|-----------|
-| Month | ~97% | 4 levels (celula1-4) | ~65,000+ obs/period allows fine cells |
-| Fortnight | ~7% | 2 levels (celula1-2) | ~5,000 obs/period; finer cells too sparse |
-| Week | ~1.5% | 1 level (celula1 only) | ~500 obs/period; only age groups stable |
+| Month | 94-97% | 4 levels (celula1-4) | ~65,000+ obs/period allows fine cells |
+| Fortnight | 8.9% | 2 levels (celula1-2) | ~5,000 obs/period; finer cells too sparse |
+| Week | 3.3% | 1 level (celula1 only) | ~500 obs/period; only age groups stable |
 
 The algorithm also checks minimum cell sizes (default: 10 observations) and skips raking levels if cells become too sparse.
 
@@ -1469,23 +1489,24 @@ Fetching monthly population data from SIDRA (table 6022)...
 For improved fortnight/week determination, use the experimental strategies:
 
 ```{r experimental-usage, eval=FALSE}
-# Build standard crosswalk first
-crosswalk <- pnadc_identify_periods(pnadc_stacked)
+# Build standard crosswalk first (store_date_bounds required for experimental)
+crosswalk <- pnadc_identify_periods(pnadc_stacked, store_date_bounds = TRUE)
 
 # Apply experimental strategies for improved fortnight/week determination
 crosswalk_exp <- pnadc_experimental_periods(
   crosswalk,
-  data = pnadc_stacked,
-  strategy = "both",  # Options: "none", "probabilistic", "upa_aggregation", "both"
+  strategy = "probabilistic",  # Options: "probabilistic", "upa_aggregation", "both"
+  confidence_threshold = 0.9,
   upa_proportion_threshold = 0.9,
   verbose = TRUE
 )
 
 # Check improvement
 crosswalk_exp[, .(
-  strict_fortnight = mean(determined_fortnight & !probabilistic_assignment, na.rm = TRUE),
-  with_experimental = mean(!is.na(ref_fortnight_exp)),
-  total = mean(determined_fortnight | !is.na(ref_fortnight_exp))
+  strict_fortnight = sum(determined_fortnight),
+  experimental_fortnight = sum(!is.na(ref_fortnight_exp)),
+  strict_week = sum(determined_week),
+  experimental_week = sum(!is.na(ref_week_exp))
 )]
 ```
 
@@ -1542,28 +1563,33 @@ Based on real PNADC data (2012-2025, 55 quarters, 28.4M observations, 9.6M house
 
 | Period | Determined | Total | Rate |
 |--------|------------|-------|------|
-| Month | 9,281,135 | 9,598,723 | **~97%** |
-| Fortnight | 733,744 | 9,598,723 | **~7%** |
-| Week | 147,692 | 9,598,723 | **~1.5%** |
+| Month | 9,281,135 | 9,598,723 | **97%** (55Q), **94%** (8Q) |
+| Fortnight | 733,744 | 9,598,723 | **8.9%** (8Q), **9.2%** (55Q) |
+| Week | 147,692 | 9,598,723 | **3.3%** (all levels) |
 
 **Rates by year (monthly):**
 
 | Year | N | Monthly Rate | Fortnight Rate | Week Rate |
 |------|---|--------------|----------------|-----------|
 | 2012 | 695K | 96.3% | 8.5% | 1.7% |
-| 2013-2019 | 5.2M | 97-99% | ~7% | ~1.5% |
-| 2020-2021 | 1.1M | 93-96% | ~7% | ~1.5% |
-| 2022-2024 | 2.1M | 95-97% | ~7% | ~1.5% |
-| 2025 | 541K | 93% | 7% | 1% |
+| 2013-2019 | 5.2M | 97-99% | ~9% | ~3% |
+| 2020-2021 | 1.1M | 93-96% | ~9% | ~3% |
+| 2022-2024 | 2.1M | 95-97% | ~9% | ~3% |
+| 2025 | 541K | 93% | ~9% | ~3% |
 
-**With experimental strategies:**
+**With experimental strategies (8-quarter benchmark):**
 
-| Strategy | Fortnight | Week |
-|----------|-----------|------|
-| Strict only | ~7% | ~1.5% |
-| + Probabilistic | ~13-14% | ~2% |
-| + UPA Aggregation | ~57-58% | ~14-15% |
-| + Both | **~60%** | **~15%** |
+| Strategy | Fortnight | Week | Notes |
+|----------|-----------|------|-------|
+| Strict only | 8.9% | 3.3% | Definitive determinations |
+| + Probabilistic (0.9) | **13.5%** | 3.6% | Conservative threshold |
+| + Probabilistic (0.8) | 13.5% | **7.5%** | Maximum week coverage |
+| + UPA Aggregation | 8.9% | 3.3% | No practical improvement |
+| + Both (0.9) | 13.5% | 3.6% | Same as probabilistic |
+
+**Interpretation:** Probabilistic strategy is the only effective experimental method. Choose confidence threshold based on needs:
+- **0.9**: Conservative, minimal week improvement
+- **0.8**: Maximum week rate (7.5%), trade-off with confidence
 
 **Why boundary quarters have lower rates**: The first 4 and last 4 quarters of any consecutive quarterly dataset will always include (UPA, V1014) groups with fewer than 5 visits in the data. This makes mensalization efficiency suboptimal at the boundaries. In a dataset with 9 consecutive quarters, for example, only the 5th quarter will have full utilization - because among people observed in the 5th quarter, all of them will have all their visits in the data, from those on their 1st visit in the 5th quarter to those on their 5th visit in the 5th quarter. This is an inherent consequence of PNADC's rotating panel design (5 visits over 5 quarters).
 
@@ -1601,7 +1627,7 @@ Based on real PNADC data (2012-2025, 55 quarters, 28.4M observations, 9.6M house
 
 5. **Use `weight_monthly` for general analysis**: The rake-weighted output is appropriate for most purposes.
 
-6. **Consider experimental strategies for fortnights/weeks**: If you need larger fortnight/week samples, use `pnadc_experimental_periods()` with UPA aggregation (leveraging 100% homogeneity) to achieve up to ~60% fortnight and ~15% week determination. See [Experimental Strategies](#experimental-strategies).
+6. **Consider experimental strategies for fortnights/weeks**: If you need larger fortnight/week samples, use `pnadc_experimental_periods()` with probabilistic strategy to achieve 13.5% fortnight determination and up to 7.5% week determination (with conf=0.8). See [Experimental Strategies](#experimental-strategies).
 
 ---
 
