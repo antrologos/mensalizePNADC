@@ -112,14 +112,14 @@
 <span><span class="fu">pkgdown</span><span class="fu">::</span><span class="fu"><a href="https://pkgdown.r-lib.org/reference/build_site.html" class="external-link">build_site</a></span><span class="op">(</span><span class="st">"PNADCperiods"</span><span class="op">)</span>  <span class="co"># Rebuild docs locally</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="github-pages-deployment">GitHub Pages Deployment<a class="anchor" aria-label="anchor" href="#github-pages-deployment"></a></h3>
-<p><strong>CRITICAL:</strong> The pkgdown site publishes from the <code>refactor/pnadc-periods</code> branch, NOT master/main.</p>
+<p>The pkgdown site automatically publishes from the <code>master</code> branch via GitHub Actions.</p>
 <p>To update the online documentation:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="bu">cd</span> <span class="st">"D:\Dropbox\Artigos\mensalizacao_pnad\PNADCperiods"</span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">pkgdown::build_site()</span>  <span class="co"># Build locally first</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">pkgdown::build_site()</span>  <span class="co"># Build locally first (optional - verifies it works)</span></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">git</span> add .</span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">-m</span> <span class="st">"Update documentation"</span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">git</span> push origin refactor/pnadc-periods  <span class="co"># Push to this branch - site rebuilds automatically</span></span></code></pre></div>
-<p><strong>Do NOT merge to master</strong> - the GitHub Actions workflow triggers on push to <code>refactor/pnadc-periods</code>.</p>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">git</span> push origin master  <span class="co"># Push to master - site rebuilds automatically via GitHub Actions</span></span></code></pre></div>
+<p>The GitHub Actions workflow triggers on push to <code>master</code> and automatically deploys to GitHub Pages.</p>
 <p>Site URL: <a href="https://antrologos.github.io/PNADCperiods/" class="uri">https://antrologos.github.io/PNADCperiods/</a></p>
 </div>
 </div>
